@@ -6,11 +6,13 @@ import {
   ReactFlow,
   useEdgesState,
   useNodesState,
+  type Edge,
+  type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-const initialNodes: any[] = [];
-const initialEdges: any[] = [];
+const initialNodes: Node[] = [];
+const initialEdges: Edge[] = [];
 
 export default function FlowPreview() {
   const [nodes, , onNodesChange] = useNodesState(initialNodes);

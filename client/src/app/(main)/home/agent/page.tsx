@@ -5,7 +5,10 @@ import { useState } from "react";
 import "allotment/dist/style.css";
 import {
   Bell,
+  Bot,
+  Brain,
   FileText,
+  Lock,
   Mic,
   MoreHorizontal,
   PanelRightClose,
@@ -27,13 +30,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useAgentStore } from "@/hooks/useAgentStore";
 import FlowPreview from "./components/FlowPreview";
 
 export default function AgentPage() {
   const [isRightOpen, setIsRightOpen] = useState(false);
   const [inputVal, setInputVal] = useState("");
-  const [selectedModel, setSelectedModel] = useState("opus-4.8");
+  const [selectedModel, setSelectedModel] = useState("claude-sonnet-3.5");
   const [activeTab, setActiveTab] = useState<"editor" | "runs">("editor");
+
+  const { activeMode, setActiveMode } = useAgentStore();
 
   return (
     <div className="h-[calc(100vh-4rem)] w-[calc(100%+3rem)] -mx-6 -my-6 flex overflow-hidden bg-background">
@@ -85,12 +91,10 @@ export default function AgentPage() {
             </div>
 
             {/* Middle welcome content */}
-            <div className="flex-1 flex flex-col items-center justify-center w-full max-w-2xl my-auto py-12">
-              <div className="relative flex items-center justify-center w-24 h-24 mb-4 group cursor-pointer">
-                <div className="absolute inset-0 bg-blue-500/10 blur-xl rounded-[2.5rem] transition-all duration-700 group-hover:bg-indigo-500/25 group-hover:scale-110 animate-pulse" />
-
-                <div className="relative w-20 h-20 bg-gradient-to-tr from-blue-600 via-purple-500 to-red-500 p-0.5 shadow-2xl flex items-center justify-center overflow-hidden animate-shape-morph">
-                  <div className="absolute inset-0 rounded-[inherit] border border-white/20 bg-gradient-to-b from-white/15 to-transparent" />
+            <div className="flex-1 flex flex-col items-center justify-center w-full max-w-2xl my-auto py-8">
+              <div className="relative flex items-center justify-center w-20 h-20 mb-4 group cursor-pointer">
+                <div className="relative w-18 h-18 bg-linear-to-tr from-blue-600 via-purple-500 to-red-500 p-0.5 shadow-2xl flex items-center justify-center overflow-hidden animate-shape-morph">
+                  <div className="absolute inset-0 rounded-[inherit] border border-white/20 bg-linear-to-b from-white/15 to-transparent" />
 
                   <svg
                     fill="currentColor"
@@ -105,7 +109,7 @@ export default function AgentPage() {
               </div>
 
               {/* Welcoming typewriter effect (Small & Slow with 2-minute delays) */}
-              <div className="text-sm font-medium text-muted-foreground/80 mb-8 text-center min-h-[20px] max-w-xl">
+              <div className="text-lg font-medium text-muted-foreground mb-8 text-center min-h-[20px] max-w-xl">
                 <Typewriter
                   onInit={(typewriter) => {
                     typewriter
@@ -131,143 +135,145 @@ export default function AgentPage() {
                 />
               </div>
 
-              {/* Input Area */}
-              <div className="relative w-full bg-muted/30 border border-border rounded-2xl p-3 focus-within:border-ring/50 focus-within:ring-2 focus-within:ring-ring/15 transition-all shadow-sm">
-                <Textarea
-                  placeholder="Describe a workflow or ask a question..."
-                  value={inputVal}
-                  onChange={(e) => setInputVal(e.target.value)}
-                  className="min-h-[80px] w-full resize-none bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:border-0 p-1 pr-12 text-base text-foreground placeholder:text-muted-foreground/80 md:text-sm"
-                />
+              {/* Input Wrapper Container (with tabs on top) */}
+              <div className="w-full flex flex-col items-center">
+                {/* Tabs for Brain and Agent */}
+                <div className="flex items-center gap-1 self-start ml-4 -mb-[1px] z-10">
+                  <button
+                    type="button"
+                    onClick={() => setActiveMode("brain")}
+                    className={`px-4 py-1.5 text-xs font-semibold rounded-t-xl flex items-center gap-1.5 transition-all cursor-pointer select-none ${
+                      activeMode === "brain"
+                        ? "bg-linear-to-tr from-blue-600 via-purple-500 to-red-500 text-white shadow-sm"
+                        : "bg-muted/40 text-muted-foreground hover:text-foreground border border-border border-b-transparent hover:bg-muted/60"
+                    }`}
+                  >
+                    <Brain className="h-4 w-4" />
+                    Ask Brain
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveMode("agent")}
+                    className={`px-4 py-1.5 text-xs font-semibold rounded-t-xl flex items-center gap-1.5 transition-all cursor-pointer select-none ${
+                      activeMode === "agent"
+                        ? "bg-linear-to-tr from-blue-600 via-purple-500 to-red-500 text-white shadow-sm"
+                        : "bg-muted/40 text-muted-foreground hover:text-foreground border border-border border-b-transparent hover:bg-muted/60"
+                    }`}
+                  >
+                    <Bot className="h-4 w-4" />
+                    Agent
+                  </button>
+                </div>
 
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40">
-                  {/* Left attachment button */}
-                  <div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg"
-                    >
-                      <Paperclip className="h-4 w-4" />
-                    </Button>
-                  </div>
+                {/* Textarea container */}
+                <div className="relative w-full bg-muted/30 border border-border rounded-2xl p-3 focus-within:border-ring/50 focus-within:ring-2 focus-within:ring-ring/15 transition-all shadow-sm">
+                  {/* Active editable state for both modes */}
+                  <Textarea
+                    placeholder={
+                      activeMode === "agent"
+                        ? "Describe a task or workflow for the Agent..."
+                        : "Describe a workflow or ask a question..."
+                    }
+                    value={inputVal}
+                    onChange={(e) => setInputVal(e.target.value)}
+                    className="min-h-[80px] w-full resize-none bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:border-0 p-1 pr-12 text-base text-foreground placeholder:text-muted-foreground/80 md:text-sm"
+                  />
 
-                  {/* Right options and Send */}
-                  <div className="flex items-center gap-1">
-                    <Select
-                      value={selectedModel}
-                      onValueChange={setSelectedModel}
-                    >
-                      <SelectTrigger className="h-8 px-2.5 bg-transparent hover:bg-muted/50 border-0 shadow-none focus:ring-0 text-xs font-medium text-muted-foreground flex items-center gap-1.5 rounded-lg cursor-pointer">
-                        <SelectValue placeholder="Select Model" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="gemini-3.5-flash">
-                          <span className="flex items-center gap-2 text-xs">
-                            <Sparkles className="h-3.5 w-3.5 text-blue-500" />
-                            Gemini 3.5 Flash
-                          </span>
-                        </SelectItem>
-                        <SelectItem value="opus-4.8">
-                          <span className="flex items-center gap-2 text-xs">
-                            <Sparkles className="h-3.5 w-3.5 text-orange-500 animate-pulse" />
-                            Opus 4.8
-                          </span>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40">
+                    {/* Left attachment button */}
+                    <div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg"
+                      >
+                        <Paperclip className="h-4 w-4" />
+                      </Button>
+                    </div>
 
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg"
-                    >
-                      <Mic className="h-4 w-4" />
-                    </Button>
+                    {/* Right options / Actions */}
+                    <div className="flex items-center gap-1">
+                      <Select
+                        value={selectedModel}
+                        onValueChange={setSelectedModel}
+                      >
+                        <SelectTrigger className="h-8 px-2.5 bg-transparent hover:bg-muted/50 border-0 shadow-none focus:ring-0 text-xs font-medium text-muted-foreground flex items-center gap-1.5 rounded-sm cursor-pointer">
+                          <SelectValue placeholder="Select Model" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="claude-sonnet-3.5">
+                            <span className="flex items-center gap-2 text-xs">
+                              <Sparkles className="h-3.5 w-3.5 text-orange-500" />
+                              Claude Sonnet 3.5
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="claude-opus-4.5" disabled>
+                            <div className="flex items-center justify-between w-full gap-8 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-2">
+                                <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
+                                Claude Opus 4.5
+                              </span>
+                              <Lock className="h-3 w-3 text-muted-foreground/45 shrink-0" />
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="gpt-4.1-mini">
+                            <span className="flex items-center gap-2 text-xs">
+                              <Sparkles className="h-3.5 w-3.5 text-blue-500" />
+                              GPT-4.1 mini
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="gpt-4.1" disabled>
+                            <div className="flex items-center justify-between w-full gap-8 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-2">
+                                <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
+                                GPT-4.1
+                              </span>
+                              <Lock className="h-3 w-3 text-muted-foreground" />
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="gpt-5.1" disabled>
+                            <div className="flex items-center justify-between w-full gap-8 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-2">
+                                <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
+                                GPT-5.1
+                              </span>
+                              <Lock className="h-3 w-3 text-muted-foreground" />
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
 
-                    <Button
-                      type="button"
-                      size="icon"
-                      className="h-8 w-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/95 transition-all shadow-sm ml-1 cursor-pointer disabled:opacity-50"
-                      disabled={!inputVal.trim()}
-                    >
-                      <SendHorizontal className="h-4 w-4" />
-                    </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg"
+                      >
+                        <Mic className="h-4 w-4" />
+                      </Button>
+
+                      <Button
+                        type="button"
+                        size="icon"
+                        className="h-8 w-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/95 transition-all shadow-sm ml-1 cursor-pointer disabled:opacity-50"
+                        disabled={!inputVal.trim()}
+                      >
+                        <SendHorizontal className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
-
-              {/* Suggestions */}
-              <div className="flex flex-col gap-2.5 mt-8 w-full">
-                <p className="text-xs font-semibold text-muted-foreground/80 flex items-center gap-1.5 px-1 uppercase tracking-wider">
-                  <Sparkles className="h-3.5 w-3.5 text-blue-500" />
-                  Suggestions
-                </p>
-                <div className="grid grid-cols-1 gap-2">
-                  <button
-                    type="button"
-                    className="flex items-start gap-3 p-3 rounded-xl border border-border bg-card/40 hover:bg-muted/50 hover:border-muted-foreground/20 transition-all text-left text-sm group cursor-pointer"
-                  >
-                    <Sparkles className="h-4 w-4 mt-0.5 text-blue-500 shrink-0 group-hover:scale-110 transition-transform" />
-                    <div className="leading-snug">
-                      <span className="font-semibold text-foreground">
-                        Fix configuration issues
-                      </span>
-                      <span className="text-muted-foreground">
-                        {" "}
-                        — Resolve any configuration issues in this workflow.
-                      </span>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    className="flex items-start gap-3 p-3 rounded-xl border border-border bg-card/40 hover:bg-muted/50 hover:border-muted-foreground/20 transition-all text-left text-sm group cursor-pointer"
-                  >
-                    <Sparkles className="h-4 w-4 mt-0.5 text-blue-500 shrink-0 group-hover:scale-110 transition-transform" />
-                    <div className="leading-snug">
-                      <span className="font-semibold text-foreground">
-                        Add another step
-                      </span>
-                      <span className="text-muted-foreground">
-                        {" "}
-                        — Add a new step to this workflow.
-                      </span>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    className="flex items-start gap-3 p-3 rounded-xl border border-border bg-card/40 hover:bg-muted/50 hover:border-muted-foreground/20 transition-all text-left text-sm group cursor-pointer"
-                  >
-                    <Sparkles className="h-4 w-4 mt-0.5 text-blue-500 shrink-0 group-hover:scale-110 transition-transform" />
-                    <div className="leading-snug">
-                      <span className="font-semibold text-foreground">
-                        Change trigger
-                      </span>
-                      <span className="text-muted-foreground">
-                        {" "}
-                        — Change what starts this workflow.
-                      </span>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Bottom empty spacing or guidelines */}
-            <div className="w-full text-center text-[11px] text-muted-foreground/50 pt-4 border-t border-border/20">
-              Aria AI may display inaccurate info, please double check important
-              workflows.
             </div>
           </div>
         </Allotment.Pane>
 
         {/* Right Pane: React Flow Preview Page */}
         <Allotment.Pane
-          minSize={isRightOpen ? 360 : 30}
-          maxSize={isRightOpen ? undefined : 30}
-          preferredSize={isRightOpen ? "50%" : 30}
+          minSize={isRightOpen ? 360 : 60}
+          maxSize={isRightOpen ? undefined : 60}
+          preferredSize={isRightOpen ? "50%" : 60}
         >
           {isRightOpen ? (
             /* Open Preview Panel */
@@ -385,20 +391,20 @@ export default function AgentPage() {
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsRightOpen(true)}
-                className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/80 rounded-lg mb-6 cursor-pointer"
+                className="h-10! w-10 text-black rounded-sm mb-6 cursor-pointer"
                 title="Open Preview"
               >
-                <PanelRightOpen className="h-4.5 w-4.5" />
+                <PanelRightOpen className="h-5 w-5!" />
               </Button>
 
               <div className="flex-1 flex items-center justify-center">
                 <button
                   type="button"
-                  className="text-xs font-bold tracking-widest text-muted-foreground/50 uppercase writing-vertical rotate-180 select-none cursor-pointer hover:text-muted-foreground transition-colors outline-none"
+                  className="text-xs font-bold tracking-wide text-muted-foreground uppercase writing-vertical rotate-180 select-none cursor-pointer hover:text-muted-foreground transition-colors outline-none"
                   onClick={() => setIsRightOpen(true)}
                   style={{ writingMode: "vertical-lr" }}
                 >
-                  Flow Preview
+                  Workflow Preview Panel
                 </button>
               </div>
             </div>
