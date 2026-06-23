@@ -3,6 +3,9 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/modules/main/AppSidebar";
 import { BreadCrumbs } from "@/modules/main/BreadCrumbs";
 import { ConnectorDropdown } from "./ConnectorDropdown";
+import { UserMenu } from "@/components/UserMenu";
+import { Cable, Mail } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function HomeLayout({
   children,
@@ -19,7 +22,24 @@ export default function HomeLayout({
             <div className="h-4 w-px bg-neutral-800 mx-2" />
             <BreadCrumbs />
           </div>
-          <ConnectorDropdown />
+          <div className="flex items-center gap-4">
+            <ConnectorDropdown />
+            <Button
+              variant={"outline"}
+              className="rounded-md bg-neutral-100"
+              size={"icon-sm"}
+            >
+              <Cable />
+            </Button>
+            <Button
+              variant={"outline"}
+              className="rounded-md bg-neutral-100"
+              size={"icon-sm"}
+            >
+              <Mail />
+            </Button>
+            <UserMenu />
+          </div>
         </header>
         <main className="flex-1 overflow-auto p-6">{children}</main>
       </div>

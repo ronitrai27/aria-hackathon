@@ -39,10 +39,10 @@ export function ConnectorDropdown() {
     >
       <Button
         type="button"
-        variant="default"
+        variant="outline"
         size="icon"
+        className="rounded-md bg-neutral-100 transition-colors"
         onClick={() => setIsOpen(!isOpen)}
-        className="rounded-md transition-colors"
       >
         <Plug className="h-5 w-5" />
       </Button>
