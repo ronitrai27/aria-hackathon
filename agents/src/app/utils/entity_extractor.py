@@ -3,7 +3,7 @@
 # A module to extract entities and relationship triplets from conversation logs
 # and other textual data to populate a personalized long-term knowledge graph.
 #
-# Core target entity nodes: USER, CONTACT, TASK, EVENT, DOCUMENT, WORKFLOW, FACT
+# Core target entity nodes: USER, CONTACT, TASK, EVENT, DOCUMENT, WORKFLOW, FACT, SKILL
 #
 # Pure extraction logic - NO database operations.
 
@@ -102,7 +102,7 @@ if "entity_ruler" not in nlp.pipe_names:
     )
 
 # Target entity types and standard spaCy mapping rules
-TARGET_ENTITIES = {"USER", "CONTACT", "TASK", "EVENT", "DOCUMENT", "WORKFLOW", "FACT"}
+TARGET_ENTITIES = {"USER", "CONTACT", "TASK", "EVENT", "DOCUMENT", "WORKFLOW", "FACT", "SKILL"}
 
 PERSON_RE = r"\b[A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+){1,3}\b"
 
@@ -187,7 +187,7 @@ def _normalize_node_name(name: str, user_name: Optional[str] = None) -> str:
 def map_label(label: str, name: str, user_name: Optional[str] = None) -> str:
     """
     Maps spaCy or custom entity labels to our core entities:
-    USER, CONTACT, TASK, EVENT, DOCUMENT, WORKFLOW, FACT
+    USER, CONTACT, TASK, EVENT, DOCUMENT, WORKFLOW, FACT, SKILL
     """
     label_upper = label.upper()
     name_lower = name.lower()
@@ -218,7 +218,10 @@ def map_label(label: str, name: str, user_name: Optional[str] = None) -> str:
     if label_upper in ("WORKFLOW", "AUTOMATION"):
         return "WORKFLOW"
 
-    if label_upper in ("FACT", "SKILL", "ROLE", "EXPERIENCE"):
+    if label_upper == "SKILL":
+        return "SKILL"
+
+    if label_upper in ("FACT", "ROLE", "EXPERIENCE"):
         return "FACT"
 
     # Lexical fallback matching
@@ -230,6 +233,8 @@ def map_label(label: str, name: str, user_name: Optional[str] = None) -> str:
         return "EVENT"
     if any(word in name_lower.split() for word in ["document", "file", "url", "codebase", "repo", "api", "doc", "pdf", "sheet"]):
         return "DOCUMENT"
+    if name_lower in SKILL_HINTS:
+        return "SKILL"
     if any(word in name_lower.split() for word in ["skill", "profile", "fact", "preference", "hobby", "habit"]):
         return "FACT"
 
@@ -240,7 +245,7 @@ def _infer_entity_label(name: str, default: str = "FACT") -> str:
     """Infer semantic categories from raw names for fallback mapping."""
     lower = name.lower().strip()
     if lower in SKILL_HINTS:
-        return "FACT"
+        return "SKILL"
     if any(word in lower.split() for word in ROLE_HINTS):
         return "FACT"
     if lower.startswith("project ") or " project " in lower:
