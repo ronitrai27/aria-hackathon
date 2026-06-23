@@ -611,29 +611,7 @@ graph.invoke(Command(resume={"approved": True}), config)
 | `browser_worker` | Browser content stored in DB | Read current page context |
 | `connector_worker` | Gmail / Outlook / Slack / Calendar | Read/write via Compose APIs |
 
-### Build Order
 
-```
-Phase 1 — Foundation
-  [x] Define AriaState TypedDict (this doc)
-  [ ] Set up graph skeleton (all nodes as stubs)
-  [ ] Supervisor node with LLM + SupervisorDecision structured output
-  [ ] Compile with MemorySaver, test routing
-
-Phase 2 — Workers (one at a time)
-  [ ] task_worker (Convex DB read/write)
-  [ ] memory_worker (Pinecone + Neo4j)
-  [ ] browser_worker
-  [ ] connector_worker
-  [ ] automation_creator (with HITL interrupt)
-
-Phase 3 — Production Hardening
-  [ ] Replace MemorySaver with PostgresSaver
-  [ ] Add LangSmith tracing
-  [ ] Idempotency keys on all Convex writes
-  [ ] Max-turn guard + error recovery in Supervisor
-  [ ] Subgraph for automation team if needed
-```
 
 ---
 
