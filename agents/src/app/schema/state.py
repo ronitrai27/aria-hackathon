@@ -2,20 +2,6 @@
 schema/state.py
 ───────────────
 The single source of truth for all data flowing through the graph.
-
-HOW STATE WORKS (read this once):
-  - Every node receives the FULL AriaState.
-  - Every node returns a PARTIAL dict (only the keys it changes).
-  - LangGraph merges that partial dict into the shared state automatically.
-  - Workers never call each other. They just read state and write state.
-  - Worker A's output is available to Worker B because they share this object.
-  - No argument-passing. No glue code. State IS the data bus.
-
-REDUCERS (parallel-write safety):
-  - Fields with `Annotated[list, operator.add]` are safe for multiple
-    parallel workers to write simultaneously — LangGraph appends all writes.
-  - Fields WITHOUT a reducer use last-writer-wins (overwrite). These must
-    only be written by a single node per turn.
 """
 
 from __future__ import annotations
@@ -103,6 +89,14 @@ class AriaState(TypedDict):
     # Written by: memory_worker
     # Semantic context retrieved from Pinecone / Neo4j for the current query.
     memory_context: str | None
+
+    # Written by: memory_ingest_worker (background worker)l/2wqhiyuueggxdhwu23wksdnn§"§
+    # IDs of messages already processed by the memory ingestion pipeline.
+    ingested_message_ids: list[str] | None
+
+    # Written by: Supervisor / spaCy pre-filter
+    # Flag signaling that the current turn contains important personal context to ingest immediately.
+    contains_memorable_info: bool | None
 
     # Written by: browser_worker
     # Raw content of the current browser page stored in DB.

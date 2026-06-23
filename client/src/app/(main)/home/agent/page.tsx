@@ -1,12 +1,13 @@
 "use client";
 
 import { Allotment } from "allotment";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import "allotment/dist/style.css";
 import {
   Bell,
   Bot,
   Brain,
+  Clock,
   FileText,
   Lock,
   MoreHorizontal,
@@ -18,6 +19,7 @@ import {
   Sparkles,
   Star,
   UserPlus,
+  Workflow,
 } from "lucide-react";
 import Image from "next/image";
 import Typewriter from "typewriter-effect";
@@ -33,12 +35,66 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAgentStore } from "@/hooks/useAgentStore";
 import FlowPreview from "./components/FlowPreview";
 
+const suggestions = [
+  {
+    title: "Context",
+    description:
+      "Suggest me some tasks and automations from yesterday research.",
+    shortDescription: "Suggest tasks from yesterday's research.",
+    prompt: "Suggest tasks and automations from yesterday research.",
+    icon: Brain,
+    iconColor: "text-purple-500",
+    iconBg: "bg-purple-500/10 group-hover:bg-purple-500/20",
+  },
+  {
+    title: "Workload & Deadline",
+    description: "Explain my recent workload and tasks pending",
+    shortDescription: "Explain my pending workload.",
+    prompt: "Explain my recent workload and tasks pending",
+    icon: Clock,
+    iconColor: "text-purple-500",
+    iconBg: "bg-purple-500/10 group-hover:bg-purple-500/20",
+  },
+  {
+    title: "Research Workflow",
+    description:
+      "Create a workflow to research about x topic and create report.",
+    shortDescription: "Research a topic and create report.",
+    prompt: "Create a workflow to research about x topic and create report.",
+    icon: Workflow,
+    iconColor: "text-purple-500",
+    iconBg: "bg-purple-500/10 group-hover:bg-purple-500/20",
+  },
+];
+
 export default function AgentPage() {
   const [isRightOpen, setIsRightOpen] = useState(false);
   const [inputVal, setInputVal] = useState("");
   const [selectedModel, setSelectedModel] = useState("claude-sonnet-3.5");
   const [activeTab, setActiveTab] = useState<"editor" | "runs">("editor");
   const [isReadWriteActive, setIsReadWriteActive] = useState(true);
+  const [paneWidth, setPaneWidth] = useState(800);
+
+  const observerRef = useRef<ResizeObserver | null>(null);
+
+  const leftPaneRef = useCallback((node: HTMLDivElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+
+    if (node !== null) {
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          setPaneWidth(entry.contentRect.width);
+        }
+      });
+      observer.observe(node);
+      observerRef.current = observer;
+    }
+  }, []);
+
+  const isNarrow = paneWidth < 580;
 
   const { activeMode, setActiveMode } = useAgentStore();
 
@@ -86,15 +142,18 @@ export default function AgentPage() {
       <Allotment key={isRightOpen ? "open" : "closed"}>
         {/* Left Pane: Agent Chat Space */}
         <Allotment.Pane minSize={400}>
-          <div className="h-full w-full flex flex-col items-center justify-between p-8 bg-background relative overflow-y-auto">
+          <div
+            ref={leftPaneRef}
+            className="h-full w-full flex flex-col items-center justify-between p-8 bg-background relative overflow-y-auto"
+          >
             <div className="w-full flex justify-between items-center pb-4 opacity-0">
               <span className="text-xs text-muted-foreground">Agent Mode</span>
             </div>
 
             {/* Middle welcome content */}
-            <div className="flex-1 flex flex-col items-center justify-center w-full max-w-2xl my-auto py-8">
-              <div className="relative flex items-center justify-center w-20 h-20 mb-4 group cursor-pointer">
-                <div className="relative w-18 h-18 bg-linear-to-tr from-blue-600 via-purple-500 to-red-500 p-0.5 shadow-2xl flex items-center justify-center overflow-hidden animate-shape-morph">
+            <div className="flex-1 flex flex-col items-center justify-center w-full max-w-2xl my-auto ">
+              <div className="relative flex items-center justify-center w-16 h-16 mb-4 group cursor-pointer">
+                <div className="relative w-16 h-16 bg-linear-to-tr from-blue-600 via-purple-500 to-red-500 p-0.5 shadow-2xl flex items-center justify-center overflow-hidden animate-shape-morph">
                   <div className="absolute inset-0 rounded-[inherit] border border-white/20 bg-linear-to-b from-white/15 to-transparent" />
 
                   <svg
@@ -110,7 +169,7 @@ export default function AgentPage() {
               </div>
 
               {/* Welcoming typewriter effect (Small & Slow with 2-minute delays) */}
-              <div className="text-lg font-medium text-muted-foreground mb-8 text-center min-h-[20px] max-w-xl">
+              <div className="text-lg font-medium text-muted-foreground mb-8 text-center max-w-xl">
                 <Typewriter
                   onInit={(typewriter) => {
                     typewriter
@@ -134,6 +193,53 @@ export default function AgentPage() {
                     cursorClassName: "text-blue-500 font-normal animate-pulse",
                   }}
                 />
+              </div>
+
+              {/* Suggestions Grid */}
+              <div
+                className={`grid w-full max-w-2xl gap-3.5 mb-10 ${
+                  isNarrow ? "grid-cols-1" : "grid-cols-3"
+                }`}
+              >
+                {suggestions.map((s) => (
+                  <button
+                    key={s.title}
+                    type="button"
+                    onClick={() => setInputVal(s.prompt)}
+                    className={`flex text-left bg-card hover:border-primary/20 hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-xs w-full ${
+                      isNarrow
+                        ? "flex-row items-center p-2 rounded-lg border border-border h-11"
+                        : "flex-col items-start p-4 rounded-xl border border-border h-36"
+                    }`}
+                  >
+                    {isNarrow ? (
+                      <>
+                        <div
+                          className={`p-1.5 rounded-lg ${s.iconBg} shrink-0 transition-colors duration-300`}
+                        >
+                          <s.icon className={`h-3.5 w-3.5 ${s.iconColor}`} />
+                        </div>
+                        <span className="text-[11px] text-muted-foreground font-medium truncate ml-2.5 flex-1 pr-1 group-hover:text-primary transition-colors duration-300">
+                          {s.shortDescription}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <div
+                          className={`p-2 rounded-lg ${s.iconBg} mb-3 transition-colors duration-300`}
+                        >
+                          <s.icon className={`h-4.5 w-4.5 ${s.iconColor}`} />
+                        </div>
+                        <h4 className="font-semibold text-xs text-foreground mb-1 group-hover:text-primary transition-colors duration-300">
+                          {s.title}
+                        </h4>
+                        <p className="text-[11px] text-muted-foreground leading-normal">
+                          {s.description}
+                        </p>
+                      </>
+                    )}
+                  </button>
+                ))}
               </div>
 
               {/* Input Wrapper Container (with tabs on top) */}
@@ -167,7 +273,11 @@ export default function AgentPage() {
                 </div>
 
                 {/* Textarea container */}
-                <div className="relative w-full bg-muted/30 border border-border rounded-2xl p-3 focus-within:border-ring/50 focus-within:ring-2 focus-within:ring-ring/15 transition-all shadow-sm">
+                <div
+                  className={`relative w-full bg-muted/30 border border-border rounded-2xl focus-within:border-ring/50 focus-within:ring-2 focus-within:ring-ring/15 transition-all shadow-sm ${
+                    isNarrow ? "p-2.5" : "p-3"
+                  }`}
+                >
                   {/* Active editable state for both modes */}
                   <Textarea
                     placeholder={
@@ -177,10 +287,18 @@ export default function AgentPage() {
                     }
                     value={inputVal}
                     onChange={(e) => setInputVal(e.target.value)}
-                    className="min-h-[80px] w-full resize-none bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:border-0 p-1 pr-12 text-base text-foreground placeholder:text-muted-foreground/80 md:text-sm"
+                    className={`w-full resize-none bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:border-0 p-1 pr-12 text-foreground placeholder:text-muted-foreground/80 ${
+                      isNarrow
+                        ? "min-h-[60px] text-sm"
+                        : "min-h-[80px] text-base md:text-sm"
+                    }`}
                   />
 
-                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40">
+                  <div
+                    className={`flex items-center justify-between border-t border-border/40 ${
+                      isNarrow ? "mt-1.5 pt-2" : "mt-2 pt-2"
+                    }`}
+                  >
                     {/* Left attachment button */}
                     <div className="flex items-center gap-2">
                       <Button
@@ -192,58 +310,81 @@ export default function AgentPage() {
                         <Paperclip className="h-4 w-4" />
                       </Button>
 
-                      <div className="border border-border shadow-sm p-1 pr-2.5 rounded-full flex items-center gap-2 bg-white">
-                        <div className="flex -space-x-0.5">
-                          <Image
-                            className="inline-block h-4.5 w-4.5  object-contain bg-background"
-                            src="/outlook.jpeg"
-                            alt="Outlook"
-                            width={17}
-                            height={17}
-                          />
-                          <Image
-                            className="inline-block h-4.5 w-4.5  object-contain bg-background"
-                            src="/gmail.png"
-                            alt="Gmail"
-                            width={17}
-                            height={17}
-                          />
-                          <Image
-                            className="inline-block h-4 w-4  object-contain bg-background"
-                            src="/calendar.png"
-                            alt="Calendar"
-                            width={17}
-                            height={17}
-                          />
-                          <Image
-                            className="inline-block h-4.5 w-4.5 object-contain bg-background"
-                            src="/slack.png"
-                            alt="Slack"
-                            width={17}
-                            height={17}
-                          />
-                        </div>
-                        <span className="text-[10px] font-medium text-muted-foreground select-none">
-                          Read & Write
-                        </span>
+                      {isNarrow ? (
                         <button
                           type="button"
                           onClick={() =>
                             setIsReadWriteActive(!isReadWriteActive)
                           }
-                          className={`w-7 h-4 rounded-full transition-colors duration-200 relative cursor-pointer shrink-0 outline-none ${
+                          className={`w-8 h-4.5 rounded-full transition-colors duration-200 relative cursor-pointer shrink-0 outline-none border border-border shadow-xs ${
                             isReadWriteActive ? "bg-emerald-500" : "bg-rose-500"
                           }`}
+                          title="Toggle Read & Write Mode"
                         >
                           <span
-                            className={`block w-3 h-3 bg-white rounded-full transition-transform duration-200 absolute top-0.5 left-0.5 ${
+                            className={`block w-3.5 h-3.5 bg-white rounded-full shadow-xs transition-transform duration-200 absolute top-0.5 left-0.5 ${
                               isReadWriteActive
-                                ? "translate-x-3"
+                                ? "translate-x-3.5"
                                 : "translate-x-0"
                             }`}
                           />
                         </button>
-                      </div>
+                      ) : (
+                        <div className="border border-border shadow-sm p-1 pr-2.5 rounded-full flex items-center gap-2 bg-white">
+                          <div className="flex -space-x-0.5">
+                            <Image
+                              className="inline-block h-4.5 w-4.5 object-contain bg-background"
+                              src="/outlook.jpeg"
+                              alt="Outlook"
+                              width={17}
+                              height={17}
+                            />
+                            <Image
+                              className="inline-block h-4.5 w-4.5 object-contain bg-background"
+                              src="/gmail.png"
+                              alt="Gmail"
+                              width={17}
+                              height={17}
+                            />
+                            <Image
+                              className="inline-block h-4 w-4 object-contain bg-background"
+                              src="/calendar.png"
+                              alt="Calendar"
+                              width={17}
+                              height={17}
+                            />
+                            <Image
+                              className="inline-block h-4.5 w-4.5 object-contain bg-background"
+                              src="/slack.png"
+                              alt="Slack"
+                              width={17}
+                              height={17}
+                            />
+                          </div>
+                          <span className="text-[10px] font-medium text-muted-foreground select-none">
+                            Read & Write
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setIsReadWriteActive(!isReadWriteActive)
+                            }
+                            className={`w-7 h-4 rounded-full transition-colors duration-200 relative cursor-pointer shrink-0 outline-none ${
+                              isReadWriteActive
+                                ? "bg-emerald-500"
+                                : "bg-rose-500"
+                            }`}
+                          >
+                            <span
+                              className={`block w-3 h-3 bg-white rounded-full transition-transform duration-200 absolute top-0.5 left-0.5 ${
+                                isReadWriteActive
+                                  ? "translate-x-3"
+                                  : "translate-x-0"
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Right options / Actions */}
@@ -259,14 +400,14 @@ export default function AgentPage() {
                           <SelectItem value="claude-sonnet-3.5">
                             <span className="flex items-center gap-2 text-xs">
                               <Sparkles className="h-3.5 w-3.5 text-orange-500" />
-                              Claude Sonnet 3.5
+                              {isNarrow ? "Sonnet 3.5" : "Claude Sonnet 3.5"}
                             </span>
                           </SelectItem>
                           <SelectItem value="claude-opus-4.5" disabled>
                             <div className="flex items-center justify-between w-full gap-8 text-xs text-muted-foreground">
                               <span className="flex items-center gap-2">
                                 <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
-                                Claude Opus 4.5
+                                {isNarrow ? "Opus 4.5" : "Claude Opus 4.5"}
                               </span>
                               <Lock className="h-3 w-3 text-muted-foreground/45 shrink-0" />
                             </div>
@@ -274,14 +415,14 @@ export default function AgentPage() {
                           <SelectItem value="gpt-4.1-mini">
                             <span className="flex items-center gap-2 text-xs">
                               <Sparkles className="h-3.5 w-3.5 text-blue-500" />
-                              GPT-4.1 mini
+                              {isNarrow ? "4.1 mini" : "GPT-4.1 mini"}
                             </span>
                           </SelectItem>
                           <SelectItem value="gpt-4.1" disabled>
                             <div className="flex items-center justify-between w-full gap-8 text-xs text-muted-foreground">
                               <span className="flex items-center gap-2">
                                 <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
-                                GPT-4.1
+                                {isNarrow ? "4.1" : "GPT-4.1"}
                               </span>
                               <Lock className="h-3 w-3 text-muted-foreground" />
                             </div>
@@ -290,7 +431,7 @@ export default function AgentPage() {
                             <div className="flex items-center justify-between w-full gap-8 text-xs text-muted-foreground">
                               <span className="flex items-center gap-2">
                                 <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
-                                GPT-5.1
+                                {isNarrow ? "5.1" : "GPT-5.1"}
                               </span>
                               <Lock className="h-3 w-3 text-muted-foreground" />
                             </div>
@@ -316,7 +457,7 @@ export default function AgentPage() {
 
         {/* Right Pane: React Flow Preview Page */}
         <Allotment.Pane
-          minSize={isRightOpen ? 360 : 60}
+          minSize={isRightOpen ? 600 : 60}
           maxSize={isRightOpen ? undefined : 60}
           preferredSize={isRightOpen ? "50%" : 60}
         >
