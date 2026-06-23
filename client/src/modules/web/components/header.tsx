@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { SignUpButton } from "@clerk/nextjs";
 
 export default function Header() {
   const navItems = [
@@ -44,10 +46,10 @@ export default function Header() {
 
         {/* CTA Button */}
         <Link
-          href="#book"
+          href="/sign-up"
           className="group flex items-center gap-3 pl-4 pr-1.5 py-1.5 rounded-full text-xs font-semibold text-white bg-white/[0.03] border border-white/10 hover:bg-white/[0.08] hover:border-white/20 transition-all duration-200 backdrop-blur-sm"
         >
-          <span>Book a call</span>
+          <span>Sign up</span>
           <div className="flex items-center justify-center w-7 h-7 rounded-full bg-white/10 text-white group-hover:bg-white/20 transition-all duration-200">
             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform duration-200" />
           </div>
