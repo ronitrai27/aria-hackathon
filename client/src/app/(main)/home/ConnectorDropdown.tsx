@@ -23,6 +23,8 @@ const connectors = [
   { name: "Typeform", icon: "/typeform.png" },
   { name: "Ashby", icon: "/ashby.webp" },
   { name: "YouTube", icon: "/youtub.png" },
+  { name: "Google Docs", icon: "/docs.png" },
+  { name: "Google Sheets", icon: "/sheets.png" },
 ];
 
 export function ConnectorDropdown() {

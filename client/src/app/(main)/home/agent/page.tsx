@@ -9,7 +9,6 @@ import {
   Brain,
   FileText,
   Lock,
-  Mic,
   MoreHorizontal,
   PanelRightClose,
   PanelRightOpen,
@@ -20,6 +19,7 @@ import {
   Star,
   UserPlus,
 } from "lucide-react";
+import Image from "next/image";
 import Typewriter from "typewriter-effect";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +38,7 @@ export default function AgentPage() {
   const [inputVal, setInputVal] = useState("");
   const [selectedModel, setSelectedModel] = useState("claude-sonnet-3.5");
   const [activeTab, setActiveTab] = useState<"editor" | "runs">("editor");
+  const [isReadWriteActive, setIsReadWriteActive] = useState(true);
 
   const { activeMode, setActiveMode } = useAgentStore();
 
@@ -181,7 +182,7 @@ export default function AgentPage() {
 
                   <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40">
                     {/* Left attachment button */}
-                    <div>
+                    <div className="flex items-center gap-2">
                       <Button
                         type="button"
                         variant="ghost"
@@ -190,6 +191,59 @@ export default function AgentPage() {
                       >
                         <Paperclip className="h-4 w-4" />
                       </Button>
+
+                      <div className="border border-border shadow-sm p-1 pr-2.5 rounded-full flex items-center gap-2 bg-white">
+                        <div className="flex -space-x-0.5">
+                          <Image
+                            className="inline-block h-4.5 w-4.5  object-contain bg-background"
+                            src="/outlook.jpeg"
+                            alt="Outlook"
+                            width={17}
+                            height={17}
+                          />
+                          <Image
+                            className="inline-block h-4.5 w-4.5  object-contain bg-background"
+                            src="/gmail.png"
+                            alt="Gmail"
+                            width={17}
+                            height={17}
+                          />
+                          <Image
+                            className="inline-block h-4 w-4  object-contain bg-background"
+                            src="/calendar.png"
+                            alt="Calendar"
+                            width={17}
+                            height={17}
+                          />
+                          <Image
+                            className="inline-block h-4.5 w-4.5 object-contain bg-background"
+                            src="/slack.png"
+                            alt="Slack"
+                            width={17}
+                            height={17}
+                          />
+                        </div>
+                        <span className="text-[10px] font-medium text-muted-foreground select-none">
+                          Read & Write
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setIsReadWriteActive(!isReadWriteActive)
+                          }
+                          className={`w-7 h-4 rounded-full transition-colors duration-200 relative cursor-pointer shrink-0 outline-none ${
+                            isReadWriteActive ? "bg-emerald-500" : "bg-rose-500"
+                          }`}
+                        >
+                          <span
+                            className={`block w-3 h-3 bg-white rounded-full transition-transform duration-200 absolute top-0.5 left-0.5 ${
+                              isReadWriteActive
+                                ? "translate-x-3"
+                                : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Right options / Actions */}
@@ -243,15 +297,6 @@ export default function AgentPage() {
                           </SelectItem>
                         </SelectContent>
                       </Select>
-
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg"
-                      >
-                        <Mic className="h-4 w-4" />
-                      </Button>
 
                       <Button
                         type="button"
