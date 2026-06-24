@@ -9,10 +9,24 @@ import sys
 import os
 import json
 import asyncio
+from dotenv import load_dotenv
+
+# Load environment variables strictly from workspace .env file and override system variables
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
+load_dotenv(dotenv_path=env_path, override=True)
+
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from loguru import logger
+
+# Log loaded API key verification (ending characters)
+api_key = os.environ.get("OPENAI_API_KEY", "")
+if api_key:
+    logger.info(f"API KEY VERIFICATION - Loaded OPENAI_API_KEY ending in: ...{api_key[-8:]}")
+else:
+    logger.warning("API KEY VERIFICATION - OPENAI_API_KEY was not found in environment!")
+
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -98,13 +112,14 @@ async def chat_endpoint(request: Request):
                         await asyncio.sleep(0.1)
 
                         # Signal subgraph starting
-                        sub_start = sse_worker_status_event(
-                            worker_name=next_rt,
-                            status="starting",
-                            details={"message": f"Initializing {next_rt.replace('_subgraph', '').title()} agent..."}
-                        )
-                        yield f"event: {sub_start['event']}\ndata: {sub_start['data']}\n\n"
-                        await asyncio.sleep(0.1)
+                        if next_rt != "__end__":
+                            sub_start = sse_worker_status_event(
+                                worker_name=next_rt,
+                                status="starting",
+                                details={"message": f"Initializing {next_rt.replace('_subgraph', '').title()} agent..."}
+                            )
+                            yield f"event: {sub_start['event']}\ndata: {sub_start['data']}\n\n"
+                            await asyncio.sleep(0.1)
 
                 # ── Brain Subgraph Real-Time Execution ────────────────────────
                 elif path == ("brain_subgraph",):
@@ -163,31 +178,45 @@ async def chat_endpoint(request: Request):
                     # Workflow Builder Node details
                     if "workflow_builder" in chunk:
                         builder_out = chunk["workflow_builder"]
-                        builder_run = sse_worker_status_event(
-                            worker_name="workflow_builder",
-                            status="running",
-                            details={"message": "Designing workflow steps, nodes, and edges..."}
-                        )
-                        yield f"event: {builder_run['event']}\ndata: {builder_run['data']}\n\n"
-                        await asyncio.sleep(0.4)
+                        # Check for workflow builder errors
+                        builder_err = None
+                        for res in builder_out.get("worker_results", []):
+                            if res.get("worker") == "workflow_builder" and res.get("error"):
+                                builder_err = res.get("error")
 
-                        # Emit live Composio metadata lookups
-                        if builder_out.get("workflow_schema"):
-                            composio_schema = sse_worker_action_event(
+                        if builder_err:
+                            err_event = {
+                                "event": "error",
+                                "data": json.dumps({"error": f"Workflow builder failed: {builder_err}"})
+                            }
+                            yield f"event: {err_event['event']}\ndata: {err_event['data']}\n\n"
+                            await asyncio.sleep(0.1)
+                        else:
+                            builder_run = sse_worker_status_event(
                                 worker_name="workflow_builder",
-                                action="fetching_composio_schemas",
-                                details={"message": "Loading live API parameter schemas from Composio..."}
+                                status="running",
+                                details={"message": "Designing workflow steps, nodes, and edges..."}
                             )
-                            yield f"event: {composio_schema['event']}\ndata: {composio_schema['data']}\n\n"
+                            yield f"event: {builder_run['event']}\ndata: {builder_run['data']}\n\n"
                             await asyncio.sleep(0.4)
 
-                            # Stream final React Flow workflow schema to client for graph rendering
-                            schema_data = sse_worker_response_event(
-                                worker_name="workflow_builder",
-                                output=builder_out["workflow_schema"]
-                            )
-                            yield f"event: {schema_data['event']}\ndata: {schema_data['data']}\n\n"
-                            await asyncio.sleep(0.1)
+                            # Emit live Composio metadata lookups
+                            if builder_out.get("workflow_schema"):
+                                composio_schema = sse_worker_action_event(
+                                    worker_name="workflow_builder",
+                                    action="fetching_composio_schemas",
+                                    details={"message": "Loading live API parameter schemas from Composio..."}
+                                )
+                                yield f"event: {composio_schema['event']}\ndata: {composio_schema['data']}\n\n"
+                                await asyncio.sleep(0.4)
+
+                                # Stream final React Flow workflow schema to client for graph rendering
+                                schema_data = sse_worker_response_event(
+                                    worker_name="workflow_builder",
+                                    output=builder_out["workflow_schema"]
+                                )
+                                yield f"event: {schema_data['event']}\ndata: {schema_data['data']}\n\n"
+                                await asyncio.sleep(0.1)
 
                     # Handle other agent workers
                     for worker in ["composio_worker", "ai_node_worker", "scheduler_worker"]:

@@ -114,13 +114,13 @@ export function AppSidebar() {
                         <item.icon
                           className={cn(
                             "h-4 w-4 shrink-0 transition-colors duration-200",
-                            isActive ? "text-black!" : "text-muted-foreground",
+                            isActive ? "text-black!" : "text-neutral-800",
                           )}
                         />
                         <span
                           className={cn(
-                            "transition-colors duration-200 text-muted-foreground",
-                            isActive && "text-neutral-800",
+                            "transition-colors duration-200 text-neutral-800",
+                            isActive && "text-black",
                           )}
                         >
                           {item.name}
@@ -147,7 +147,7 @@ export function AppSidebar() {
                   <PopoverContent
                     side="right"
                     align="start"
-                    className="w-80 p-4 rounded-2xl shadow-xl border border-border bg-popover text-popover-foreground z-50"
+                    className="w-72 p-4 rounded-xl shadow-xl border border-border bg-popover text-popover-foreground z-50"
                   >
                     <div className="flex flex-col gap-3">
                       <div>
@@ -174,31 +174,19 @@ export function AppSidebar() {
                           </p>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 gap-2 max-h-[240px] overflow-y-auto pr-1">
+                        <div className="grid grid-cols-4 gap-2 max-h-[240px] overflow-y-auto pr-1">
                           {connectedApps.map((appName) => {
                             const icon = connectorIcons[appName] || "/logo.svg";
                             return (
-                              <div
-                                key={appName}
-                                className="flex items-center justify-between p-2 rounded-xl bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors"
-                              >
-                                <div className="flex items-center gap-2">
+                              <div key={appName} className="">
+                                <div className="flex items-center justify-center gap-2">
                                   <Image
                                     src={icon}
                                     alt={appName}
                                     width={20}
                                     height={20}
-                                    className="w-5 h-5 object-contain"
+                                    className="w-7 h-7 object-contain"
                                   />
-                                  <span className="text-xs font-medium text-foreground">
-                                    {appName}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                  <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                                    Connected
-                                  </span>
                                 </div>
                               </div>
                             );

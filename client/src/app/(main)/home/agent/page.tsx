@@ -40,8 +40,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAgentStore } from "@/hooks/useAgentStore";
 import { connectorIcons } from "@/lib/static";
 import { api } from "../../../../../convex/_generated/api";
-import FlowPreview from "./components/FlowPreview";
-import ChatMessageItem, { StatusStepper } from "./components/ChatMessage";
+import FlowPreview from "../../../../modules/Ai/components/FlowPreview";
+import ChatMessageItem, {
+  StatusStepper,
+} from "../../../../modules/Ai/components/ChatMessage";
 import { useAgentChat } from "@/hooks/useAgentChat";
 
 const suggestions = [
@@ -153,7 +155,19 @@ export default function AgentPage() {
 
   const { activeMode, setActiveMode, openConnectionDialog } = useAgentStore();
 
+  const isAgentMode = activeMode === "agent";
+  const unconnectedApps = isAgentMode
+    ? selectedSuggestionApps.filter((app) => !user?.connecters?.includes(app))
+    : [];
+  const hasUnconnectedApps = unconnectedApps.length > 0;
+  const hasNoAppsSelected = isAgentMode && selectedSuggestionApps.length === 0;
+
   const handleSend = async (overrideText?: string) => {
+    if (
+      isAgentMode &&
+      (hasUnconnectedApps || selectedSuggestionApps.length === 0)
+    )
+      return;
     const textToSend = overrideText || inputVal;
     if (!textToSend.trim()) return;
 
@@ -293,7 +307,7 @@ export default function AgentPage() {
 
                 {/* Suggestions Grid */}
                 <div
-                  className={`grid w-full max-w-2xl gap-3.5 mb-10 ${
+                  className={`grid w-full max-w-2xl gap-3.5 mb-6 ${
                     isNarrow ? "grid-cols-1" : "grid-cols-3"
                   }`}
                 >
@@ -301,7 +315,7 @@ export default function AgentPage() {
                     <button
                       key={s.title}
                       type="button"
-                      onClick={() => handleSend(s.prompt)}
+                      onClick={() => setInputVal(s.prompt)}
                       className={`flex text-left bg-card hover:border-primary/20 hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-xs w-full ${
                         isNarrow
                           ? "flex-row items-center p-2 rounded-lg border border-border h-11"
@@ -343,7 +357,7 @@ export default function AgentPage() {
             {/* Input Wrapper Container (with tabs on top) */}
             <div className="w-full max-w-2xl flex flex-col items-center shrink-0">
               {/* Tabs for Brain and Agent */}
-              <div className="flex items-center gap-1 self-start ml-4 -mb-[1px] z-10">
+              <div className="flex items-center gap-1 self-start ml-4 -mb-px z-10">
                 <button
                   type="button"
                   onClick={() => setActiveMode("brain")}
@@ -380,8 +394,8 @@ export default function AgentPage() {
                   ref={textareaRef}
                   placeholder={
                     activeMode === "agent"
-                      ? "Describe a task or workflow for the Agent..."
-                      : "Describe a workflow or ask a question..."
+                      ? "Create Complex automated workflows in single go..."
+                      : "Get tasks suggestion from past activity"
                   }
                   value={inputVal}
                   onChange={(e) => setInputVal(e.target.value)}
@@ -405,14 +419,16 @@ export default function AgentPage() {
                 >
                   {/* Left attachment button */}
                   <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg"
-                    >
-                      <Paperclip className="h-4 w-4" />
-                    </Button>
+                    {activeMode === "brain" && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg"
+                      >
+                        <Paperclip className="h-4 w-4" />
+                      </Button>
+                    )}
 
                     {activeMode === "agent" ? (
                       <div className="relative" ref={popoverRef}>
@@ -429,14 +445,26 @@ export default function AgentPage() {
                           className="border border-border/80 shadow-xs p-1.5 px-3 rounded-full flex items-center gap-2 bg-white/90 hover:bg-neutral-50 dark:bg-zinc-900/90 dark:hover:bg-zinc-800 transition-colors select-none cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-ring"
                         >
                           {selectedSuggestionApps.length === 0 ? (
-                            <span className="text-[10px] font-semibold text-muted-foreground select-none">
-                              Apps: 0 selected
-                            </span>
-                          ) : (
                             <div className="flex items-center gap-1.5">
                               <span className="text-[10px] font-semibold text-muted-foreground select-none">
-                                Apps ({selectedSuggestionApps.length}):
+                                {isNarrow ? "Apps" : "Apps: 0 selected"}
                               </span>
+                              {!isNarrow && (
+                                <div className="flex items-center gap-1 ml-1 pl-1.5 border-l border-border/80 text-[10px] shrink-0">
+                                  <AlertCircle className="h-3.5 w-3.5 shrink-0 text-rose-500" />
+                                  <span className="text-[9px] select-none shrink-0">
+                                    0 selected
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              {!isNarrow && (
+                                <span className="text-[10px] font-semibold text-muted-foreground select-none">
+                                  Apps ({selectedSuggestionApps.length}):
+                                </span>
+                              )}
                               <div className="flex -space-x-0.5">
                                 {selectedSuggestionApps.map((app) => {
                                   const iconSrc = connectorIcons[app];
@@ -462,7 +490,7 @@ export default function AgentPage() {
                                         className="object-contain"
                                       />
                                       {!isConnected && (
-                                        <div className="absolute inset-0 bg-red-500/10 flex items-center justify-center pointer-events-none">
+                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                           <AlertCircle className="h-3 w-3 text-red-600 bg-white rounded-full shrink-0" />
                                         </div>
                                       )}
@@ -470,6 +498,23 @@ export default function AgentPage() {
                                   );
                                 })}
                               </div>
+                              {!isNarrow &&
+                                (() => {
+                                  const unconnected =
+                                    selectedSuggestionApps.filter(
+                                      (app) => !user?.connecters?.includes(app),
+                                    );
+                                  const hasUnconnectedApps =
+                                    unconnected.length > 0;
+                                  return hasUnconnectedApps ? (
+                                    <div className="flex items-center gap-1 ml-1 pl-1.5 border-l border-border/80 text-[10px] shrink-0">
+                                      <AlertCircle className="h-3.5 w-3.5 shrink-0 text-rose-500" />
+                                      <span className="text-[9px] select-none shrink-0">
+                                        Connection Required
+                                      </span>
+                                    </div>
+                                  ) : null;
+                                })()}
                             </div>
                           )}
                           <ChevronUp
@@ -529,9 +574,8 @@ export default function AgentPage() {
                                     selectedSuggestionApps.includes(app);
                                   const iconSrc = connectorIcons[app];
                                   return (
-                                    <button
+                                    <div
                                       key={app}
-                                      type="button"
                                       onClick={() => {
                                         if (isSelected) {
                                           setSelectedSuggestionApps(
@@ -571,12 +615,24 @@ export default function AgentPage() {
                                         )}
                                         <span>{app}</span>
                                       </div>
-                                      {isSelected && (
-                                        <span className="text-[10px] font-bold text-primary mr-1">
-                                          Selected
-                                        </span>
-                                      )}
-                                    </button>
+                                      <div className="flex items-center gap-2">
+                                        {isSelected && (
+                                          <span className="text-[10px] font-bold text-primary mr-1">
+                                            Selected
+                                          </span>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            openConnectionDialog(app);
+                                          }}
+                                          className="px-2 py-0.5 text-[10px] bg-emerald-50 hover:bg-neutral-100 border border-neutral-300 rounded-md text-foreground transition-colors cursor-pointer shrink-0"
+                                        >
+                                          Connect
+                                        </button>
+                                      </div>
+                                    </div>
                                   );
                                 })}
                               {Object.keys(connectorIcons).filter((app) =>
@@ -618,7 +674,7 @@ export default function AgentPage() {
                       </button>
                     ) : (
                       <div className="border border-border shadow-sm p-1 pr-2.5 rounded-full flex items-center gap-2 bg-white">
-                        <div className="flex -space-x-0.5">
+                        <div className="flex space-x-0.5">
                           <Image
                             className="inline-block h-4.5 w-4.5 object-contain bg-background"
                             src="/outlook.jpeg"
@@ -637,13 +693,6 @@ export default function AgentPage() {
                             className="inline-block h-4.5 w-4.5 object-contain bg-background"
                             src="/calendar.png"
                             alt="Calendar"
-                            width={17}
-                            height={17}
-                          />
-                          <Image
-                            className="inline-block h-4.5 w-4.5 object-contain bg-background"
-                            src="/slack.png"
-                            alt="Slack"
                             width={17}
                             height={17}
                           />
@@ -729,7 +778,13 @@ export default function AgentPage() {
                       size="icon"
                       onClick={() => handleSend()}
                       className="h-8 w-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/95 transition-all shadow-sm ml-1 cursor-pointer disabled:opacity-50"
-                      disabled={!inputVal.trim() || isGenerating}
+                      disabled={
+                        !inputVal.trim() ||
+                        isGenerating ||
+                        (isAgentMode &&
+                          (hasUnconnectedApps ||
+                            selectedSuggestionApps.length === 0))
+                      }
                     >
                       <SendHorizontal className="h-4 w-4" />
                     </Button>
@@ -854,8 +909,11 @@ export default function AgentPage() {
                 <div className="w-full h-full flex-1 min-h-0">
                   <FlowPreview
                     onSelectSuggestion={(prompt, apps) => {
+                      if (activeMode === "brain") {
+                        setActiveMode("agent");
+                      }
                       setSelectedSuggestionApps(apps || []);
-                      handleSend(prompt);
+                      setInputVal(prompt);
                     }}
                     nodes={workflowData?.nodes}
                     edges={workflowData?.edges}

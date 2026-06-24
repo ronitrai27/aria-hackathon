@@ -29,7 +29,7 @@ def brain_supervisor_node(state: BrainState) -> Command:
     logger.info(f"[Brain Supervisor] Processing query: '{last_msg}'")
 
     # ── Check for Agent handoff ──────────────────────────────────────────────
-    if "workflow" in last_msg or "automate" in last_msg:
+    if "workflow" in last_msg or "automate" in last_msg or "flow" in last_msg:
         logger.info("[Brain Supervisor] Detected workflow/automation intent. Requesting handoff.")
         return Command(
             update={

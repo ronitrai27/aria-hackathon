@@ -6,6 +6,12 @@ Contains the supervisor node and real worker nodes for workflow building.
 """
 
 import os
+from dotenv import load_dotenv
+
+# Load environment variables strictly from workspace .env file and override system variables
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", ".env")
+load_dotenv(dotenv_path=env_path, override=True)
+
 from typing import Literal, Optional, List, Dict, Any
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -67,7 +73,7 @@ class WorkflowDesign(BaseModel):
 
 # ── Model Instantiation ───────────────────────────────────────────────────────
 try:
-    llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.0)
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
 except Exception as e:
     logger.warning(f"Failed to instantiate ChatOpenAI for AgentGraph: {e}")
     llm = None
@@ -168,7 +174,7 @@ def workflow_builder_node(state: AgentState) -> dict:
 
     try:
         # Call LLM with structured output to get workflow design
-        structured_llm = llm.with_structured_output(WorkflowDesign)
+        structured_llm = llm.with_structured_output(WorkflowDesign, method="function_calling")
         system_prompt = (
             "You are an expert AI Workflow Designer.\n"
             "Build a directed acyclic graph (DAG) of nodes and edges matching the user's intent.\n"

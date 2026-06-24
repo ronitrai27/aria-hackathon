@@ -1,5 +1,8 @@
 import { useState, useCallback } from "react";
-import { ChatMessage, formatMessageContent } from "@/app/(main)/home/agent/components/ChatMessage";
+import {
+  ChatMessage,
+  formatMessageContent,
+} from "@/modules/Ai/components/ChatMessage";
 
 export function useAgentChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
