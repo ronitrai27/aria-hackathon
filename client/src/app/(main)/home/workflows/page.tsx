@@ -1,7 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { StepPopover, type ComposioAction } from "@/modules/workflows/components/StepPopover";
+import {
+  StepPopover,
+  type ComposioAction,
+} from "@/modules/workflows/components/StepPopover";
 import { Button } from "@/components/ui/button";
 import { Plus, Zap, AlertCircle } from "lucide-react";
 
@@ -50,7 +53,7 @@ export default function WorkflowsPage() {
                     {selectedAction.action.description}
                   </p>
                 </div>
-                
+
                 {/* Trigger selection for editing/changing */}
                 <StepPopover
                   isOpen={isPopoverOpen}
@@ -113,7 +116,8 @@ export default function WorkflowsPage() {
         <div className="mt-8 flex items-start gap-2.5 p-3.5 rounded-xl border border-amber-200/50 bg-amber-50/20 dark:border-amber-950/20 dark:bg-amber-950/5 text-left max-w-xs">
           <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
           <p className="text-[10px] text-amber-800 dark:text-amber-300 leading-normal">
-            Click <strong>Add trigger</strong> to view the categories list, search apps, choose integrations, and browse supported actions.
+            Click <strong>Add trigger</strong> to view the categories list,
+            search apps, choose integrations, and browse supported actions.
           </p>
         </div>
       </div>

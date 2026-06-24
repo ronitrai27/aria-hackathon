@@ -76,6 +76,7 @@ export default function AgentPage() {
   const [paneWidth, setPaneWidth] = useState(800);
 
   const observerRef = useRef<ResizeObserver | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const leftPaneRef = useCallback((node: HTMLDivElement | null) => {
     if (observerRef.current) {
@@ -205,7 +206,10 @@ export default function AgentPage() {
                   <button
                     key={s.title}
                     type="button"
-                    onClick={() => setInputVal(s.prompt)}
+                    onClick={() => {
+                      setInputVal(s.prompt);
+                      textareaRef.current?.focus();
+                    }}
                     className={`flex text-left bg-card hover:border-primary/20 hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-xs w-full ${
                       isNarrow
                         ? "flex-row items-center p-2 rounded-lg border border-border h-11"
@@ -280,6 +284,7 @@ export default function AgentPage() {
                 >
                   {/* Active editable state for both modes */}
                   <Textarea
+                    ref={textareaRef}
                     placeholder={
                       activeMode === "agent"
                         ? "Describe a task or workflow for the Agent..."
@@ -565,7 +570,12 @@ export default function AgentPage() {
               <div className="flex-1 relative flex flex-col bg-muted/5 min-h-0">
                 {/* React Flow Render Component */}
                 <div className="w-full h-full flex-1 min-h-0">
-                  <FlowPreview />
+                  <FlowPreview
+                    onSelectSuggestion={(prompt) => {
+                      setInputVal(prompt);
+                      textareaRef.current?.focus();
+                    }}
+                  />
                 </div>
               </div>
             </div>
