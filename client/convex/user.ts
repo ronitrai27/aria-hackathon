@@ -1,4 +1,5 @@
 import { mutation, query } from "./_generated/server";
+import { v } from "convex/values";
 
 /**
  * Mutation to sync the authenticated Clerk user to Convex.
@@ -77,5 +78,31 @@ export const getCurrentUser = query({
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("id", identity.subject))
       .unique();
+  },
+});
+
+export const toggleConnector = mutation({
+  args: { name: v.string() },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("id", identity.subject))
+      .unique();
+    if (!user) {
+      throw new Error("User not found");
+    }
+    const connecters = user.connecters ?? [];
+    let nextConnecters = [];
+    if (connecters.includes(args.name)) {
+      nextConnecters = connecters.filter((c) => c !== args.name);
+    } else {
+      nextConnecters = [...connecters, args.name];
+    }
+    await ctx.db.patch(user._id, { connecters: nextConnecters });
+    return nextConnecters;
   },
 });

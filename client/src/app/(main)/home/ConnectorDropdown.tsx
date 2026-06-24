@@ -11,9 +11,10 @@ const connectors = [
   { name: "GitHub", icon: "/github.png" },
   { name: "Reddit", icon: "/reddit.png" },
   { name: "Calendar", icon: "/calendar.png" },
-  { name: "Asana", icon: "/asana.jpeg" },
+  { name: "LinkedIn", icon: "/linkedin.png" },
+  { name: "Google Meet", icon: "/meet.png" },
+  { name: "Todoist", icon: "/todoist.jpg" },
   { name: "Attio", icon: "/attio.jpeg" },
-  { name: "Firecrawl", icon: "/firecrawl.jpeg" },
   { name: "Hacker News", icon: "/hacker-news.jpeg" },
   { name: "HubSpot", icon: "/hubspot.png" },
   { name: "Jira", icon: "/jira.jpeg" },
@@ -29,7 +30,6 @@ const connectors = [
 
 export function ConnectorDropdown() {
   const [isOpen, setIsOpen] = useState(false);
-
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: hover trigger container
     <div

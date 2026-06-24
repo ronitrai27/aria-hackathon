@@ -1,7 +1,7 @@
 "use client";
 
 import { Allotment } from "allotment";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "allotment/dist/style.css";
 import {
   Bell,
@@ -20,6 +20,9 @@ import {
   Star,
   UserPlus,
   Workflow,
+  ChevronUp,
+  Search,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import Typewriter from "typewriter-effect";
@@ -34,6 +37,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useAgentStore } from "@/hooks/useAgentStore";
 import FlowPreview from "./components/FlowPreview";
+import { connectorIcons } from "@/lib/static";
 
 const suggestions = [
   {
@@ -74,6 +78,28 @@ export default function AgentPage() {
   const [activeTab, setActiveTab] = useState<"editor" | "runs">("editor");
   const [isReadWriteActive, setIsReadWriteActive] = useState(true);
   const [paneWidth, setPaneWidth] = useState(800);
+  const [selectedSuggestionApps, setSelectedSuggestionApps] = useState<
+    string[]
+  >([]);
+
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        popoverRef.current &&
+        !popoverRef.current.contains(event.target as Node)
+      ) {
+        setIsPopoverOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const observerRef = useRef<ResizeObserver | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -208,6 +234,7 @@ export default function AgentPage() {
                     type="button"
                     onClick={() => {
                       setInputVal(s.prompt);
+                      setSelectedSuggestionApps([]);
                       textareaRef.current?.focus();
                     }}
                     className={`flex text-left bg-card hover:border-primary/20 hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-xs w-full ${
@@ -315,7 +342,175 @@ export default function AgentPage() {
                         <Paperclip className="h-4 w-4" />
                       </Button>
 
-                      {isNarrow ? (
+                      {activeMode === "agent" ? (
+                        <div className="relative" ref={popoverRef}>
+                          <button
+                            type="button"
+                            onClick={() => setIsPopoverOpen(!isPopoverOpen)}
+                            className="border border-border/80 shadow-xs p-1.5 px-3 rounded-full flex items-center gap-2 bg-white/90 hover:bg-neutral-50 dark:bg-zinc-900/90 dark:hover:bg-zinc-800 transition-colors select-none cursor-pointer"
+                          >
+                            {selectedSuggestionApps.length === 0 ? (
+                              <span className="text-[10px] font-semibold text-muted-foreground select-none">
+                                Apps: 0 selected
+                              </span>
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] font-semibold text-muted-foreground select-none">
+                                  Apps ({selectedSuggestionApps.length}):
+                                </span>
+                                <div className="flex -space-x-1">
+                                  {selectedSuggestionApps.map((app) => {
+                                    const iconSrc = connectorIcons[app];
+                                    if (!iconSrc) return null;
+                                    return (
+                                      <div
+                                        key={app}
+                                        className="relative h-5 w-5 rounded overflow-hidden flex items-center justify-center shrink-0 border border-border bg-background shadow-xs"
+                                        title={app}
+                                      >
+                                        <Image
+                                          src={iconSrc}
+                                          alt={app}
+                                          width={16}
+                                          height={16}
+                                          className="object-contain"
+                                        />
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                            <ChevronUp
+                              className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200"
+                              style={{
+                                transform: isPopoverOpen
+                                  ? "rotate(180deg)"
+                                  : "none",
+                              }}
+                            />
+                          </button>
+
+                          {isPopoverOpen && (
+                            <div className="absolute bottom-full left-0 mb-2.5 z-50 w-64 bg-card text-card-foreground border border-border rounded-xl shadow-xl p-3 flex flex-col gap-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold text-foreground">
+                                  Select Apps (Free limit: 3)
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setIsPopoverOpen(false)}
+                                  className="text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+
+                              <div className="relative">
+                                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                                <input
+                                  type="text"
+                                  value={searchQuery}
+                                  onChange={(e) =>
+                                    setSearchQuery(e.target.value)
+                                  }
+                                  placeholder="Search apps..."
+                                  className="w-full bg-muted/50 border border-border rounded-lg pl-8 pr-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                                />
+                                {searchQuery && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSearchQuery("")}
+                                    className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="max-h-40 overflow-y-auto space-y-0.5 pr-1">
+                                {Object.keys(connectorIcons)
+                                  .filter((app) =>
+                                    app
+                                      .toLowerCase()
+                                      .includes(searchQuery.toLowerCase()),
+                                  )
+                                  .map((app) => {
+                                    const isSelected =
+                                      selectedSuggestionApps.includes(app);
+                                    const iconSrc = connectorIcons[app];
+                                    return (
+                                      <button
+                                        key={app}
+                                        type="button"
+                                        onClick={() => {
+                                          if (isSelected) {
+                                            setSelectedSuggestionApps(
+                                              selectedSuggestionApps.filter(
+                                                (a) => a !== app,
+                                              ),
+                                            );
+                                          } else {
+                                            if (
+                                              selectedSuggestionApps.length >= 3
+                                            ) {
+                                              return;
+                                            }
+                                            setSelectedSuggestionApps([
+                                              ...selectedSuggestionApps,
+                                              app,
+                                            ]);
+                                          }
+                                        }}
+                                        className={`w-full flex items-center justify-between p-1.5 rounded-lg text-xs text-left transition-colors cursor-pointer ${
+                                          isSelected
+                                            ? "bg-primary/10 text-primary hover:bg-primary/15"
+                                            : "hover:bg-muted/50 text-foreground"
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          {iconSrc && (
+                                            <div className="relative h-5 w-5 rounded overflow-hidden flex items-center justify-center shrink-0 border border-border bg-background">
+                                              <Image
+                                                src={iconSrc}
+                                                alt={app}
+                                                width={16}
+                                                height={16}
+                                                className="object-contain"
+                                              />
+                                            </div>
+                                          )}
+                                          <span>{app}</span>
+                                        </div>
+                                        {isSelected && (
+                                          <span className="text-[10px] font-bold text-primary mr-1">
+                                            Selected
+                                          </span>
+                                        )}
+                                      </button>
+                                    );
+                                  })}
+                                {Object.keys(connectorIcons).filter((app) =>
+                                  app
+                                    .toLowerCase()
+                                    .includes(searchQuery.toLowerCase()),
+                                ).length === 0 && (
+                                  <div className="text-[10px] text-muted-foreground text-center py-4">
+                                    No apps found
+                                  </div>
+                                )}
+                              </div>
+
+                              {selectedSuggestionApps.length >= 3 && (
+                                <div className="mt-1 pt-1.5 border-t border-border/40 text-[9px] text-amber-500 dark:text-amber-400 font-medium leading-snug">
+                                  ⚠️ Max 3 apps selected. For higher limits
+                                  upgrade!
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : isNarrow ? (
                         <button
                           type="button"
                           onClick={() =>
@@ -352,7 +547,7 @@ export default function AgentPage() {
                               height={17}
                             />
                             <Image
-                              className="inline-block h-4 w-4 object-contain bg-background"
+                              className="inline-block h-4.5 w-4.5 object-contain bg-background"
                               src="/calendar.png"
                               alt="Calendar"
                               width={17}
@@ -381,7 +576,7 @@ export default function AgentPage() {
                             }`}
                           >
                             <span
-                              className={`block w-3 h-3 bg-white rounded-full transition-transform duration-200 absolute top-0.5 left-0.5 ${
+                              className={`block w-3.5 h-3.5 bg-white rounded-full transition-transform duration-200 absolute top-0.5 left-0.5 ${
                                 isReadWriteActive
                                   ? "translate-x-3"
                                   : "translate-x-0"
@@ -571,8 +766,10 @@ export default function AgentPage() {
                 {/* React Flow Render Component */}
                 <div className="w-full h-full flex-1 min-h-0">
                   <FlowPreview
-                    onSelectSuggestion={(prompt) => {
+                    onSelectSuggestion={(prompt, apps) => {
                       setInputVal(prompt);
+                      setActiveMode("agent");
+                      setSelectedSuggestionApps(apps);
                       textareaRef.current?.focus();
                     }}
                   />

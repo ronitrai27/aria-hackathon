@@ -1,11 +1,22 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { Background, ReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { ArrowRight, FileText, Share2, Sparkles, Workflow } from "lucide-react";
+import {
+  ArrowRight,
+  FileText,
+  Share2,
+  Sparkles,
+  Workflow,
+  CheckCircle,
+  RefreshCw,
+  Ghost,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface FlowPreviewProps {
-  onSelectSuggestion?: (prompt: string) => void;
+  onSelectSuggestion?: (prompt: string, apps: string[]) => void;
 }
 
 const recipes = [
@@ -19,6 +30,7 @@ const recipes = [
     colorClass: "text-indigo-500",
     bgClass:
       "bg-indigo-500/10 group-hover:bg-indigo-500/20 border-indigo-500/20",
+    apps: ["Google Docs", "Gmail"],
   },
   {
     title: "Carbon Footprint Syndication",
@@ -27,6 +39,7 @@ const recipes = [
     icon: Share2,
     colorClass: "text-rose-500",
     bgClass: "bg-rose-500/10 group-hover:bg-rose-500/20 border-rose-500/20",
+    apps: ["Slack", "Reddit"],
   },
   {
     title: "Asana & Slack Sync",
@@ -36,10 +49,54 @@ const recipes = [
     colorClass: "text-emerald-500",
     bgClass:
       "bg-emerald-500/10 group-hover:bg-emerald-500/20 border-emerald-500/20",
+    apps: ["Asana", "Slack"],
+  },
+  {
+    title: "Slack & Todoist Sync",
+    description: "When task completes -> update in slack -> update in todoist",
+    prompt: "Task x completes, update in slack, update in todoist",
+    icon: CheckCircle,
+    colorClass: "text-amber-500",
+    bgClass: "bg-amber-500/10 group-hover:bg-amber-500/20 border-amber-500/20",
+    apps: ["Slack", "Todoist"],
+  },
+  {
+    title: "Linear & Email Automation",
+    description:
+      "Task x in-progress -> Linear update -> Email -> Message in Slack",
+    prompt: "task x in-progress -> linear update - email - message in slack",
+    icon: Sparkles,
+    colorClass: "text-blue-500",
+    bgClass: "bg-blue-500/10 group-hover:bg-blue-500/20 border-blue-500/20",
+    apps: ["Linear", "Gmail", "Slack"],
+  },
+  {
+    title: "Monthly Activity Summary",
+    description:
+      "Summarize about my last 1 month activity -> create doc in Google Doc -> email.",
+    prompt:
+      "summarize about my last 1 month activity - create doc -> gogole doc - email.",
+    icon: FileText,
+    colorClass: "text-purple-500",
+    bgClass:
+      "bg-purple-500/10 group-hover:bg-purple-500/20 border-purple-500/20",
+    apps: ["Google Docs", "Gmail"],
   },
 ];
 
 export default function FlowPreview({ onSelectSuggestion }: FlowPreviewProps) {
+  const [currentRecipes, setCurrentRecipes] = useState<typeof recipes>([]);
+
+  const handleSuggestNew = () => {
+    const shuffled = [...recipes].sort(() => 0.5 - Math.random());
+    setCurrentRecipes(shuffled.slice(0, 3));
+  };
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount
+  useEffect(() => {
+    handleSuggestNew();
+  }, []);
+
   return (
     <div className="w-full h-full relative flex items-center justify-center p-6">
       {/* Dotted Canvas Background */}
@@ -50,28 +107,43 @@ export default function FlowPreview({ onSelectSuggestion }: FlowPreviewProps) {
       </div>
 
       {/* Suggestion Recipes Glassmorphic Card */}
-      <div className="relative z-10 max-w-md w-full border shadow rounded-md p-4">
-        <div className="flex items-center gap-3 mb-5">
-          <div className="h-10 w-10 rounded-md flex items-center justify-center shrink-0">
-            <Workflow className="h-5 w-5 " />
-          </div>
-          <div>
-            <h3 className="font-bold text-sm text-foreground">
-              Select a Workflow Recipe
-            </h3>
-            <p className="text-xs text-muted-foreground leading-snug">
-              Choose a prompt template below to let the AI agent create your
-              workflow.
-            </p>
+      <div className="relative z-10 max-w-md w-full border shadow rounded-md p-4 bg-background">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-md flex items-center justify-center shrink-0">
+              <Workflow className="h-5 w-5 " />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm text-foreground">
+                Select a Workflow Recipe
+              </h3>
+              <p className="text-xs text-muted-foreground leading-snug">
+                Choose a prompt template below to let the AI agent create your
+                workflow.
+              </p>
+            </div>
           </div>
         </div>
 
+        <div className="flex justify-end mb-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleSuggestNew}
+            className="flex items-center gap-1.5 text-[10px]"
+          >
+            <RefreshCw className="h-3 w-3" />
+            Suggest New
+          </Button>
+        </div>
+
         <div className="flex flex-col gap-3">
-          {recipes.map((recipe) => (
+          {currentRecipes.map((recipe) => (
             <button
               key={recipe.title}
               type="button"
-              onClick={() => onSelectSuggestion?.(recipe.prompt)}
+              onClick={() => onSelectSuggestion?.(recipe.prompt, recipe.apps)}
               className="flex items-center text-left p-3.5 rounded-xl border border-neutral-200/50 dark:border-zinc-800/50 bg-neutral-50/30 dark:bg-zinc-900/20 hover:bg-neutral-50/80 dark:hover:bg-zinc-800/50 hover:border-neutral-300 dark:hover:border-zinc-700 hover:scale-[1.01] hover:-translate-y-0.5 shadow-xs hover:shadow-sm transition-all duration-300 group cursor-pointer w-full"
             >
               <div
