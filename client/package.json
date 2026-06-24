@@ -12,7 +12,12 @@
   "dependencies": {
     "@base-ui/react": "^1.6.0",
     "@clerk/nextjs": "^7.5.7",
+    "@composio/core": "^0.11.0",
+    "@composio/langchain": "^0.9.3",
     "@gsap/react": "^2.1.2",
+    "@langchain/core": "^1.2.1",
+    "@langchain/langgraph": "^1.4.5",
+    "@langchain/openai": "^1.5.3",
     "@xyflow/react": "^12.11.1",
     "allotment": "^1.20.5",
     "class-variance-authority": "^0.7.1",

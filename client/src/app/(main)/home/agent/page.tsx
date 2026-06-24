@@ -23,6 +23,7 @@ import {
   ChevronUp,
   Search,
   X,
+  AlertCircle,
 } from "lucide-react";
 import Image from "next/image";
 import Typewriter from "typewriter-effect";
@@ -38,6 +39,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAgentStore } from "@/hooks/useAgentStore";
 import FlowPreview from "./components/FlowPreview";
 import { connectorIcons } from "@/lib/static";
+import { useQuery } from "convex/react";
+import { api } from "../../../../../convex/_generated/api";
 
 const suggestions = [
   {
@@ -82,6 +85,8 @@ export default function AgentPage() {
     string[]
   >([]);
 
+  const user = useQuery(api.user.getCurrentUser);
+
   const popoverRef = useRef<HTMLDivElement>(null);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -123,7 +128,7 @@ export default function AgentPage() {
 
   const isNarrow = paneWidth < 580;
 
-  const { activeMode, setActiveMode } = useAgentStore();
+  const { activeMode, setActiveMode, openConnectionDialog } = useAgentStore();
 
   return (
     <div className="h-[calc(100vh-4rem)] w-[calc(100%+3rem)] -mx-6 -my-6 flex overflow-hidden bg-background">
@@ -344,10 +349,17 @@ export default function AgentPage() {
 
                       {activeMode === "agent" ? (
                         <div className="relative" ref={popoverRef}>
-                          <button
-                            type="button"
+                          <div
+                            role="button"
+                            tabIndex={0}
                             onClick={() => setIsPopoverOpen(!isPopoverOpen)}
-                            className="border border-border/80 shadow-xs p-1.5 px-3 rounded-full flex items-center gap-2 bg-white/90 hover:bg-neutral-50 dark:bg-zinc-900/90 dark:hover:bg-zinc-800 transition-colors select-none cursor-pointer"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setIsPopoverOpen(!isPopoverOpen);
+                              }
+                            }}
+                            className="border border-border/80 shadow-xs p-1.5 px-3 rounded-full flex items-center gap-2 bg-white/90 hover:bg-neutral-50 dark:bg-zinc-900/90 dark:hover:bg-zinc-800 transition-colors select-none cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-ring"
                           >
                             {selectedSuggestionApps.length === 0 ? (
                               <span className="text-[10px] font-semibold text-muted-foreground select-none">
@@ -362,11 +374,18 @@ export default function AgentPage() {
                                   {selectedSuggestionApps.map((app) => {
                                     const iconSrc = connectorIcons[app];
                                     if (!iconSrc) return null;
+                                    const isConnected =
+                                      user?.connecters?.includes(app);
                                     return (
-                                      <div
+                                      <button
                                         key={app}
-                                        className="relative h-5 w-5 rounded overflow-hidden flex items-center justify-center shrink-0"
-                                        title={app}
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          openConnectionDialog(app);
+                                        }}
+                                        className="relative h-5 w-5 rounded overflow-hidden flex items-center justify-center shrink-0 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+                                        title={`${app}${isConnected ? " (Connected) - Click to manage" : " (Not connected) - Click to connect"}`}
                                       >
                                         <Image
                                           src={iconSrc}
@@ -375,7 +394,12 @@ export default function AgentPage() {
                                           height={16}
                                           className="object-contain"
                                         />
-                                      </div>
+                                        {!isConnected && (
+                                          <div className="absolute inset-0 bg-red-500/10 flex items-center justify-center pointer-events-none">
+                                            <AlertCircle className="h-3 w-3 text-red-600 bg-white rounded-full shrink-0" />
+                                          </div>
+                                        )}
+                                      </button>
                                     );
                                   })}
                                 </div>
@@ -389,7 +413,7 @@ export default function AgentPage() {
                                   : "none",
                               }}
                             />
-                          </button>
+                          </div>
 
                           {isPopoverOpen && (
                             <div className="absolute bottom-full left-0 mb-2.5 z-50 w-64 bg-card text-card-foreground border border-border rounded-xl shadow-xl p-3 flex flex-col gap-2">
@@ -470,7 +494,7 @@ export default function AgentPage() {
                                       >
                                         <div className="flex items-center gap-2">
                                           {iconSrc && (
-                                            <div className="relative h-5 w-5 rounded overflow-hidden flex items-center justify-center shrink-0 border border-border bg-background">
+                                            <div className="relative h-5 w-5 rounded overflow-hidden flex items-center justify-center shrink-0">
                                               <Image
                                                 src={iconSrc}
                                                 alt={app}

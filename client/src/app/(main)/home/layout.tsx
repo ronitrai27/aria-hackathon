@@ -4,6 +4,7 @@ import { AppSidebar } from "@/modules/main/AppSidebar";
 import { BreadCrumbs } from "@/modules/main/BreadCrumbs";
 import { ConnectorDropdown } from "./ConnectorDropdown";
 import { UserMenu } from "@/components/UserMenu";
+import { ConnectionDialog } from "@/components/ConnectionDialog";
 import { Cable, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -43,6 +44,7 @@ export default function HomeLayout({
         </header>
         <main className="flex-1 overflow-auto p-6">{children}</main>
       </div>
+      <ConnectionDialog />
     </SidebarProvider>
   );
 }

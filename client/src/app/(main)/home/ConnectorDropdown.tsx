@@ -1,9 +1,13 @@
 "use client";
 
-import { Plug } from "lucide-react";
+import { Plug, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import { toast } from "sonner";
+import { useAgentStore } from "@/hooks/useAgentStore";
 
 const connectors = [
   { name: "Gmail", icon: "/gmail.png" },
@@ -30,6 +34,11 @@ const connectors = [
 
 export function ConnectorDropdown() {
   const [isOpen, setIsOpen] = useState(false);
+
+  const user = useQuery(api.user.getCurrentUser);
+  const openConnectionDialog = useAgentStore((state) => state.openConnectionDialog);
+  const connectedApps = user?.connecters ?? [];
+
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: hover trigger container
     <div
@@ -55,29 +64,44 @@ export function ConnectorDropdown() {
             </div>
             <div className="border-b border-border/60 mb-2.5" />
             <div className="grid grid-cols-4 gap-2">
-              {connectors.map((connector) => (
-                <div
-                  key={connector.name}
-                  className="flex flex-col items-center gap-1.5 p-1 rounded-xl hover:bg-muted/40 transition-colors"
-                >
-                  <Image
-                    src={connector.icon}
-                    alt={connector.name}
-                    width={32}
-                    height={32}
-                    className="w-7 h-7 object-contain"
-                  />
-                  <span className="text-[10px] font-medium text-muted-foreground text-center">
-                    {connector.name}
-                  </span>
-                  <button
-                    type="button"
-                    className="w-full rounded-full py-0.5 px-0.5 bg-white border border-border text-[9px] font-medium flex items-center justify-center gap-0.5 transition-all shadow-sm cursor-pointer"
+              {connectors.map((connector) => {
+                const isConnected = connectedApps.includes(connector.name);
+
+                return (
+                  <div
+                    key={connector.name}
+                    className="flex flex-col items-center gap-1.5 p-1 rounded-xl hover:bg-muted/40 transition-colors"
                   >
-                    Connect <span className="font-semibold text-xs">+</span>
-                  </button>
-                </div>
-              ))}
+                    <Image
+                      src={connector.icon}
+                      alt={connector.name}
+                      width={32}
+                      height={32}
+                      className="w-7 h-7 object-contain"
+                    />
+                    <span className="text-[10px] font-medium text-muted-foreground text-center animate-in">
+                      {connector.name}
+                    </span>
+                    {isConnected ? (
+                      <button
+                        type="button"
+                        onClick={() => openConnectionDialog(connector.name)}
+                        className="w-full rounded-full py-0.5 px-0.5 bg-emerald-50 border border-emerald-200 text-emerald-600 dark:bg-emerald-950/20 dark:border-emerald-900 dark:text-emerald-400 text-[9px] font-medium flex items-center justify-center gap-0.5 transition-all shadow-sm cursor-pointer hover:bg-emerald-100"
+                      >
+                        Connected
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openConnectionDialog(connector.name)}
+                        className="w-full rounded-full py-0.5 px-0.5 bg-white border border-border text-[9px] font-medium flex items-center justify-center gap-0.5 transition-all shadow-sm cursor-pointer hover:bg-muted"
+                      >
+                        Connect <span className="font-semibold text-xs">+</span>
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
