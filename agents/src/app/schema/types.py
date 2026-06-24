@@ -58,3 +58,21 @@ StatusName = Literal[
     "done",               # Supervisor / parent completed execution
     "error",              # Unrecoverable error occurred
 ]
+
+# ── Workflow Engine Node Types ────────────────────────────────────────────────
+AINodeType = Literal[
+    "summarize",          # Summarizes a text input or context
+    "classify",           # Classifies text input into target classes
+    "extract",            # Extracts structured schema from text
+    "research",           # Performs detailed web research or deep topic lookup
+]
+
+NodeType = Literal[
+    "ai_summarize",
+    "ai_classify",
+    "ai_extract",
+    "ai_research",
+    "composio_app",
+    "task_trigger",
+]
+
