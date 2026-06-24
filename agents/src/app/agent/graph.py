@@ -115,10 +115,15 @@ def agent_supervisor_node(state: AgentState) -> Command:
     # If worker results are present, it means the builder worker has run. We terminate.
     if state.get("worker_results"):
         logger.info("[Agent Supervisor] Workers completed. Completing subgraph turn.")
+        workflow_name = "Workflow"
+        schema = state.get("workflow_schema")
+        if schema and "workflow_name" in schema:
+            workflow_name = schema["workflow_name"]
+        final_msg = f"I have successfully created the workflow: '{workflow_name}'. Feel free to modify it or ask me to add anything else!"
         return Command(
             update={
                 "status": "done",
-                "final_response": "Workflow designed successfully and populated with parameter schemas."
+                "final_response": final_msg
             },
             goto=END
         )

@@ -32,6 +32,8 @@ dependencies = [
     "nemoguardrails==0.22.0",
     "composio (>=0.15.0,<0.16.0)",
     "composio-langchain (>=0.15.0,<0.16.0)",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.28.0",
 ]
 
 
