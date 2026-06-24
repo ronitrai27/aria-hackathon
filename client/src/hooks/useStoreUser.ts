@@ -12,14 +12,27 @@ import { Id } from "../../convex/_generated/dataModel";
  * - userId: the Convex Id of the synced user record.
  */
 export function useStoreUser() {
-  const { isLoaded, isSignedIn } = useUser();
+  const { isLoaded, isSignedIn, user } = useUser();
   const [userId, setUserId] = useState<Id<"users"> | null>(null);
   const storeUser = useMutation(api.user.createUser);
 
   useEffect(() => {
     if (!isSignedIn) {
       setUserId(null);
+      localStorage.removeItem("aria_clerk_user_id");
+      localStorage.removeItem("aria_convex_site_url");
+      localStorage.removeItem("aria_user_name");
       return;
+    }
+
+    if (user?.id) {
+      localStorage.setItem("aria_clerk_user_id", user.id);
+      const fullName = user.fullName || [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username || user.emailAddresses?.[0]?.emailAddress || "User";
+      localStorage.setItem("aria_user_name", fullName);
+    }
+    const convexSiteUrl = process.env.NEXT_PUBLIC_CONVEX_SITE_URL;
+    if (convexSiteUrl) {
+      localStorage.setItem("aria_convex_site_url", convexSiteUrl);
     }
 
     const syncUser = async () => {
@@ -32,7 +45,7 @@ export function useStoreUser() {
     };
 
     syncUser();
-  }, [isSignedIn, storeUser]);
+  }, [isSignedIn, user, storeUser]);
 
   return {
     isLoading: !isLoaded || (isSignedIn && userId === null),

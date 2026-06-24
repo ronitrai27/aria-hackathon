@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aria Tracker</title>
+    <style>
+      :root {
+        --bg: #09090b;
+        --card-bg: rgba(255, 255, 255, 0.03);
+        --card-border: rgba(255, 255, 255, 0.08);
+        --text: #f4f4f5;
+        --text-muted: #a1a1aa;
+        --primary: #8b5cf6;
+        --primary-hover: #7c3aed;
+        --success: #10b981;
+        --danger: #ef4444;
+      }
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        margin: 0;
+        padding: 12px;
+        width: 280px;
+      }
+      .container {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--card-border);
+        padding-bottom: 8px;
+      }
+      .logo {
+        font-weight: 700;
+        font-size: 1rem;
+        background: linear-gradient(135deg, #a78bfa, #8b5cf6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .status-badge {
+        font-size: 0.7rem;
+        padding: 2px 8px;
+        border-radius: 9999px;
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--success);
+        border: 1px solid rgba(16, 185, 129, 0.2);
+        cursor: default;
+      }
+      .status-badge.disconnected {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--danger);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+      }
+      .card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 10px;
+        padding: 10px;
+        backdrop-filter: blur(10px);
+      }
+      .card-title {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .site-info {
+        font-size: 0.9rem;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 6px;
+        font-size: 0.85rem;
+      }
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 36px;
+        height: 20px;
+      }
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #27272a;
+        transition: 0.2s;
+        border-radius: 20px;
+      }
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 14px;
+        width: 14px;
+        left: 3px;
+        bottom: 3px;
+        background-color: #fff;
+        transition: 0.2s;
+        border-radius: 50%;
+      }
+      input:checked + .slider {
+        background-color: var(--primary);
+      }
+      input:checked + .slider:before {
+        transform: translateX(16px);
+      }
+      .btn {
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 7px 12px;
+        font-weight: 500;
+        cursor: pointer;
+        width: 100%;
+        font-size: 0.85rem;
+        transition:
+          background 0.2s,
+          transform 0.1s;
+      }
+      .btn:hover {
+        background: var(--primary-hover);
+      }
+      .btn:active {
+        transform: scale(0.98);
+      }
+      .btn.secondary {
+        background: transparent;
+        border: 1px solid var(--card-border);
+        color: var(--text-muted);
+        margin-top: 6px;
+      }
+      .btn.secondary:hover {
+        border-color: var(--danger);
+        color: var(--danger);
+        background: rgba(239, 68, 68, 0.05);
+      }
+      .connect-card {
+        border-color: rgba(139, 92, 246, 0.3);
+        background: rgba(139, 92, 246, 0.04);
+      }
+      .connect-hint {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-top: 6px;
+        text-align: center;
+        line-height: 1.4;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="logo">Aria Web Tracker</div>
+        <div id="connection-status" class="status-badge disconnected">
+          Disconnected
+        </div>
+      </div>
+
+      <!-- Shown only when disconnected -->
+      <div id="connect-card" class="card connect-card" style="display: none">
+        <div class="card-title">⚡ Connect Account</div>
+        <button id="connect-btn" class="btn">Connect to Aria App Tab</button>
+        <p class="connect-hint">
+          Open <strong>localhost:3000</strong> while signed in,<br />then click
+          above to connect instantly.
+        </p>
+      </div>
+
+      <div id="tracking-card" class="card" style="display: none">
+        <div class="card-title">Active Site</div>
+        <div id="active-url" class="site-info">Loading active tab...</div>
+        <div class="toggle-row">
+          <span>Track this website</span>
+          <label class="switch">
+            <input type="checkbox" id="tracking-toggle" checked />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div id="sync-card" class="card" style="display: none">
+        <div class="card-title">Sync Details</div>
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+          "
+        >
+          <span>Unsynced Logs:</span>
+          <span id="unsynced-count" style="font-weight: bold">0</span>
+        </div>
+        <button id="sync-now-btn" class="btn" style="margin-bottom: 8px">
+          Sync Queue Now
+        </button>
+        <button id="disconnect-btn" class="btn secondary">
+          Disconnect Account
+        </button>
+      </div>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>

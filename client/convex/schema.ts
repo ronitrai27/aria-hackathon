@@ -16,4 +16,16 @@ export default defineSchema({
   })
     .index("by_clerk_id", ["id"])
     .index("by_email", ["email"]),
+
+  browserData: defineTable({
+    userId: v.string(),
+    clientUuid: v.string(), // - this is only what makes the "don't save twice" logic possible — Convex checks this index before inserting.
+    url: v.string(),
+    content: v.optional(v.string()), // short summary, not raw page
+    openedAt: v.number(),
+    duration: v.optional(v.number()), // ms, filled when tab closes/leaves
+    scrollDepth: v.optional(v.number()), // 0-100
+  })
+    .index("by_user", ["userId"])
+    .index("by_uuid", ["clientUuid"]),
 });
