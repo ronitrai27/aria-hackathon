@@ -30,6 +30,8 @@ dependencies = [
     "pinecone>=9.1.0,<10.0.0",
     "langchain-openai>=1.3.2,<2.0.0",
     "nemoguardrails==0.22.0",
+    "composio (>=0.15.0,<0.16.0)",
+    "composio-langchain (>=0.15.0,<0.16.0)",
 ]
 
 
