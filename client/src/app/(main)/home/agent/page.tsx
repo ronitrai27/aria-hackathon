@@ -358,14 +358,14 @@ export default function AgentPage() {
                                 <span className="text-[10px] font-semibold text-muted-foreground select-none">
                                   Apps ({selectedSuggestionApps.length}):
                                 </span>
-                                <div className="flex -space-x-1">
+                                <div className="flex -space-x-0.5">
                                   {selectedSuggestionApps.map((app) => {
                                     const iconSrc = connectorIcons[app];
                                     if (!iconSrc) return null;
                                     return (
                                       <div
                                         key={app}
-                                        className="relative h-5 w-5 rounded overflow-hidden flex items-center justify-center shrink-0 border border-border bg-background shadow-xs"
+                                        className="relative h-5 w-5 rounded overflow-hidden flex items-center justify-center shrink-0"
                                         title={app}
                                       >
                                         <Image
