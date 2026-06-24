@@ -189,22 +189,32 @@ def workflow_builder_node(state: AgentState) -> dict:
         react_flow_edges = []
         
         for step in design.steps:
+            # Clean string values to fit custom nodes beautifully
+            label_clean = step.label.strip() if step.label else ""
+            if (label_clean.startswith('"') and label_clean.endswith('"')) or (label_clean.startswith("'") and label_clean.endswith("'")):
+                label_clean = label_clean[1:-1].strip()
+
             node_data = {
-                "label": step.label,
+                "label": label_clean,
                 "type": step.type,
             }
             
             # Populate AI configurations
             if step.type.startswith("ai_"):
+                prompt_clean = step.ai_prompt.strip() if step.ai_prompt else ""
+                if (prompt_clean.startswith('"') and prompt_clean.endswith('"')) or (prompt_clean.startswith("'") and prompt_clean.endswith("'")):
+                    prompt_clean = prompt_clean[1:-1].strip()
                 node_data["ai_config"] = {
-                    "prompt": step.ai_prompt,
+                    "prompt": prompt_clean,
                     "target_classes": step.ai_target_classes,
                     "extraction_schema": step.ai_extraction_schema,
                 }
             
             # Populate Composio configuration & fetch real-time schemas
             elif step.type == "composio_app" and step.composio_action_slug:
-                action_slug = step.composio_action_slug.lower()
+                action_slug = step.composio_action_slug.strip().lower()
+                if (action_slug.startswith('"') and action_slug.endswith('"')) or (action_slug.startswith("'") and action_slug.endswith("'")):
+                    action_slug = action_slug[1:-1].strip()
                 node_data["composio_config"] = {
                     "action_slug": action_slug,
                     "params_mapping": step.composio_params_mapping or {},

@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { Composio } from "@composio/core";
+import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   try {
@@ -7,7 +7,7 @@ export async function POST(request: Request) {
     if (!userId || !appName) {
       return NextResponse.json(
         { error: "userId and appName are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -15,18 +15,21 @@ export async function POST(request: Request) {
     if (!apiKey) {
       return NextResponse.json(
         { error: "COMPOSIO_API_KEY is not configured" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     const client = new Composio({ apiKey });
     // Normalize app/toolkit slug
-    const toolkitSlug = appName.toLowerCase() === "calendar" ? "googlecalendar" : appName.toLowerCase();
+    const toolkitSlug =
+      appName.toLowerCase() === "calendar"
+        ? "googlecalendar"
+        : appName.toLowerCase();
 
     // 1. List accounts for the user and toolkit
     const accounts = await client.connectedAccounts.list({
       userIds: [userId],
-      toolkitSlugs: [toolkitSlug]
+      toolkitSlugs: [toolkitSlug],
     });
 
     // 2. Delete all active/matching connected accounts
@@ -41,7 +44,7 @@ export async function POST(request: Request) {
     console.error("Disconnect error:", error);
     return NextResponse.json(
       { error: error.message || "Failed to disconnect" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

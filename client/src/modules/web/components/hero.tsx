@@ -104,22 +104,46 @@ export default function Hero() {
         <div className="absolute inset-0 pointer-events-none z-10 select-none overflow-hidden">
           {/* Cloud 1 - Bottom Left Back */}
           <div className="absolute bottom-20 -left-20 w-[50%] max-w-[600px] aspect-square animate-cloud-1 opacity-90 mix-blend-screen">
-            <Image src="/1.svg" alt="" fill priority className="object-contain" />
+            <Image
+              src="/1.svg"
+              alt=""
+              fill
+              priority
+              className="object-contain"
+            />
           </div>
 
           {/* Cloud 2 - Bottom Right Back */}
           <div className="absolute bottom-12 -right-20 w-[50%] max-w-[600px] aspect-square animate-cloud-2 opacity-90 mix-blend-screen">
-            <Image src="/2.svg" alt="" fill priority className="object-contain" />
+            <Image
+              src="/2.svg"
+              alt=""
+              fill
+              priority
+              className="object-contain"
+            />
           </div>
 
           {/* Cloud 3 - Bottom Left Front */}
           <div className="absolute -bottom-10 left-[16%] w-[45%] max-w-[500px] aspect-square animate-cloud-3 opacity-80 mix-blend-screen">
-            <Image src="/3.svg" alt="" fill priority className="object-contain" />
+            <Image
+              src="/3.svg"
+              alt=""
+              fill
+              priority
+              className="object-contain"
+            />
           </div>
 
           {/* Cloud 4 - Bottom Right Front */}
           <div className="absolute -bottom-10 right-[5%] w-[45%] max-w-[500px] aspect-square animate-cloud-4 opacity-80 mix-blend-screen">
-            <Image src="/4.svg" alt="" fill priority className="object-contain" />
+            <Image
+              src="/4.svg"
+              alt=""
+              fill
+              priority
+              className="object-contain"
+            />
           </div>
         </div>
 

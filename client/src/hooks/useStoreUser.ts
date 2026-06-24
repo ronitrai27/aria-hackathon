@@ -27,7 +27,12 @@ export function useStoreUser() {
 
     if (user?.id) {
       localStorage.setItem("aria_clerk_user_id", user.id);
-      const fullName = user.fullName || [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username || user.emailAddresses?.[0]?.emailAddress || "User";
+      const fullName =
+        user.fullName ||
+        [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+        user.username ||
+        user.emailAddresses?.[0]?.emailAddress ||
+        "User";
       localStorage.setItem("aria_user_name", fullName);
     }
     const convexSiteUrl = process.env.NEXT_PUBLIC_CONVEX_SITE_URL;

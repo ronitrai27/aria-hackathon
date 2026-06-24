@@ -16,7 +16,7 @@ export const syncBrowserData = mutation({
         openedAt: v.number(),
         duration: v.optional(v.number()),
         scrollDepth: v.optional(v.number()),
-      })
+      }),
     ),
   },
   handler: async (ctx, args) => {
@@ -27,7 +27,9 @@ export const syncBrowserData = mutation({
       .unique();
 
     if (!user) {
-      throw new Error(`Unauthorized: Clerk user with ID '${args.userId}' not found.`);
+      throw new Error(
+        `Unauthorized: Clerk user with ID '${args.userId}' not found.`,
+      );
     }
 
     const results = [];
@@ -44,11 +46,17 @@ export const syncBrowserData = mutation({
         const updates: Partial<typeof existing> = {};
         let needsUpdate = false;
 
-        if (event.duration !== undefined && event.duration !== existing.duration) {
+        if (
+          event.duration !== undefined &&
+          event.duration !== existing.duration
+        ) {
           updates.duration = event.duration;
           needsUpdate = true;
         }
-        if (event.scrollDepth !== undefined && event.scrollDepth !== existing.scrollDepth) {
+        if (
+          event.scrollDepth !== undefined &&
+          event.scrollDepth !== existing.scrollDepth
+        ) {
           updates.scrollDepth = event.scrollDepth;
           needsUpdate = true;
         }

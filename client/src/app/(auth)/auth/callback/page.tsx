@@ -1,11 +1,11 @@
 "use client";
-import OnboardCard from "@/modules/auth/OnboardCard";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
-import { api } from "../../../../../convex/_generated/api";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { useStoreUser } from "@/hooks/useStoreUser";
 import { useUserStore } from "@/hooks/useUserStore";
+import OnboardCard from "@/modules/auth/OnboardCard";
+import { api } from "../../../../../convex/_generated/api";
 
 const AuthCallback = () => {
   const { isAuthenticated, isLoading: isStoreLoading } = useStoreUser();

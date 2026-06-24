@@ -12,7 +12,9 @@ export const createUser = mutation({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("Unauthorized: Cannot store user without a valid Clerk session.");
+      throw new Error(
+        "Unauthorized: Cannot store user without a valid Clerk session.",
+      );
     }
 
     // Check if the user already exists

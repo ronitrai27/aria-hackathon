@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { Composio } from "@composio/core";
+import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
   try {
@@ -8,7 +8,7 @@ export async function GET(request: Request) {
     if (!userId) {
       return NextResponse.json(
         { error: "userId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -16,20 +16,22 @@ export async function GET(request: Request) {
     if (!apiKey) {
       return NextResponse.json(
         { error: "COMPOSIO_API_KEY is not configured" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     const client = new Composio({ apiKey });
     const accounts = await client.connectedAccounts.list({
-      userIds: [userId]
+      userIds: [userId],
     });
 
     // Extract toolkits with ACTIVE connection
     const activeToolkits = accounts.items
-      .filter(acc => acc.status === "ACTIVE")
-      .map(acc => {
-        const slug = acc.toolkit?.slug || (typeof acc.toolkit === 'string' ? acc.toolkit : "");
+      .filter((acc) => acc.status === "ACTIVE")
+      .map((acc) => {
+        const slug =
+          acc.toolkit?.slug ||
+          (typeof acc.toolkit === "string" ? acc.toolkit : "");
         // Normalize googlecalendar back to calendar
         return slug.toLowerCase() === "googlecalendar" ? "calendar" : slug;
       });
@@ -39,7 +41,7 @@ export async function GET(request: Request) {
     console.error("Status error:", error);
     return NextResponse.json(
       { error: error.message || "Failed to fetch status" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

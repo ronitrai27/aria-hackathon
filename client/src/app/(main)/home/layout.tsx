@@ -1,12 +1,12 @@
+import { Cable, Mail } from "lucide-react";
 import type React from "react";
+import { ConnectionDialog } from "@/components/ConnectionDialog";
+import { UserMenu } from "@/components/UserMenu";
+import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/modules/main/AppSidebar";
 import { BreadCrumbs } from "@/modules/main/BreadCrumbs";
 import { ConnectorDropdown } from "./ConnectorDropdown";
-import { UserMenu } from "@/components/UserMenu";
-import { ConnectionDialog } from "@/components/ConnectionDialog";
-import { Cable, Mail } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 export default function HomeLayout({
   children,

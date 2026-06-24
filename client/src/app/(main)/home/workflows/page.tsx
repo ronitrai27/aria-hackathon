@@ -1,12 +1,12 @@
 "use client";
 
+import { AlertCircle, Plus, Zap } from "lucide-react";
 import * as React from "react";
-import {
-  StepPopover,
-  type ComposioAction,
-} from "@/modules/workflows/components/StepPopover";
 import { Button } from "@/components/ui/button";
-import { Plus, Zap, AlertCircle } from "lucide-react";
+import {
+  type ComposioAction,
+  StepPopover,
+} from "@/modules/workflows/components/StepPopover";
 
 export default function WorkflowsPage() {
   const [isPopoverOpen, setIsPopoverOpen] = React.useState(false);

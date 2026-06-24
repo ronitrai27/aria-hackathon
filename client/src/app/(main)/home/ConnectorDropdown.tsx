@@ -1,13 +1,13 @@
 "use client";
 
-import { Plug, Loader2 } from "lucide-react";
+import { useMutation, useQuery } from "convex/react";
+import { Loader2, Plug } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { useAgentStore } from "@/hooks/useAgentStore";
+import { api } from "../../../../convex/_generated/api";
 
 const connectors = [
   { name: "Gmail", icon: "/gmail.png" },
@@ -36,7 +36,9 @@ export function ConnectorDropdown() {
   const [isOpen, setIsOpen] = useState(false);
 
   const user = useQuery(api.user.getCurrentUser);
-  const openConnectionDialog = useAgentStore((state) => state.openConnectionDialog);
+  const openConnectionDialog = useAgentStore(
+    (state) => state.openConnectionDialog,
+  );
   const connectedApps = user?.connecters ?? [];
 
   return (

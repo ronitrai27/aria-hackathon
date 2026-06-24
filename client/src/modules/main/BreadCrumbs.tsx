@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import { usePathname } from "next/navigation"
-import Link from "next/link"
-import React from "react"
+import { usePathname } from "next/navigation";
+import Link from "next/link";
+import React from "react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -10,7 +10,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+} from "@/components/ui/breadcrumb";
 
 const routeMap: Record<string, string> = {
   home: "Home",
@@ -18,24 +18,26 @@ const routeMap: Record<string, string> = {
   tasks: "Tasks",
   workflows: "Workflows",
   "life-graph": "Life Graph",
-}
+};
 
 export function BreadCrumbs() {
-  const pathname = usePathname()
-  if (!pathname) return null
+  const pathname = usePathname();
+  if (!pathname) return null;
 
   // Split path into segments, filtering out empty strings
-  const segments = pathname.split("/").filter(Boolean)
+  const segments = pathname.split("/").filter(Boolean);
 
   return (
     <Breadcrumb>
       <BreadcrumbList>
         {segments.map((segment, index) => {
-          const isLast = index === segments.length - 1
-          const href = "/" + segments.slice(0, index + 1).join("/")
-          
+          const isLast = index === segments.length - 1;
+          const href = "/" + segments.slice(0, index + 1).join("/");
+
           // Fallback to capitalizing the segment if not in map
-          const title = routeMap[segment] || segment.charAt(0).toUpperCase() + segment.slice(1)
+          const title =
+            routeMap[segment] ||
+            segment.charAt(0).toUpperCase() + segment.slice(1);
 
           return (
             <React.Fragment key={href}>
@@ -50,9 +52,9 @@ export function BreadCrumbs() {
                 )}
               </BreadcrumbItem>
             </React.Fragment>
-          )
+          );
         })}
       </BreadcrumbList>
     </Breadcrumb>
-  )
+  );
 }

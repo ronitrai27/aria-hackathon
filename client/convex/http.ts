@@ -25,12 +25,18 @@ http.route({
         });
       }
 
-      const results = await ctx.runMutation(api.activities.syncBrowserData, { userId, events });
-
-      return new Response(JSON.stringify({ success: true, count: events.length, results }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      const results = await ctx.runMutation(api.activities.syncBrowserData, {
+        userId,
+        events,
       });
+
+      return new Response(
+        JSON.stringify({ success: true, count: events.length, results }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     } catch (err: any) {
       return new Response(JSON.stringify({ error: err.message }), {
         status: 500,
