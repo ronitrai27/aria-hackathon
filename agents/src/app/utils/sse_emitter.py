@@ -196,3 +196,29 @@ def sse_memorable_info_event(detected: bool, info_summary: Optional[str] = None,
         "event": "memorable_info",
         "data": json.dumps(payload),
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Handoff Trigger Event
+# ─────────────────────────────────────────────────────────────────────────────
+
+def sse_handoff_event(target: str, reason: str, query: Optional[str] = None) -> dict:
+    """
+    Streams when a conversation is dynamically handed off to a different agent/subgraph.
+
+    Args:
+        target — target subgraph ("agent_subgraph" | "brain_subgraph")
+        reason — explanation for why handoff was triggered
+        query  — optional forwarded user query
+    """
+    payload = {
+        "target": target,
+        "reason": reason
+    }
+    if query is not None:
+        payload["query"] = query
+    return {
+        "event": "handoff",
+        "data": json.dumps(payload),
+    }
+

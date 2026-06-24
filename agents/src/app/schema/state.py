@@ -1,7 +1,7 @@
 """
 schema/state.py
 ───────────────
-The single source of truth for all data flowing through the graph.
+The state definitions for ParentGraph, BrainGraph, and AgentGraph.
 """
 
 from __future__ import annotations
@@ -12,108 +12,90 @@ from typing_extensions import TypedDict
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 
-from .types import IntentName, StatusName, WorkerName
+from .types import (
+    AgentIntentName,
+    AgentWorkerName,
+    BrainIntentName,
+    BrainWorkerName,
+    ParentWorkerName,
+    StatusName,
+)
 
 
-# ── Intermediate result produced by every worker ───────────────────────────────
 class WorkerResult(TypedDict):
     """
-    Standardised envelope every worker must return inside `worker_results`.
-
-    Fields:
-        worker  — which worker produced this result (for the Supervisor to read)
-        output  — the actual payload (task list, memory context, etc.)
-        error   — None on success; error string on failure
+    Standard envelope returned by any worker node in worker_results.
     """
-    worker: WorkerName
-    output: Any
-    error: str | None
+    worker: str  # The name of the worker that executed.
+    output: Any  # The computed payload output of the worker.
+    error: str | None  # Error message if the worker execution failed.
 
 
-# ── The Unified State ──────────────────────────────────────────────────────────
-class AriaState(TypedDict):
+class ParentState(TypedDict):
     """
-    Single shared state object for the entire Aria graph.
-
-    Passed into every node. Every node returns a partial update.
-    LangGraph merges the update — no manual state management needed.
+    Global top-level state managed by ParentGraph.
     """
+    messages: Annotated[list[BaseMessage], add_messages]  # Complete conversation history shared across graphs.
+    next_route: ParentWorkerName  # Target subgraph name or termination marker (__end__).
+    final_response: str | None  # Natural-language text response returned to the user interface.
+    status: StatusName  # Current lifecycle execution status of the graph run.
+    error_message: str | None  # Last caught error traceback or message if a step failed.
+    turn_count: int  # Cumulative step count across graphs to check against recursion limits.
+    worker_results: Annotated[list[WorkerResult], operator.add]  # Safe parallel-accumulated checklist of execution steps.
+    tasks: list[dict] | None  # Task list retrieved or modified from the database.
+    last_created_task_id: str | None  # ID of the task most recently created to link as workflow triggers.
+    automations: list[dict] | None  # Active workflow templates configured for the workspace.
+    workflow_schema: dict | None  # React Flow diagram structural definition (nodes/edges).
+    memory_context: str | None  # Recalled user context or profile constraints from long-term memory.
+    contains_memorable_info: bool | None  # Ingestion flag triggering background memory vector+graph updates.
+    transfer_to_agent: bool  # Handoff flag signaling request should switch to Agent workflow builder.
+    transfer_query: str | None  # Raw query forwarded to the Agent subgraph after handoff.
 
-    # ── Conversation ───────────────────────────────────────────────────────────
-    # `add_messages` is LangGraph's built-in reducer.
-    # It APPENDS new messages and deduplicates by message.id.
-    # NEVER overwrite this field with a plain assignment.
-    messages: Annotated[list[BaseMessage], add_messages]
 
-    # ── Supervisor fields ──────────────────────────────────────────────────────
-    # `current_intent` — label the Supervisor LLM assigns to the user's request.
-    # This is a TRACKING label only. It does NOT look up workers.
-    # The LLM outputs `planned_workers` separately and freely.
-    current_intent: IntentName
+class BrainState(TypedDict):
+    """
+    State dictionary managed inside BrainGraph.
+    """
+    # Shared with parent (automatically synchronized)
+    messages: Annotated[list[BaseMessage], add_messages]  # Synced conversation history thread.
+    turn_count: int  # Current step sequence counter.
+    status: StatusName  # Lifecyle execution status of the brain graph.
+    error_message: str | None  # Captured node error messages.
+    final_response: str | None  # Subgraph final computed natural language response.
+    worker_results: Annotated[list[WorkerResult], operator.add]  # Accumulator for brain worker traces.
+    tasks: list[dict] | None  # Active task lists returned from database.
+    last_created_task_id: str | None  # Tracked target task ID.
+    memory_context: str | None  # Summarized memory facts fetched from vectors/graphs.
+    contains_memorable_info: bool | None  # Memorable data signal for background worker.
+    transfer_to_agent: bool  # Flag to trigger handoff to AgentGraph.
+    transfer_query: str | None  # Extracted query for AgentGraph to process.
 
-    # `planned_workers` — list of worker node names the Supervisor decided to
-    # invoke this turn. Set by Supervisor, read by workers for context.
-    planned_workers: list[WorkerName]
+    # Brain internal specific fields
+    current_intent: BrainIntentName  # The categorized intent of the user request.
+    planned_workers: list[BrainWorkerName]  # Workers chosen by the supervisor to process the query.
+    daily_summary: str | None  # Generated summary of yesterday's workload and research logs.
+    connector_data: dict | None  # Inbox or Calendar events read from integrations.
 
-    # `final_response` — the natural-language reply to surface to the user.
-    # Set by the Supervisor when it decides the task is complete.
-    final_response: str | None
 
-    # ── Worker results (PARALLEL-SAFE) ────────────────────────────────────────
-    # `operator.add` = list append reducer.
-    # Multiple workers running in parallel can all write to this field safely.
-    # After fan-in, this contains one WorkerResult entry per invoked worker.
-    # The Supervisor reads this on the next turn to understand what happened.
-    worker_results: Annotated[list[WorkerResult], operator.add]
+class AgentState(TypedDict):
+    """
+    State dictionary managed inside AgentGraph.
+    """
+    # Shared with parent (automatically synchronized)
+    messages: Annotated[list[BaseMessage], add_messages]  # Synced conversation history thread.
+    turn_count: int  # Current step sequence counter.
+    status: StatusName  # Lifecycle execution status of the agent graph.
+    error_message: str | None  # Captured node error messages.
+    final_response: str | None  # Subgraph final computed natural language response.
+    worker_results: Annotated[list[WorkerResult], operator.add]  # Accumulator for agent worker traces.
+    automations: list[dict] | None  # Generated or fetched workspace automation flows.
+    workflow_schema: dict | None  # Output React Flow nodes and edges definition.
 
-    # ── Domain-specific fields (single-writer, no reducer needed) ─────────────
-
-    # Written by: task_worker
-    # Contains the full list of tasks returned from Convex DB.
-    tasks: list[dict] | None
-
-    # Written by: task_worker
-    # The ID of the task most recently created or modified.
-    # automation_creator reads this to link automations to tasks.
-    last_created_task_id: str | None
-
-    # Written by: automation_creator
-    # The React Flow graph definitions (nodes + edges) for active automations.
-    automations: list[dict] | None
-
-    # Written by: automation_creator (staging area for HITL)
-    # Holds an unexecuted automation plan waiting for human approval.
-    # Cleared after interrupt() resolves (approved or cancelled).
-    pending_automation_plan: dict | None
-
-    # Written by: memory_worker
-    # Semantic context retrieved from Pinecone / Neo4j for the current query.
-    memory_context: str | None
-
-    # Written by: memory_ingest_worker (background worker)l/2wqhiyuueggxdhwu23wksdnn§"§
-    # IDs of messages already processed by the memory ingestion pipeline.
-    ingested_message_ids: list[str] | None
-
-    # Written by: Supervisor / spaCy pre-filter
-    # Flag signaling that the current turn contains important personal context to ingest immediately.
-    contains_memorable_info: bool | None
-
-    # Written by: browser_worker
-    # Raw content of the current browser page stored in DB.
-    browser_content: str | None
-
-    # Written by: connector_worker
-    # Data retrieved from Gmail / Outlook / Slack / Calendar.
-    connector_data: dict | None
-
-    # ── Control ────────────────────────────────────────────────────────────────
-    # Graph lifecycle status — set by Supervisor.
-    status: StatusName
-
-    # Last error message. Set by any node on exception.
-    # The Supervisor reads this to decide whether to retry or abort.
-    error_message: str | None
-
-    # Turn counter incremented by the Supervisor on every cycle.
-    # Used to detect and break infinite loops (see MAX_TURNS in supervisor).
-    turn_count: int
+    # Agent internal specific fields
+    current_intent: AgentIntentName  # The categorized intent of the workflow request.
+    planned_workers: list[AgentWorkerName]  # Workers chosen by the supervisor to build or run workflow.
+    pending_workflow_plan: dict | None  # Built plan staging area waiting for user approval.
+    connected_apps: list[str] | None  # List of integrations (like LinkedIn, Slack) verified for user.
+    composio_action_results: list[dict] | None  # Results of executing tools through Composio actions.
+    ai_node_configs: list[dict] | None  # Configuration settings for AI research/summarize pipeline nodes.
+    schedule_config: dict | None  # Active trigger rules or cron settings for the workflow.

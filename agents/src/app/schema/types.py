@@ -1,51 +1,60 @@
 """
 schema/types.py
 ───────────────
-Literal type aliases used across the entire graph.
-
-IMPORTANT — READ THIS:
-  These Literals are purely for type-safety and IDE auto-complete.
-  They are NOT used to look up workers. The Supervisor LLM outputs
-  both `intent` (a label) and `workers_to_invoke` (a free list) as
-  separate fields in SupervisorDecision. No hardcoded mapping exists.
-
-  IntentName  → label the LLM attaches to the user's request
-  WorkerName  → names of nodes registered in the StateGraph
-  StatusName  → lifecycle status of the current graph run
+Literal type aliases used across Parent, Brain, and Agent graphs.
 """
 
 from typing import Literal
 
-# ── Worker node names ──────────────────────────────────────────────────────────
-# These must match the string names used in builder.add_node() exactly.
-WorkerName = Literal[
-    "memory_worker",       # Pinecone (vector) + Neo4j (graph) — reflect / context
-    "task_worker",         # Convex DB — CRUD on tasks
-    "automation_creator",  # React Flow nodes/edges — create/edit automations
-    "browser_worker",      # Browser content stored in DB — page context
-    "connector_worker",    # Gmail / Outlook / Slack / Calendar via Compose
+# ── Parent Graph Nodes ────────────────────────────────────────────────────────
+ParentWorkerName = Literal[
+    "router",
+    "brain_subgraph",
+    "agent_subgraph",
+    "__end__",
 ]
 
-# ── Intent labels ──────────────────────────────────────────────────────────────
-# The LLM picks the CLOSEST label for tracking purposes only.
-# If no label fits (multi-intent or novel request), it returns "unknown".
-# The LLM then SEPARATELY outputs workers_to_invoke — no lookup table needed.
-IntentName = Literal[
-    "reflect",            # recall memories, past context
-    "task_status",        # read / query existing tasks
-    "summarize",          # summarize browser content or task list
-    "create_task",        # write a new task to Convex
-    "create_automation",  # build a new React Flow automation
-    "edit_automation",    # modify an existing automation
-    "prioritize",         # rank tasks / suggest priority order
-    "suggest",            # proactive suggestions from context + connectors
-    "unknown",            # multi-intent or novel — LLM still picks workers freely
+# ── Brain Subgraph Workers ───────────────────────────────────────────────────
+BrainWorkerName = Literal[
+    "memory_worker",      # Pinecone (vector) + Neo4j (graph) retrieval
+    "task_worker",        # Convex DB CRUD operations (bulk actions, update, get)
+    "upload_worker",      # Parse and split doc text using LlamaCloud
+    "reflect_worker",     # Recall context, past reflections, suggest next steps
+    "composio_worker",    # Read emails (Gmail/Outlook), Calendar, etc.
 ]
 
-# ── Graph lifecycle status ─────────────────────────────────────────────────────
+# ── Agent Subgraph Workers ───────────────────────────────────────────────────
+AgentWorkerName = Literal[
+    "workflow_builder",   # React Flow node/edge builder
+    "composio_worker",    # Write/perform actions (send email, post LinkedIn)
+    "ai_node_worker",     # Parameters for AI nodes (summarize, research, classify, extract)
+    "scheduler_worker",   # Set cron job / run configuration
+]
+
+# ── Brain Subgraph Intents ───────────────────────────────────────────────────
+BrainIntentName = Literal[
+    "reflect",            # Past reflections and general queries
+    "task_crud",          # CRUD on tasks (get tasks, create task, update task)
+    "suggest",            # Suggest tasks or context based on past days
+    "upload",             # Upload document to build tasks from it
+    "read_connectors",    # Read from Gmail/Outlook/Calendar
+    "unknown",            # Default fallback
+]
+
+# ── Agent Subgraph Intents ───────────────────────────────────────────────────
+AgentIntentName = Literal[
+    "create_workflow",    # Generate a workflow structure (React Flow)
+    "edit_workflow",      # Customize an existing workflow
+    "add_ai_node",        # Add AI summarization/classification/research parameters
+    "schedule",           # Define trigger or run schedule
+    "run",                # Execute workflow immediately
+    "unknown",            # Default fallback
+]
+
+# ── Graph Lifecycle Status ───────────────────────────────────────────────────
 StatusName = Literal[
-    "running",            # graph is actively executing
-    "waiting_for_human",  # interrupt() was called, awaiting human input
-    "done",               # supervisor decided task is complete
-    "error",              # an unrecoverable error occurred
+    "running",            # Graph is actively executing
+    "waiting_for_human",  # interrupt() called, awaiting human input
+    "done",               # Supervisor / parent completed execution
+    "error",              # Unrecoverable error occurred
 ]
