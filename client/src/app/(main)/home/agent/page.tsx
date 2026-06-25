@@ -1062,6 +1062,17 @@ export default function AgentPage() {
                       setSelectedSuggestionApps(apps || []);
                       setInputVal(prompt);
                     }}
+                    onEditWorkflow={(text) => {
+                      if (activeMode === "brain") {
+                        setActiveMode("agent");
+                      }
+                      setInputVal(text);
+                      setTimeout(() => {
+                        if (textareaRef.current) {
+                          textareaRef.current.focus();
+                        }
+                      }, 50);
+                    }}
                     nodes={workflowData?.nodes}
                     edges={workflowData?.edges}
                     onChangeNodes={handleNodesChange}

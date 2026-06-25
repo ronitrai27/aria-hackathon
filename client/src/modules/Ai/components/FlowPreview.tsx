@@ -13,6 +13,7 @@ import "@xyflow/react/dist/style.css";
 import {
   AlertCircle,
   ArrowRight,
+  Bot,
   Check,
   CheckCircle,
   FileText,
@@ -28,9 +29,11 @@ import {
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { connectorIcons } from "@/lib/static";
+import { Button } from "@/components/ui/button";
 
 interface FlowPreviewProps {
   onSelectSuggestion?: (prompt: string, apps: string[]) => void;
+  onEditWorkflow?: (text: string) => void;
   nodes?: any[];
   edges?: any[];
   onChangeNodes?: (nodes: any[]) => void;
@@ -601,21 +604,23 @@ function AINode({ data }: { data: any }) {
               AI · {typeTag}
             </span>
           </div>
-          {data.isRunsTab && data.isSimulationActive ? (
-            <div className="h-6 w-6 flex items-center justify-center shrink-0">
-              {data.status === "running" && (
-                <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
-              )}
-              {data.status === "success" && (
-                <Check className="h-3.5 w-3.5 text-white font-bold" />
-              )}
-              {data.status === "failed" && (
-                <X className="h-3.5 w-3.5 text-red-205 font-bold" />
-              )}
-              {data.status === "pending" && (
-                <div className="h-1.5 w-1.5 rounded-full bg-white/40" />
-              )}
-            </div>
+          {data.isRunsTab ? (
+            data.isSimulationActive ? (
+              <div className="h-6 w-6 flex items-center justify-center shrink-0">
+                {data.status === "running" && (
+                  <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
+                )}
+                {data.status === "success" && (
+                  <Check className="h-3.5 w-3.5 text-white font-bold" />
+                )}
+                {data.status === "failed" && (
+                  <X className="h-3.5 w-3.5 text-red-205 font-bold" />
+                )}
+                {data.status === "pending" && (
+                  <div className="h-1.5 w-1.5 rounded-full bg-white/40" />
+                )}
+              </div>
+            ) : null
           ) : (
             <button
               type="button"
@@ -672,21 +677,23 @@ function AINode({ data }: { data: any }) {
             AI · {typeTag}
           </span>
         </div>
-        {data.isRunsTab && data.isSimulationActive ? (
-          <div className="h-6 w-6 flex items-center justify-center shrink-0">
-            {data.status === "running" && (
-              <Loader2 className="h-3.5 w-3.5 text-blue-600 animate-spin" />
-            )}
-            {data.status === "success" && (
-              <Check className="h-3.5 w-3.5 text-emerald-600 font-bold" />
-            )}
-            {data.status === "failed" && (
-              <X className="h-3.5 w-3.5 text-red-600 font-bold" />
-            )}
-            {data.status === "pending" && (
-              <div className="h-1.5 w-1.5 rounded-full bg-neutral-300" />
-            )}
-          </div>
+        {data.isRunsTab ? (
+          data.isSimulationActive ? (
+            <div className="h-6 w-6 flex items-center justify-center shrink-0">
+              {data.status === "running" && (
+                <Loader2 className="h-3.5 w-3.5 text-blue-600 animate-spin" />
+              )}
+              {data.status === "success" && (
+                <Check className="h-3.5 w-3.5 text-emerald-600 font-bold" />
+              )}
+              {data.status === "failed" && (
+                <X className="h-3.5 w-3.5 text-red-600 font-bold" />
+              )}
+              {data.status === "pending" && (
+                <div className="h-1.5 w-1.5 rounded-full bg-neutral-300" />
+              )}
+            </div>
+          ) : null
         ) : (
           <button
             type="button"
@@ -765,21 +772,23 @@ function AppNode({ data }: { data: any }) {
             </div>
             <span className="text-sm font-semibold uppercase">{appName}</span>
           </div>
-          {data.isRunsTab && data.isSimulationActive ? (
-            <div className="h-6 w-6 flex items-center justify-center shrink-0">
-              {data.status === "running" && (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              )}
-              {data.status === "success" && (
-                <Check className="h-3.5 w-3.5 font-bold" />
-              )}
-              {data.status === "failed" && (
-                <X className="h-3.5 w-3.5 font-bold" />
-              )}
-              {data.status === "pending" && (
-                <div className="h-1.5 w-1.5 rounded-full bg-white/40" />
-              )}
-            </div>
+          {data.isRunsTab ? (
+            data.isSimulationActive ? (
+              <div className="h-6 w-6 flex items-center justify-center shrink-0">
+                {data.status === "running" && (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                )}
+                {data.status === "success" && (
+                  <Check className="h-3.5 w-3.5 font-bold" />
+                )}
+                {data.status === "failed" && (
+                  <X className="h-3.5 w-3.5 font-bold" />
+                )}
+                {data.status === "pending" && (
+                  <div className="h-1.5 w-1.5 rounded-full bg-white/40" />
+                )}
+              </div>
+            ) : null
           ) : (
             <button
               type="button"
@@ -802,11 +811,25 @@ function AppNode({ data }: { data: any }) {
             <span className="text-[10px] text-blue-100 bg-blue-700/50 border border-blue-400/30 px-2 py-0.5 rounded-md font-medium truncate max-w-[130px]">
               {actionName}
             </span>
-            {paramCount > 0 && (
-              <div className="flex items-center gap-1 text-[10px] ">
-                {paramCount} paramter{paramCount !== 1 ? "s" : ""}{" "}
-                <Settings2 className="text-muted-foreground size-4" />
-              </div>
+            {data.isRunsTab ? (
+              data.errors && data.errors.length > 0 ? (
+                <div className="flex items-center gap-1 text-[10px] text-red-200 font-medium">
+                  <AlertCircle className="size-3.5 text-red-200" />
+                  <span>Missing parameter</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-medium">
+                  <Check className="size-3.5 text-emerald-600" />
+                  <span>All parameters configured</span>
+                </div>
+              )
+            ) : (
+              paramCount > 0 && (
+                <div className="flex items-center gap-1 text-[10px] ">
+                  {paramCount} paramter{paramCount !== 1 ? "s" : ""}{" "}
+                  <Settings2 className="text-muted-foreground size-4" />
+                </div>
+              )
             )}
           </div>
         )}
@@ -848,21 +871,23 @@ function AppNode({ data }: { data: any }) {
           </div>
           <span className="text-sm font-semibold uppercase">{appName}</span>
         </div>
-        {data.isRunsTab && data.isSimulationActive ? (
-          <div className="h-6 w-6 flex items-center justify-center shrink-0">
-            {data.status === "running" && (
-              <Loader2 className="h-3.5 w-3.5 text-blue-600 animate-spin" />
-            )}
-            {data.status === "success" && (
-              <Check className="h-3.5 w-3.5 text-emerald-600 font-bold" />
-            )}
-            {data.status === "failed" && (
-              <X className="h-3.5 w-3.5 text-red-600 font-bold" />
-            )}
-            {data.status === "pending" && (
-              <div className="h-1.5 w-1.5 rounded-full bg-neutral-300" />
-            )}
-          </div>
+        {data.isRunsTab ? (
+          data.isSimulationActive ? (
+            <div className="h-6 w-6 flex items-center justify-center shrink-0">
+              {data.status === "running" && (
+                <Loader2 className="h-3.5 w-3.5 text-blue-600 animate-spin" />
+              )}
+              {data.status === "success" && (
+                <Check className="h-3.5 w-3.5 text-emerald-600 font-bold" />
+              )}
+              {data.status === "failed" && (
+                <X className="h-3.5 w-3.5 text-red-600 font-bold" />
+              )}
+              {data.status === "pending" && (
+                <div className="h-1.5 w-1.5 rounded-full bg-neutral-300" />
+              )}
+            </div>
+          ) : null
         ) : (
           <button
             type="button"
@@ -885,11 +910,25 @@ function AppNode({ data }: { data: any }) {
           <span className="text-[10px] text-neutral-500 bg-neutral-100 border border-neutral-200 px-2 py-0.5 rounded-md font-medium truncate max-w-[130px]">
             {actionName}
           </span>
-          {paramCount > 0 && (
-            <div className="flex items-center gap-1 text-[10px] ">
-              {paramCount} paramter{paramCount !== 1 ? "s" : ""}{" "}
-              <Settings2 className="text-muted-foreground size-4" />
-            </div>
+          {data.isRunsTab ? (
+            data.errors && data.errors.length > 0 ? (
+              <div className="flex items-center gap-1 text-[10px] text-red-600 font-semibold">
+                <AlertCircle className="size-3.5 text-red-500" />
+                <span>Missing parameter</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-semibold">
+                <Check className="size-3.5 text-emerald-500" />
+                <span>All parameters configured</span>
+              </div>
+            )
+          ) : (
+            paramCount > 0 && (
+              <div className="flex items-center gap-1 text-[10px] ">
+                {paramCount} paramter{paramCount !== 1 ? "s" : ""}{" "}
+                <Settings2 className="text-muted-foreground size-4" />
+              </div>
+            )
           )}
         </div>
       )}
@@ -966,6 +1005,7 @@ function FlowFitter({
 
 export default function FlowPreview({
   onSelectSuggestion,
+  onEditWorkflow,
   nodes,
   edges,
   onChangeNodes,
@@ -1192,6 +1232,22 @@ export default function FlowPreview({
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {activeTab === "editor" && hasWorkflow && (
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-10 flex items-center gap-3 bg-white border border-neutral-200 px-4 py-2 rounded-lg shadow-md animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <span className="text-[11px] font-medium text-neutral-500 flex items-center gap-1.5 select-none">
+            Want fixes &gt; ask agent to adjust or edit workflow..
+          </span>
+          <div className="h-3.5 w-px bg-neutral-200" />
+          <Button
+            type="button"
+            onClick={() => onEditWorkflow?.("edit this workflow as ")}
+            className="text-xs rounded  cursor-pointer py-1"
+          >
+            Edit workflow...
+          </Button>
         </div>
       )}
     </div>
