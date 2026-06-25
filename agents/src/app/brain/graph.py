@@ -42,7 +42,7 @@ def brain_supervisor_node(state: BrainState) -> Command:
         )
 
     # ── Check for completion ──────────────────────────────────────────────────
-    if state.get("worker_results"):
+    if state.get("completed_steps"):
         logger.info("[Brain Supervisor] Workers completed. Exiting subgraph turn.")
         return Command(
             update={
@@ -85,6 +85,7 @@ def memory_worker_node(state: BrainState) -> dict:
     logger.info("[memory_worker] Running...")
     return {
         "memory_context": None,
+        "completed_steps": ["memory_worker"],
         "worker_results": [
             WorkerResult(
                 worker="memory_worker",
@@ -100,6 +101,7 @@ def task_worker_node(state: BrainState) -> dict:
     return {
         "tasks": None,
         "last_created_task_id": None,
+        "completed_steps": ["task_worker"],
         "worker_results": [
             WorkerResult(
                 worker="task_worker",
@@ -113,6 +115,7 @@ def task_worker_node(state: BrainState) -> dict:
 def upload_worker_node(state: BrainState) -> dict:
     logger.info("[upload_worker] Running...")
     return {
+        "completed_steps": ["upload_worker"],
         "worker_results": [
             WorkerResult(
                 worker="upload_worker",
@@ -127,6 +130,7 @@ def reflect_worker_node(state: BrainState) -> dict:
     logger.info("[reflect_worker] Running...")
     return {
         "daily_summary": None,
+        "completed_steps": ["reflect_worker"],
         "worker_results": [
             WorkerResult(
                 worker="reflect_worker",
@@ -141,6 +145,7 @@ def composio_worker_node(state: BrainState) -> dict:
     logger.info("[composio_worker] Running...")
     return {
         "connector_data": None,
+        "completed_steps": ["composio_worker"],
         "worker_results": [
             WorkerResult(
                 worker="composio_worker",

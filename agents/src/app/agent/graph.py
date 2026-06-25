@@ -91,14 +91,15 @@ def fetch_composio_action_schema(action_slug: str) -> dict:
     try:
         from composio import Composio
         comp = Composio(api_key=api_key)
-        logger.info(f"Fetching Composio schema for action: {action_slug}")
-        # user_id is required but schema lookup is identical for all users
+        logger.info(f"[Composio] Fetching live schema for action: {action_slug}")
         tools = comp.tools.get(user_id="schema_looker", slug=action_slug)
         if tools and len(tools) > 0:
             function_data = tools[0].get("function", {})
-            return function_data.get("parameters", {})
+            schema = function_data.get("parameters", {})
+            logger.info(f"[Composio] Schema received for {action_slug} — {len(str(schema))} chars")
+            return schema
     except Exception as e:
-        logger.warning(f"Could not load Composio schema for {action_slug}: {e}")
+        logger.warning(f"[Composio] Could not load schema for {action_slug}: {e}")
     return {}
 
 
@@ -106,7 +107,7 @@ def fetch_composio_action_schema(action_slug: str) -> dict:
 def agent_supervisor_node(state: AgentState) -> Command:
     """
     Supervisor node inside the AgentGraph.
-    Decides which worker to execute based on user message.
+    Decides which worker to execute based on user message and current state.
     """
     messages = state.get("messages", [])
     if not messages:
@@ -116,43 +117,96 @@ def agent_supervisor_node(state: AgentState) -> Command:
         )
 
     last_msg = str(messages[-1].content).lower()
-    logger.info(f"[Agent Supervisor] Evaluating query: '{last_msg}'")
+    logger.info(f"[Agent Supervisor] Evaluating query: '{last_msg[:80]}...'")
 
-    # If worker results are present, it means the builder worker has run. We terminate.
-    if state.get("worker_results"):
-        logger.info("[Agent Supervisor] Workers completed. Completing subgraph turn.")
-        workflow_name = "Workflow"
-        schema = state.get("workflow_schema")
-        if schema and "workflow_name" in schema:
-            workflow_name = schema["workflow_name"]
-        final_msg = f"I have successfully created the workflow: '{workflow_name}'. Feel free to modify it or ask me to add anything else!"
-        return Command(
-            update={
-                "status": "done",
-                "final_response": final_msg
-            },
-            goto=END
-        )
+    completed_workers = set(state.get("completed_steps") or [])
 
-    # Route based on intent
-    if "schedule" in last_msg:
-        intent = "schedule"
-        workers = ["scheduler_worker"]
-    elif "run" in last_msg or "execute" in last_msg:
-        intent = "run"
-        workers = ["composio_worker"]
-    else:
+    logger.info(f"[Agent Supervisor] Completed workers so far: {completed_workers}")
+
+    # ── Step 1: Build workflow schema first ───────────────────────────────────
+    if "workflow_builder" not in completed_workers:
         intent = "create_workflow"
         workers = ["workflow_builder"]
+        logger.info(f"[Agent Supervisor] STEP 1 — Routing to workflow_builder")
+        return Command(
+            update={
+                "current_intent": intent,
+                "planned_workers": workers,
+                "turn_count": state.get("turn_count", 0) + 1
+            },
+            goto="workflow_builder"
+        )
 
-    logger.info(f"[Agent Supervisor] Selected worker(s) {workers} for intent '{intent}'")
+    # ── Step 2: Configure AI nodes (research/summarize prompts) ──────────────
+    if "ai_node_worker" not in completed_workers:
+        logger.info(f"[Agent Supervisor] STEP 2 — Routing to ai_node_worker")
+        return Command(
+            update={
+                "current_intent": "add_ai_node",
+                "planned_workers": ["ai_node_worker"],
+                "turn_count": state.get("turn_count", 0) + 1
+            },
+            goto="ai_node_worker"
+        )
+
+    # ── Step 3: Execute Composio integration tool calls ───────────────────────
+    if "composio_worker" not in completed_workers:
+        logger.info(f"[Agent Supervisor] STEP 3 — Routing to composio_worker")
+        return Command(
+            update={
+                "current_intent": "run",
+                "planned_workers": ["composio_worker"],
+                "turn_count": state.get("turn_count", 0) + 1
+            },
+            goto="composio_worker"
+        )
+
+    # ── All workers done — finalize ───────────────────────────────────────────
+    import json as _json
+    logger.info("[Agent Supervisor] All workers completed. Finalizing.")
+    schema = state.get("workflow_schema")
+    workflow_name = schema.get("workflow_name", "Workflow") if schema else "Workflow"
+
+    # Count nodes by type for the summary
+    node_types: dict = {}
+    if schema:
+        for n in schema.get("nodes", []):
+            t = n.get("type", "unknown")
+            node_types[t] = node_types.get(t, 0) + 1
+
+    node_summary = ", ".join(f"{v}x {k}" for k, v in node_types.items())
+    composio_slugs = [
+        n.get("data", {}).get("composio_config", {}).get("action_slug", "")
+        for n in (schema.get("nodes", []) if schema else [])
+        if n.get("type") == "composio_app"
+    ]
+    integration_line = (
+        f" Integrations wired: {', '.join(s for s in composio_slugs if s)}."
+        if composio_slugs else ""
+    )
+
+    # ── Print full structured JSON to console ─────────────────────────────────
+    logger.info("[Agent Supervisor] ╔══════════════════════════════════════════════╗")
+    logger.info("[Agent Supervisor] ║   FINAL WORKFLOW JSON — NODES & EDGES        ║")
+    logger.info("[Agent Supervisor] ╚══════════════════════════════════════════════╝")
+    if schema:
+        logger.info("\n" + _json.dumps(schema, indent=2))
+    else:
+        logger.warning("[Agent Supervisor] No workflow schema found in state!")
+    logger.info("[Agent Supervisor] ═══════════════════════════════════════════════")
+
+    final_msg = (
+        f"Successfully built the workflow '{workflow_name}' with {len(schema.get('nodes', [])) if schema else 0} nodes "
+        f"({node_summary}) and {len(schema.get('edges', [])) if schema else 0} edges.{integration_line} "
+        f"The canvas is now live — feel free to modify any node or ask me to refine it!"
+    )
+
     return Command(
         update={
-            "current_intent": intent,
-            "planned_workers": workers,
-            "turn_count": state.get("turn_count", 0) + 1
+            "status": "done",
+            "final_response": final_msg
         },
-        goto=workers[0]
+        goto=END
     )
 
 
@@ -162,7 +216,7 @@ def workflow_builder_node(state: AgentState) -> dict:
     Analyzes user prompts to construct a structured workflow schema.
     Queries Composio dynamically to inject input field parameter properties.
     """
-    logger.info("[workflow_builder] Designing workflow structure...")
+    logger.info("[workflow_builder] === STARTING: Designing workflow structure ===")
     messages = state.get("messages", [])
     if not messages or llm is None:
         logger.warning("No messages or LLM unavailable in workflow_builder.")
@@ -185,17 +239,19 @@ def workflow_builder_node(state: AgentState) -> dict:
             "Map references between nodes using double braces, e.g., {{node_1.output}} to feed data sequentially."
         )
         
+        logger.info("[workflow_builder] Calling GPT-4o-mini for workflow structure design...")
         design: WorkflowDesign = structured_llm.invoke([
             {"role": "system", "content": system_prompt},
             *messages
         ])
+        logger.info(f"[workflow_builder] LLM designed workflow: '{design.workflow_name}' with {len(design.steps)} nodes")
         
         # Convert design into React Flow compatible nodes and edges
         react_flow_nodes = []
         react_flow_edges = []
         
-        for step in design.steps:
-            # Clean string values to fit custom nodes beautifully
+        for i, step in enumerate(design.steps):
+            # Clean string values
             label_clean = step.label.strip() if step.label else ""
             if (label_clean.startswith('"') and label_clean.endswith('"')) or (label_clean.startswith("'") and label_clean.endswith("'")):
                 label_clean = label_clean[1:-1].strip()
@@ -215,6 +271,7 @@ def workflow_builder_node(state: AgentState) -> dict:
                     "target_classes": step.ai_target_classes,
                     "extraction_schema": step.ai_extraction_schema,
                 }
+                logger.info(f"[workflow_builder]   Node [{step.id}] AI node: {step.type} | prompt: '{prompt_clean[:60]}...'")
             
             # Populate Composio configuration & fetch real-time schemas
             elif step.type == "composio_app" and step.composio_action_slug:
@@ -227,14 +284,19 @@ def workflow_builder_node(state: AgentState) -> dict:
                 }
                 
                 # Fetch live schema parameter fields for parameters form rendering on UI
+                logger.info(f"[workflow_builder]   Node [{step.id}] Composio node: {action_slug} — fetching live schema...")
                 parameter_schema = fetch_composio_action_schema(action_slug)
                 if parameter_schema:
                     node_data["parameter_schema"] = parameter_schema
+                    logger.info(f"[workflow_builder]   Node [{step.id}] Schema ready — {len(parameter_schema.get('properties', {}))} params available")
             
+            elif step.type == "task_trigger":
+                logger.info(f"[workflow_builder]   Node [{step.id}] Trigger node: {label_clean}")
+
             react_flow_nodes.append({
                 "id": step.id,
                 "type": step.type,
-                "position": {"x": 100, "y": 100},  # Mock placement coordinate
+                "position": {"x": 250, "y": i * 160 + 80},
                 "data": node_data
             })
             
@@ -244,28 +306,37 @@ def workflow_builder_node(state: AgentState) -> dict:
                 "source": conn.source,
                 "target": conn.target
             })
+            logger.info(f"[workflow_builder]   Edge: {conn.source} --> {conn.target}")
             
+        import json as _json
         final_schema = {
             "workflow_name": design.workflow_name,
             "nodes": react_flow_nodes,
             "edges": react_flow_edges
         }
         
-        logger.info(f"[workflow_builder] Successfully built workflow: {design.workflow_name}")
+        logger.info(f"[workflow_builder] === DONE: Built '{design.workflow_name}' — {len(react_flow_nodes)} nodes, {len(react_flow_edges)} edges ===")
+        logger.info("[workflow_builder] ╔══════════════════════════════════════════════╗")
+        logger.info("[workflow_builder] ║     FINAL WORKFLOW SCHEMA (JSON OUTPUT)      ║")
+        logger.info("[workflow_builder] ╚══════════════════════════════════════════════╝")
+        logger.info("\n" + _json.dumps(final_schema, indent=2))
+        logger.info("[workflow_builder] ═══════════════════════════════════════════════")
         return {
             "workflow_schema": final_schema,
+            "completed_steps": ["workflow_builder"],
             "worker_results": [
                 WorkerResult(
                     worker="workflow_builder",
-                    output=f"Designed workflow: {design.workflow_name}",
+                    output=f"Designed workflow: {design.workflow_name} ({len(react_flow_nodes)} nodes, {len(react_flow_edges)} edges)",
                     error=None
                 )
             ]
         }
         
     except Exception as e:
-        logger.error(f"[workflow_builder] Failed to build workflow: {e}")
+        logger.error(f"[workflow_builder] FAILED: {e}")
         return {
+            "completed_steps": ["workflow_builder"],
             "worker_results": [
                 WorkerResult(
                     worker="workflow_builder",
@@ -276,28 +347,140 @@ def workflow_builder_node(state: AgentState) -> dict:
         }
 
 
-def composio_worker_node(state: AgentState) -> dict:
-    logger.info("[composio_worker] Placeholder active.")
+def ai_node_worker_node(state: AgentState) -> dict:
+    """
+    Configures AI node parameters for research/summarize/classify/extract nodes in the workflow.
+    """
+    logger.info("[ai_node_worker] === STARTING: Configuring AI node parameters ===")
+    
+    schema = state.get("workflow_schema")
+    if not schema:
+        logger.warning("[ai_node_worker] No workflow schema available to configure.")
+        return {
+            "ai_node_configs": None,
+            "completed_steps": ["ai_node_worker"],
+            "worker_results": [
+                WorkerResult(
+                    worker="ai_node_worker",
+                    output="No workflow schema available.",
+                    error=None
+                )
+            ]
+        }
+
+    ai_nodes = [n for n in schema.get("nodes", []) if n.get("type", "").startswith("ai_")]
+    configs = []
+
+    for node in ai_nodes:
+        node_id = node.get("id")
+        node_type = node.get("type")
+        ai_config = node.get("data", {}).get("ai_config", {})
+        prompt = ai_config.get("prompt", "")
+        
+        logger.info(f"[ai_node_worker]   Configuring node [{node_id}] type={node_type}")
+        logger.info(f"[ai_node_worker]   Prompt: '{prompt[:80]}...'")
+
+        config = {
+            "node_id": node_id,
+            "type": node_type,
+            "prompt": prompt,
+            "model": "gpt-4o-mini",
+            "temperature": 0.3,
+            "max_tokens": 1024,
+        }
+        configs.append(config)
+        logger.info(f"[ai_node_worker]   Config set: model=gpt-4o-mini, temp=0.3, max_tokens=1024")
+
+    logger.info(f"[ai_node_worker] === DONE: Configured {len(configs)} AI nodes ===")
     return {
-        "composio_action_results": None,
+        "ai_node_configs": configs,
+        "completed_steps": ["ai_node_worker"],
         "worker_results": [
             WorkerResult(
-                worker="composio_worker",
-                output="Composio action completed placeholder.",
+                worker="ai_node_worker",
+                output=f"Configured {len(configs)} AI node(s): {[c['node_id'] for c in configs]}",
                 error=None
             )
         ]
     }
 
 
-def ai_node_worker_node(state: AgentState) -> dict:
-    logger.info("[ai_node_worker] Placeholder active.")
+def composio_worker_node(state: AgentState) -> dict:
+    """
+    Validates Composio integration nodes — verifies action slugs and 
+    confirms required parameters are mapped in the workflow schema.
+    """
+    logger.info("[composio_worker] === STARTING: Validating Composio integration nodes ===")
+
+    schema = state.get("workflow_schema")
+    if not schema:
+        logger.warning("[composio_worker] No workflow schema to validate.")
+        return {
+            "composio_action_results": None,
+            "completed_steps": ["composio_worker"],
+            "worker_results": [
+                WorkerResult(
+                    worker="composio_worker",
+                    output="No workflow schema available.",
+                    error=None
+                )
+            ]
+        }
+
+    composio_nodes = [
+        n for n in schema.get("nodes", [])
+        if n.get("type") == "composio_app"
+    ]
+
+    logger.info(f"[composio_worker] Found {len(composio_nodes)} Composio integration node(s)")
+    
+    validation_results = []
+    for node in composio_nodes:
+        node_id = node.get("id")
+        composio_cfg = node.get("data", {}).get("composio_config", {})
+        action_slug = composio_cfg.get("action_slug", "")
+        params_mapping = composio_cfg.get("params_mapping", {})
+        param_schema = node.get("data", {}).get("parameter_schema", {})
+        
+        required_params = param_schema.get("required", [])
+        mapped_params = list(params_mapping.keys())
+        missing_params = [p for p in required_params if p not in mapped_params]
+        
+        logger.info(f"[composio_worker]   Node [{node_id}] action={action_slug}")
+        logger.info(f"[composio_worker]   Mapped params: {mapped_params}")
+        logger.info(f"[composio_worker]   Required params: {required_params}")
+        
+        if missing_params:
+            logger.warning(f"[composio_worker]   Missing required params: {missing_params}")
+        else:
+            logger.info(f"[composio_worker]   All required params satisfied!")
+
+        # Log each param mapping
+        for param_key, param_val in params_mapping.items():
+            logger.info(f"[composio_worker]     {param_key} = {param_val}")
+
+        validation_results.append({
+            "node_id": node_id,
+            "action_slug": action_slug,
+            "status": "ready" if not missing_params else "needs_params",
+            "mapped_params": mapped_params,
+            "missing_params": missing_params,
+        })
+
+    ready_count = sum(1 for r in validation_results if r["status"] == "ready")
+    logger.info(f"[composio_worker] === DONE: {ready_count}/{len(validation_results)} nodes ready for execution ===")
+
     return {
-        "ai_node_configs": None,
+        "composio_action_results": validation_results,
+        "completed_steps": ["composio_worker"],
         "worker_results": [
             WorkerResult(
-                worker="ai_node_worker",
-                output="AI node configured placeholder.",
+                worker="composio_worker",
+                output={
+                    "validated_nodes": len(validation_results),
+                    "ready_nodes": ready_count,
+                    "results": validation_results,
+                },
                 error=None
             )
         ]
@@ -305,13 +488,16 @@ def ai_node_worker_node(state: AgentState) -> dict:
 
 
 def scheduler_worker_node(state: AgentState) -> dict:
-    logger.info("[scheduler_worker] Placeholder active.")
+    logger.info("[scheduler_worker] === STARTING: Configuring schedule/trigger settings ===")
+    logger.info("[scheduler_worker] Placeholder: No schedule configuration in current request.")
+    logger.info("[scheduler_worker] === DONE ===")
     return {
         "schedule_config": None,
+        "completed_steps": ["scheduler_worker"],
         "worker_results": [
             WorkerResult(
                 worker="scheduler_worker",
-                output="Scheduler active placeholder.",
+                output="No schedule configuration required for this workflow.",
                 error=None
             )
         ]
@@ -332,10 +518,10 @@ def build_agent_graph(checkpointer=None) -> StateGraph:
     builder.add_node("ai_node_worker", ai_node_worker_node)
     builder.add_node("scheduler_worker", scheduler_worker_node)
 
-    # Define edges
+    # Entry point
     builder.add_edge(START, "supervisor")
 
-    # All workers loop back to supervisor
+    # All workers loop back to supervisor for next step decision
     builder.add_edge("workflow_builder", "supervisor")
     builder.add_edge("composio_worker", "supervisor")
     builder.add_edge("ai_node_worker", "supervisor")

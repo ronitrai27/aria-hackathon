@@ -76,7 +76,8 @@ def router_node(state: ParentState) -> dict:
             "transfer_to_agent": False,
             "transfer_query": None,
             "status": "running",
-            "messages": messages_update
+            "messages": messages_update,
+            "completed_steps": []
         }
 
     # ── 2. Check Subgraph Loop-back Completion ────────────────────────────────
@@ -94,7 +95,7 @@ def router_node(state: ParentState) -> dict:
     if not messages:
         logger.info("\n[Parent Router] INCOMING QUERY: (None/Empty)")
         logger.info("[Parent Router] DECISION MADE: next_route = brain_subgraph | reason = No messages found")
-        return {"next_route": "brain_subgraph", "status": "running"}
+        return {"next_route": "brain_subgraph", "status": "running", "completed_steps": []}
 
     last_msg = messages[-1]
     incoming_query = last_msg.content if hasattr(last_msg, "content") else str(last_msg)
@@ -109,7 +110,7 @@ def router_node(state: ParentState) -> dict:
         route, reason = heuristic_routing(incoming_query)
         logger.error("Router LLM is not initialized. Defaulting to heuristic fallback.")
         logger.info(f"[Parent Router] DECISION MADE: next_route = {route} | reason = {reason} (LLM not initialized)")
-        return {"next_route": route, "status": "running"}
+        return {"next_route": route, "status": "running", "completed_steps": []}
 
     # Invoke LLM structured routing
     try:
@@ -131,13 +132,13 @@ def router_node(state: ParentState) -> dict:
         ])
         
         logger.info(f"[Parent Router] DECISION MADE: next_route = {decision.next_route} | reason = {decision.reason}")
-        return {"next_route": decision.next_route, "status": "running"}
+        return {"next_route": decision.next_route, "status": "running", "completed_steps": []}
         
     except Exception as e:
         logger.error(f"[Parent Router] LLM routing failed: {e}. Falling back to heuristics.")
         route, reason = heuristic_routing(incoming_query)
         logger.info(f"[Parent Router] DECISION MADE: next_route = {route} | reason = {reason} (LLM call failed: {e})")
-        return {"next_route": route, "status": "running"}
+        return {"next_route": route, "status": "running", "completed_steps": []}
 
 
 

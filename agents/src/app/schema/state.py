@@ -22,6 +22,22 @@ from .types import (
 )
 
 
+def reduce_completed_steps(left: list[str] | None, right: list[str] | None) -> list[str]:
+    """
+    Resettable list reducer. If right is empty list [], returns empty list [] to reset/clear.
+    Otherwise, appends unique items.
+    """
+    if right is None:
+        return left or []
+    if not right:  # If right is empty list [], it signals a reset
+        return []
+    res = list(left or [])
+    for val in right:
+        if val not in res:
+            res.append(val)
+    return res
+
+
 class WorkerResult(TypedDict):
     """
     Standard envelope returned by any worker node in worker_results.
@@ -42,6 +58,7 @@ class ParentState(TypedDict):
     error_message: str | None  # Last caught error traceback or message if a step failed.
     turn_count: int  # Cumulative step count across graphs to check against recursion limits.
     worker_results: Annotated[list[WorkerResult], operator.add]  # Safe parallel-accumulated checklist of execution steps.
+    completed_steps: Annotated[list[str], reduce_completed_steps]  # Resettable list of completed workers in current query.
     tasks: list[dict] | None  # Task list retrieved or modified from the database.
     last_created_task_id: str | None  # ID of the task most recently created to link as workflow triggers.
     automations: list[dict] | None  # Active workflow templates configured for the workspace.
@@ -63,6 +80,7 @@ class BrainState(TypedDict):
     error_message: str | None  # Captured node error messages.
     final_response: str | None  # Subgraph final computed natural language response.
     worker_results: Annotated[list[WorkerResult], operator.add]  # Accumulator for brain worker traces.
+    completed_steps: Annotated[list[str], reduce_completed_steps]  # Resettable list of completed workers in current query.
     tasks: list[dict] | None  # Active task lists returned from database.
     last_created_task_id: str | None  # Tracked target task ID.
     memory_context: str | None  # Summarized memory facts fetched from vectors/graphs.
@@ -88,6 +106,7 @@ class AgentState(TypedDict):
     error_message: str | None  # Captured node error messages.
     final_response: str | None  # Subgraph final computed natural language response.
     worker_results: Annotated[list[WorkerResult], operator.add]  # Accumulator for agent worker traces.
+    completed_steps: Annotated[list[str], reduce_completed_steps]  # Resettable list of completed workers in current query.
     automations: list[dict] | None  # Generated or fetched workspace automation flows.
     workflow_schema: dict | None  # Output React Flow nodes and edges definition.
 

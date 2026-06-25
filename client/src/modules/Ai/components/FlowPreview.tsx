@@ -7,6 +7,7 @@ import {
   MiniMap,
   Position,
   ReactFlow,
+  useReactFlow,
 } from "@xyflow/react";
 import { Button } from "@/components/ui/button";
 import "@xyflow/react/dist/style.css";
@@ -290,6 +291,22 @@ function AppNode({ data }: { data: any }) {
   );
 }
 
+// Helper component to auto-fit view when nodes change
+function FlowFitter({ nodes }: { nodes: any[] }) {
+  const { fitView } = useReactFlow();
+
+  useEffect(() => {
+    if (nodes && nodes.length > 0) {
+      const timer = setTimeout(() => {
+        fitView({ padding: 0.2, duration: 400 });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [nodes, fitView]);
+
+  return null;
+}
+
 export default function FlowPreview({
   onSelectSuggestion,
   nodes,
@@ -355,6 +372,7 @@ export default function FlowPreview({
             color="var(--border)"
             className="opacity-60"
           />
+          <FlowFitter nodes={renderedNodes} />
           {hasWorkflow && (
             <>
               <Controls className="!bg-background !border-border !text-foreground [&_button]:!border-border [&_button]:!bg-background hover:[&_button]:!bg-muted [&_svg]:!fill-foreground dark:!bg-zinc-900 dark:!border-zinc-800 dark:!text-white dark:[&_button]:!border-zinc-800 dark:[&_button]:!bg-zinc-900 dark:hover:[&_button]:!bg-zinc-800 dark:[&_svg]:!fill-white" />

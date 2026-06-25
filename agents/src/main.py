@@ -2,7 +2,16 @@
 main.py
 ───────
 Entry point for the backend FastAPI application.
-Handles CORS, configures ParentGraph checkpointer, and hosts the SSE streaming /api/chat route.
+
+KEY ARCHITECTURE NOTE:
+  LangGraph compiles subgraphs as black-box nodes inside the parent graph.
+  When you stream the parent graph, it yields the entire agent_subgraph run
+  as ONE atomic chunk — internal worker steps (workflow_builder, ai_node_worker,
+  composio_worker) are never surfaced.
+
+  FIX: Use the parent graph only to get the routing decision. When the router
+  says "agent_subgraph", immediately stream the agent graph directly via its
+  own astream() call. This gives us per-worker SSE events in real-time.
 """
 
 import sys
@@ -11,29 +20,23 @@ import json
 import asyncio
 from dotenv import load_dotenv
 
-# Load environment variables strictly from workspace .env file and override system variables
+# Load environment variables from workspace .env
 env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
 load_dotenv(dotenv_path=env_path, override=True)
+
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from loguru import logger
-
-# Log loaded API key verification (ending characters)
-api_key = os.environ.get("OPENAI_API_KEY", "")
-if api_key:
-    logger.info(f"API KEY VERIFICATION - Loaded OPENAI_API_KEY ending in: ...{api_key[-8:]}")
-else:
-    logger.warning("API KEY VERIFICATION - OPENAI_API_KEY was not found in environment!")
-
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 
-# Add app package to sys.path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from app.parent.graph import build_parent_graph
+from app.parent.router import router_node
+from app.agent.graph import build_agent_graph
+from app.brain.graph import build_brain_graph
 from app.utils.sse_emitter import (
     sse_worker_status_event,
     sse_worker_action_event,
@@ -42,10 +45,15 @@ from app.utils.sse_emitter import (
     sse_handoff_event,
 )
 
-# Initialize FastAPI application
-app = FastAPI(title="Aria Dual-Agent Backend Server")
+# ── Startup verification ──────────────────────────────────────────────────────
+api_key = os.environ.get("OPENAI_API_KEY", "")
+if api_key:
+    logger.info(f"OPENAI_API_KEY loaded — ending: ...{api_key[-8:]}")
+else:
+    logger.warning("OPENAI_API_KEY not found in environment!")
 
-# Enable CORS for Next.js frontend calls on other ports
+# ── FastAPI App ───────────────────────────────────────────────────────────────
+app = FastAPI(title="Aria Dual-Agent Backend Server")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -54,11 +62,239 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Persistent checkpointer for parent graphs
-checkpointer = MemorySaver()
-parent_graph = build_parent_graph().compile(checkpointer=checkpointer)
+# ── Compile graphs once at startup ────────────────────────────────────────────
+# Agent graph compiled separately so we can stream it directly.
+agent_graph = build_agent_graph().compile()
+brain_graph  = build_brain_graph().compile()
+
+logger.info("Agent and Brain graphs compiled and ready.")
 
 
+# ── Helpers: extract output from WorkerResult (handles dict or Pydantic) ─────
+def _get_output(res):
+    if isinstance(res, dict):
+        return res.get("output")
+    return getattr(res, "output", None)
+
+def _get_error(res):
+    if isinstance(res, dict):
+        return res.get("error")
+    return getattr(res, "error", None)
+
+def _get_worker(res):
+    if isinstance(res, dict):
+        return res.get("worker")
+    return getattr(res, "worker", None)
+
+
+# ── SSE helper: yield a formatted SSE line ────────────────────────────────────
+def _sse(evt: dict) -> str:
+    return f"event: {evt['event']}\ndata: {evt['data']}\n\n"
+
+
+# ── Agent Subgraph Direct Streamer ────────────────────────────────────────────
+async def stream_agent(messages: list, thread_id: str):
+    """
+    Streams the agent graph directly, yielding formatted SSE strings.
+    Each worker node (workflow_builder, ai_node_worker, composio_worker)
+    emits its own real-time events as the graph executes step-by-step.
+    """
+    config = {"configurable": {"thread_id": f"{thread_id}_agent"}}
+    state_input = {
+        "messages": messages,
+        "turn_count": 0,
+        "status": "running",
+        "completed_steps": [],
+    }
+
+    final_response = None
+    workflow_schema = None
+
+    async for chunk in agent_graph.astream(state_input, config, stream_mode="updates"):
+        logger.info(f"[agent_stream] chunk keys: {list(chunk.keys())}")
+
+        # ── workflow_builder ──────────────────────────────────────────────────
+        if "workflow_builder" in chunk:
+            out = chunk["workflow_builder"]
+            results = out.get("worker_results") or []
+
+            # Check for error
+            error = next((_get_error(r) for r in results if _get_worker(r) == "workflow_builder" and _get_error(r)), None)
+            if error:
+                yield _sse({"event": "error", "data": json.dumps({"error": f"Workflow builder failed: {error}"})})
+                continue
+
+            # Status: running
+            yield _sse(sse_worker_status_event("workflow_builder", "running", {"message": "Designing workflow DAG with GPT-4o-mini..."}))
+            await asyncio.sleep(0.05)
+
+            wf_schema = out.get("workflow_schema")
+            if wf_schema:
+                workflow_schema = wf_schema
+
+                # Composio schema fetch action
+                yield _sse(sse_worker_action_event("workflow_builder", "fetching_composio_schemas", {"message": "Loading live API parameter schemas from Composio..."}))
+                await asyncio.sleep(0.05)
+
+                # Per-node composio schema events
+                for node in wf_schema.get("nodes", []):
+                    if node.get("type") == "composio_app":
+                        slug = node.get("data", {}).get("composio_config", {}).get("action_slug", "")
+                        has_schema = bool(node.get("data", {}).get("parameter_schema"))
+                        yield _sse(sse_worker_action_event("workflow_builder", "composio_schema_fetched", {
+                            "action_slug": slug,
+                            "schema_loaded": has_schema,
+                            "message": f"Schema ready for {slug}"
+                        }))
+                        await asyncio.sleep(0.05)
+
+                # ★ THE KEY EVENT: emit full workflow schema JSON to frontend
+                logger.info(f"[agent_stream] Emitting workflow_schema — {len(json.dumps(wf_schema))} chars")
+                yield _sse(sse_worker_response_event("workflow_builder", wf_schema))
+                await asyncio.sleep(0.05)
+            else:
+                # No schema built — still mark as done
+                yield _sse(sse_worker_response_event("workflow_builder", None))
+
+        # ── ai_node_worker ────────────────────────────────────────────────────
+        if "ai_node_worker" in chunk:
+            out = chunk["ai_node_worker"]
+
+            yield _sse(sse_worker_status_event("ai_node_worker", "running", {"message": "Configuring AI node parameters (model, prompts, settings)..."}))
+            await asyncio.sleep(0.05)
+
+            for cfg in (out.get("ai_node_configs") or []):
+                yield _sse(sse_worker_action_event("ai_node_worker", "node_configured", {
+                    "node_id": cfg.get("node_id"),
+                    "type": cfg.get("type"),
+                    "model": cfg.get("model"),
+                    "message": f"Node {cfg.get('node_id')} ({cfg.get('type')}) configured with {cfg.get('model')}"
+                }))
+                await asyncio.sleep(0.05)
+
+            result_output = next((_get_output(r) for r in (out.get("worker_results") or []) if _get_worker(r) == "ai_node_worker"), None)
+            yield _sse(sse_worker_response_event("ai_node_worker", result_output))
+            await asyncio.sleep(0.05)
+
+        # ── composio_worker ───────────────────────────────────────────────────
+        if "composio_worker" in chunk:
+            out = chunk["composio_worker"]
+
+            yield _sse(sse_worker_status_event("composio_worker", "running", {"message": "Validating Composio integration nodes and parameter mappings..."}))
+            await asyncio.sleep(0.05)
+
+            # Per-node validation events
+            for r in (out.get("worker_results") or []):
+                if _get_worker(r) == "composio_worker":
+                    output = _get_output(r)
+                    if isinstance(output, dict):
+                        for vr in output.get("results", []):
+                            slug = vr.get("action_slug", "")
+                            status = vr.get("status", "unknown")
+                            missing = vr.get("missing_params", [])
+                            yield _sse(sse_worker_action_event("composio_worker", "tool_validation", {
+                                "action_slug": slug,
+                                "status": status,
+                                "missing_params": missing,
+                                "message": f"{slug}: ready" if status == "ready" else f"{slug}: needs params {missing}"
+                            }))
+                            await asyncio.sleep(0.05)
+
+            comp_output = next((_get_output(r) for r in (out.get("worker_results") or []) if _get_worker(r) == "composio_worker"), None)
+            yield _sse(sse_worker_response_event("composio_worker", comp_output))
+            await asyncio.sleep(0.05)
+
+        # ── scheduler_worker ──────────────────────────────────────────────────
+        if "scheduler_worker" in chunk:
+            out = chunk["scheduler_worker"]
+            yield _sse(sse_worker_status_event("scheduler_worker", "running", {"message": "Configuring workflow trigger and schedule settings..."}))
+            await asyncio.sleep(0.05)
+            sched_output = next((_get_output(r) for r in (out.get("worker_results") or []) if _get_worker(r) == "scheduler_worker"), None)
+            yield _sse(sse_worker_response_event("scheduler_worker", sched_output))
+            await asyncio.sleep(0.05)
+
+        # ── supervisor final state ────────────────────────────────────────────
+        if "supervisor" in chunk:
+            sup = chunk["supervisor"]
+            if sup.get("status") == "done" and sup.get("final_response"):
+                final_response = sup["final_response"]
+
+    # Pull final response from graph state if not captured above
+    if not final_response:
+        try:
+            state = agent_graph.get_state(config).values
+            final_response = state.get("final_response") or "Workflow built successfully."
+            if not workflow_schema:
+                workflow_schema = state.get("workflow_schema")
+        except Exception as e:
+            logger.warning(f"[agent_stream] Could not get final state: {e}")
+            final_response = "Workflow built successfully."
+
+    # Yield the done event
+    yield _sse(sse_supervisor_data_event(
+        intent="create_workflow",
+        planned_workers=[],
+        final_response=final_response,
+        status="done"
+    ))
+
+
+# ── Brain Subgraph Direct Streamer ────────────────────────────────────────────
+async def stream_brain(messages: list, thread_id: str, original_message: str):
+    """
+    Streams the brain graph directly, yielding formatted SSE strings.
+    """
+    config = {"configurable": {"thread_id": f"{thread_id}_brain"}}
+    state_input = {
+        "messages": messages,
+        "turn_count": 0,
+        "status": "running",
+        "completed_steps": [],
+    }
+
+    final_response = None
+
+    async for chunk in brain_graph.astream(state_input, config, stream_mode="updates"):
+        logger.info(f"[brain_stream] chunk keys: {list(chunk.keys())}")
+
+        if "supervisor" in chunk:
+            sup = chunk["supervisor"]
+            if sup.get("transfer_to_agent"):
+                yield _sse(sse_handoff_event("agent_subgraph", "workflow_creation", original_message))
+                await asyncio.sleep(0.05)
+                return  # Handoff — caller handles agent routing
+            if sup.get("final_response"):
+                final_response = sup["final_response"]
+
+        for worker in ["memory_worker", "task_worker", "upload_worker", "reflect_worker", "composio_worker"]:
+            if worker in chunk:
+                out = chunk[worker]
+                yield _sse(sse_worker_status_event(worker, "running", {"message": f"{worker.replace('_', ' ').title()} is executing..."}))
+                await asyncio.sleep(0.1)
+                result_output = None
+                results = out.get("worker_results") or []
+                if results:
+                    first = results[0]
+                    result_output = _get_output(first)
+                yield _sse(sse_worker_response_event(worker, result_output))
+                await asyncio.sleep(0.05)
+
+    if not final_response:
+        try:
+            state = brain_graph.get_state(config).values
+            final_response = state.get("final_response") or "Done."
+        except Exception:
+            final_response = "Done."
+
+    yield _sse(sse_supervisor_data_event(
+        intent="brain_task",
+        planned_workers=[],
+        final_response=final_response,
+        status="done"
+    ))
+
+
+# ── Main Chat Endpoint ────────────────────────────────────────────────────────
 @app.post("/api/chat")
 async def chat_endpoint(request: Request):
     """
@@ -69,193 +305,79 @@ async def chat_endpoint(request: Request):
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON body.")
 
-    message_text = body.get("message")
-    thread_id = body.get("thread_id", "default_thread")
+    message_text = body.get("message", "").strip()
+    thread_id    = body.get("thread_id", "default_thread")
 
     if not message_text:
         raise HTTPException(status_code=400, detail="Message field is required.")
 
     async def event_generator():
-        config = {"configurable": {"thread_id": thread_id}}
-        state_input = {
-            "messages": [HumanMessage(content=message_text)],
-            "turn_count": 0,
-            "status": "running"
-        }
+        messages = [HumanMessage(content=message_text)]
 
-        # 1. Signal that Parent Router is starting intent check
-        router_start = sse_worker_status_event(
-            worker_name="router",
-            status="running",
-            details={"message": "Analyzing query and checking user intent..."}
-        )
-        yield f"event: {router_start['event']}\ndata: {router_start['data']}\n\n"
-        await asyncio.sleep(0.1)
+        # ── Step 1: Emit router starting ──────────────────────────────────────
+        yield _sse(sse_worker_status_event("router", "running", {"message": "Analyzing query and checking user intent..."}))
+        await asyncio.sleep(0.05)
 
         try:
-            # 2. Iterate graph updates (including internal subgraph updates)
-            async for path, chunk in parent_graph.astream(
-                state_input, config, stream_mode="updates", subgraphs=True
-            ):
-                # ── Parent Router Route Decision ──────────────────────────────
-                if not path:
-                    if "router" in chunk:
-                        router_out = chunk["router"]
-                        next_rt = router_out.get("next_route", "brain_subgraph")
+            # ── Step 2: Get routing decision from router_node directly ────────
+            # We call the router function directly instead of streaming the full
+            # parent graph, so we get the decision instantly without waiting for
+            # the whole subgraph to complete.
+            from app.schema.state import ParentState
+            router_state: ParentState = {
+                "messages": messages,
+                "turn_count": 0,
+                "status": "running",
+                "next_route": "brain_subgraph",
+                "final_response": None,
+                "error_message": None,
+                "worker_results": [],
+                "completed_steps": [],
+                "tasks": None,
+                "last_created_task_id": None,
+                "automations": None,
+                "workflow_schema": None,
+                "memory_context": None,
+                "contains_memorable_info": None,
+                "transfer_to_agent": False,
+                "transfer_query": None,
+            }
 
-                        router_done = sse_worker_status_event(
-                            worker_name="router",
-                            status="completed",
-                            details={"next_route": next_rt}
-                        )
-                        yield f"event: {router_done['event']}\ndata: {router_done['data']}\n\n"
-                        await asyncio.sleep(0.1)
+            router_result = router_node(router_state)
+            next_route = router_result.get("next_route", "brain_subgraph")
+            logger.info(f"[chat] Router decision: {next_route}")
 
-                        # Signal subgraph starting
-                        if next_rt != "__end__":
-                            sub_start = sse_worker_status_event(
-                                worker_name=next_rt,
-                                status="starting",
-                                details={"message": f"Initializing {next_rt.replace('_subgraph', '').title()} agent..."}
-                            )
-                            yield f"event: {sub_start['event']}\ndata: {sub_start['data']}\n\n"
-                            await asyncio.sleep(0.1)
+            # ── Step 3: Emit router done ──────────────────────────────────────
+            yield _sse(sse_worker_status_event("router", "completed", {"next_route": next_route}))
+            await asyncio.sleep(0.05)
 
-                # ── Brain Subgraph Real-Time Execution ────────────────────────
-                elif path == ("brain_subgraph",):
-                    if "supervisor" in chunk:
-                        brain_super = chunk["supervisor"]
-                        # Check for user context handoff
-                        if brain_super.get("transfer_to_agent"):
-                            handoff = sse_handoff_event(
-                                target="agent_subgraph",
-                                reason="workflow_creation",
-                                query=message_text
-                            )
-                            yield f"event: {handoff['event']}\ndata: {handoff['data']}\n\n"
-                            await asyncio.sleep(0.1)
-                        else:
-                            super_data = sse_supervisor_data_event(
-                                intent=brain_super.get("current_intent", "unknown"),
-                                planned_workers=brain_super.get("planned_workers", []),
-                                status=brain_super.get("status", "running")
-                            )
-                            yield f"event: {super_data['event']}\ndata: {super_data['data']}\n\n"
-                            await asyncio.sleep(0.1)
+            # ── Step 4: Stream the correct subgraph ───────────────────────────
+            if next_route == "agent_subgraph":
+                yield _sse(sse_worker_status_event("agent_subgraph", "starting", {"message": "Initializing Agent workflow builder..."}))
+                await asyncio.sleep(0.05)
 
-                    # Handle individual brain workers
-                    for worker in ["memory_worker", "task_worker", "upload_worker", "reflect_worker", "composio_worker"]:
-                        if worker in chunk:
-                            worker_run = sse_worker_status_event(
-                                worker_name=worker,
-                                status="running",
-                                details={"message": f"{worker.replace('_', ' ').title()} is executing..."}
-                            )
-                            yield f"event: {worker_run['event']}\ndata: {worker_run['data']}\n\n"
-                            await asyncio.sleep(0.4)
+                async for sse_line in stream_agent(messages, thread_id):
+                    yield sse_line
 
-                            # Stream worker outputs/footprints
-                            worker_val = chunk[worker].get("worker_results", [{}])[0].get("output")
-                            worker_resp = sse_worker_response_event(
-                                worker_name=worker,
-                                output=worker_val
-                            )
-                            yield f"event: {worker_resp['event']}\ndata: {worker_resp['data']}\n\n"
-                            await asyncio.sleep(0.1)
+            elif next_route == "brain_subgraph":
+                yield _sse(sse_worker_status_event("brain_subgraph", "starting", {"message": "Initializing Brain agent..."}))
+                await asyncio.sleep(0.05)
 
-                # ── Agent Subgraph Real-Time Execution ────────────────────────
-                elif path == ("agent_subgraph",):
-                    if "supervisor" in chunk:
-                        agent_super = chunk["supervisor"]
-                        super_data = sse_supervisor_data_event(
-                            intent=agent_super.get("current_intent", "unknown"),
-                            planned_workers=agent_super.get("planned_workers", []),
-                            status=agent_super.get("status", "running")
-                        )
-                        yield f"event: {super_data['event']}\ndata: {super_data['data']}\n\n"
-                        await asyncio.sleep(0.1)
+                async for sse_line in stream_brain(messages, thread_id, message_text):
+                    yield sse_line
 
-                    # Workflow Builder Node details
-                    if "workflow_builder" in chunk:
-                        builder_out = chunk["workflow_builder"]
-                        # Check for workflow builder errors
-                        builder_err = None
-                        for res in builder_out.get("worker_results", []):
-                            if res.get("worker") == "workflow_builder" and res.get("error"):
-                                builder_err = res.get("error")
-
-                        if builder_err:
-                            err_event = {
-                                "event": "error",
-                                "data": json.dumps({"error": f"Workflow builder failed: {builder_err}"})
-                            }
-                            yield f"event: {err_event['event']}\ndata: {err_event['data']}\n\n"
-                            await asyncio.sleep(0.1)
-                        else:
-                            builder_run = sse_worker_status_event(
-                                worker_name="workflow_builder",
-                                status="running",
-                                details={"message": "Designing workflow steps, nodes, and edges..."}
-                            )
-                            yield f"event: {builder_run['event']}\ndata: {builder_run['data']}\n\n"
-                            await asyncio.sleep(0.4)
-
-                            # Emit live Composio metadata lookups
-                            if builder_out.get("workflow_schema"):
-                                composio_schema = sse_worker_action_event(
-                                    worker_name="workflow_builder",
-                                    action="fetching_composio_schemas",
-                                    details={"message": "Loading live API parameter schemas from Composio..."}
-                                )
-                                yield f"event: {composio_schema['event']}\ndata: {composio_schema['data']}\n\n"
-                                await asyncio.sleep(0.4)
-
-                                # Stream final React Flow workflow schema to client for graph rendering
-                                schema_data = sse_worker_response_event(
-                                    worker_name="workflow_builder",
-                                    output=builder_out["workflow_schema"]
-                                )
-                                yield f"event: {schema_data['event']}\ndata: {schema_data['data']}\n\n"
-                                await asyncio.sleep(0.1)
-
-                    # Handle other agent workers
-                    for worker in ["composio_worker", "ai_node_worker", "scheduler_worker"]:
-                        if worker in chunk:
-                            worker_run = sse_worker_status_event(
-                                worker_name=worker,
-                                status="running",
-                                details={"message": f"{worker.replace('_', ' ').title()} is executing..."}
-                            )
-                            yield f"event: {worker_run['event']}\ndata: {worker_run['data']}\n\n"
-                            await asyncio.sleep(0.4)
-
-                            worker_val = chunk[worker].get("worker_results", [{}])[0].get("output")
-                            worker_resp = sse_worker_response_event(
-                                worker_name=worker,
-                                output=worker_val
-                            )
-                            yield f"event: {worker_resp['event']}\ndata: {worker_resp['data']}\n\n"
-                            await asyncio.sleep(0.1)
-
-            # 3. Retrieve and stream the final natural language response
-            final_state = parent_graph.get_state(config).values
-            final_reply = final_state.get("final_response") or "Processing complete."
-
-            done_event = sse_supervisor_data_event(
-                intent="create_workflow",
-                planned_workers=[],
-                final_response=final_reply,
-                status="done"
-            )
-            yield f"event: {done_event['event']}\ndata: {done_event['data']}\n\n"
+            else:
+                # __end__ or unknown — just send done
+                yield _sse(sse_supervisor_data_event("none", [], "Nothing to do.", status="done"))
 
         except Exception as e:
-            logger.error(f"Error during graph execution stream: {e}")
+            logger.error(f"[chat] Stream error: {e}", exc_info=True)
             yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
+# ── Dev server entry ──────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
     logger.info("Starting Aria Backend Server on http://localhost:8000")

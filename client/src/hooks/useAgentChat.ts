@@ -85,6 +85,7 @@ export function useAgentChat() {
           if (dataStr) {
             try {
               const payload = JSON.parse(dataStr);
+              console.log(`[useAgentChat] Received SSE event: "${eventName}"`, payload);
 
               if (eventName === "worker_status") {
                 const worker = payload.worker;
@@ -124,6 +125,23 @@ export function useAgentChat() {
                 if (action === "fetching_composio_schemas") {
                   detailsMsg =
                     "Loading live API parameter schemas from Composio...";
+                } else if (action === "composio_schema_fetched") {
+                  const slug = payload.details?.action_slug || "";
+                  detailsMsg = `Schema ready for ${slug}`;
+                } else if (action === "tool_validation") {
+                  const slug = payload.details?.action_slug || "";
+                  const status = payload.details?.status || "";
+                  detailsMsg =
+                    status === "ready"
+                      ? `${slug}: params validated OK`
+                      : `${slug}: ${payload.details?.message || "checking params"}...`;
+                } else if (action === "node_configured") {
+                  const nodeId = payload.details?.node_id || "";
+                  const nodeType = payload.details?.type || "";
+                  const model = payload.details?.model || "";
+                  detailsMsg = `AI node [${nodeId}] (${nodeType}) configured with ${model}`;
+                } else if (action === "configuring_ai_nodes") {
+                  detailsMsg = payload.details?.message || "Configuring AI nodes...";
                 }
 
                 const stepKey = `${worker}_${action}`;
@@ -149,6 +167,9 @@ export function useAgentChat() {
 
                 // If it is the workflow builder, update the canvas with the nodes and edges
                 if (worker === "workflow_builder" && payload.output?.nodes) {
+                  console.log("=========================================");
+                  console.log("Full JSON Architecture:", JSON.stringify(payload.output, null, 2));
+                  console.log("=========================================");
                   setWorkflowData({
                     nodes: payload.output.nodes,
                     edges: payload.output.edges,
