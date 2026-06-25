@@ -3,6 +3,7 @@ import {
   ChatMessage,
   formatMessageContent,
 } from "@/modules/Ai/components/ChatMessage";
+import { useAgentStore } from "./useAgentStore";
 
 export function useAgentChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -15,6 +16,8 @@ export function useAgentChat() {
     edges: any[];
   } | null>(null);
   const [isRightOpen, setIsRightOpen] = useState(false);
+  const { activeMode } = useAgentStore();
+  const [threadId] = useState(() => `thread_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
 
   const sendMessage = useCallback(async (textToSend: string) => {
     if (!textToSend.trim()) return;
@@ -46,7 +49,8 @@ export function useAgentChat() {
         },
         body: JSON.stringify({
           message: textToSend,
-          thread_id: "agent_session_thread",
+          thread_id: threadId,
+          mode: activeMode,
         }),
       });
 

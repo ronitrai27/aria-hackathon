@@ -1071,7 +1071,6 @@ export default function FlowPreview({
   const [activePopoverNodeId, setActivePopoverNodeId] = useState<string | null>(
     null,
   );
-
   const handleSuggestNew = () => {
     const shuffled = [...recipes].sort(() => 0.5 - Math.random());
     setCurrentRecipes(shuffled.slice(0, 3));
@@ -1107,7 +1106,8 @@ export default function FlowPreview({
 
   // Lay out nodes vertically (tight vertical spacing index * 140, always start from top, no need to center)
   const renderedNodes = useMemo(() => {
-    return localNodes.map((node, index) => {
+    const filteredNodes = localNodes.filter(node => node.type !== "task_trigger");
+    return filteredNodes.map((node, index) => {
       const errors: string[] = [];
       const nodeType = node.type || "";
       if (nodeType.startsWith("ai_")) {
@@ -1143,11 +1143,14 @@ export default function FlowPreview({
     });
   }, [localNodes, activeTab, isRunning, nodeStatuses]);
 
-  // Force all edges to use straight type
+  // Force all edges to use straight type and filter out ones connected to task_trigger
   const renderedEdges = useMemo(() => {
     if (!edges) return [];
-    return edges.map((edge) => ({ ...edge, type: "straight" }));
-  }, [edges]);
+    const validNodeIds = new Set(renderedNodes.map(n => n.id));
+    return edges
+      .filter((edge) => validNodeIds.has(edge.source) && validNodeIds.has(edge.target))
+      .map((edge) => ({ ...edge, type: "straight" }));
+  }, [edges, renderedNodes]);
 
   const activeNode = useMemo(() => {
     return renderedNodes.find((n) => n.id === activePopoverNodeId);

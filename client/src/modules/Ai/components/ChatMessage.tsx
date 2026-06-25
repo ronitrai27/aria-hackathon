@@ -17,7 +17,11 @@ export function StatusStepper({
       <div className="flex items-center justify-between border-b border-border dark:border-white/5 pb-2">
         <span className="text-[10px] font-bold text-muted-foreground dark:text-zinc-400 tracking-wider uppercase flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
-          Agent Action Trace Logs
+          {steps.some((s) =>
+            ["memory_worker", "task_worker", "upload_worker", "reflect_worker", "brain_subgraph"].includes(s.worker)
+          )
+            ? "Brain Action Trace Logs"
+            : "Agent Action Trace Logs"}
         </span>
         <span className="text-[9px] text-muted-foreground dark:text-zinc-500 font-medium">
           Real-time status
