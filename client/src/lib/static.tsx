@@ -20,3 +20,41 @@ export const connectorIcons: Record<string, string> = {
   "Google Docs": "/docs.png",
   "Google Sheets": "/sheets.png",
 };
+
+export const models = [
+  {
+    value: "claude-sonnet-3.5",
+    label: "Claude Sonnet 3.5",
+    short: "Sonnet 3.5",
+    logo: "/claude.png",
+    disabled: false,
+  },
+  {
+    value: "claude-opus-4.5",
+    label: "Claude Opus 4.5",
+    short: "Opus 4.5",
+    logo: "/claude.png",
+    disabled: true,
+  },
+  {
+    value: "gpt-4.1-mini",
+    label: "GPT-4.1 mini",
+    short: "4.1 mini",
+    logo: "/chatgpt.png",
+    disabled: false,
+  },
+  {
+    value: "gpt-4.1",
+    label: "GPT-4.1",
+    short: "4.1",
+    logo: "/chatgpt.png",
+    disabled: true,
+  },
+  {
+    value: "gpt-5.1",
+    label: "GPT-5.1",
+    short: "5.1",
+    logo: "/chatgpt.png",
+    disabled: true,
+  },
+];

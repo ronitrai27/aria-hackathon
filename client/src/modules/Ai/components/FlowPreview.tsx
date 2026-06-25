@@ -30,7 +30,11 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { connectorIcons } from "@/lib/static";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface FlowPreviewProps {
   onSelectSuggestion?: (prompt: string, apps: string[]) => void;
@@ -475,8 +479,6 @@ function AppNodePopover({
   );
 }
 
-
-
 // ─── Trigger Node ─────────────────────────────────────────────────────────────
 
 function TriggerNode({ data }: { data: any }) {
@@ -837,10 +839,16 @@ function AppNode({ data }: { data: any }) {
                           Trace Result
                         </button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-96 p-4 rounded-xl border border-neutral-200 bg-white shadow-xl z-[9999]" align="end" onClick={(e) => e.stopPropagation()}>
+                      <PopoverContent
+                        className="w-96 p-4 rounded-xl border border-neutral-200 bg-white shadow-xl z-[9999]"
+                        align="end"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <div className="flex flex-col gap-2">
                           <div className="flex items-center justify-between border-b pb-2">
-                            <span className="font-semibold text-xs text-neutral-900">Execution Trace Result</span>
+                            <span className="font-semibold text-xs text-neutral-900">
+                              Execution Trace Result
+                            </span>
                           </div>
                           <pre className="text-[10px] bg-neutral-50 p-2.5 rounded-lg border border-neutral-200 overflow-x-auto overflow-y-auto max-h-60 font-mono text-neutral-800 leading-relaxed max-w-full whitespace-pre-wrap">
                             {JSON.stringify(data.traceResult, null, 2)}
@@ -961,10 +969,16 @@ function AppNode({ data }: { data: any }) {
                         Trace Result
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-96 p-4 rounded-xl border border-neutral-200 bg-white shadow-xl z-[9999]" align="end" onClick={(e) => e.stopPropagation()}>
+                    <PopoverContent
+                      className="w-96 p-4 rounded-xl border border-neutral-200 bg-white shadow-xl z-[9999]"
+                      align="end"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center justify-between border-b pb-2">
-                          <span className="font-semibold text-xs text-neutral-900">Execution Trace Result</span>
+                          <span className="font-semibold text-xs text-neutral-900">
+                            Execution Trace Result
+                          </span>
                         </div>
                         <pre className="text-[10px] bg-neutral-50 p-2.5 rounded-lg border border-neutral-200 overflow-x-auto overflow-y-auto max-h-60 font-mono text-neutral-800 leading-relaxed max-w-full whitespace-pre-wrap">
                           {JSON.stringify(data.traceResult, null, 2)}
@@ -1106,7 +1120,9 @@ export default function FlowPreview({
 
   // Lay out nodes vertically (tight vertical spacing index * 140, always start from top, no need to center)
   const renderedNodes = useMemo(() => {
-    const filteredNodes = localNodes.filter(node => node.type !== "task_trigger");
+    const filteredNodes = localNodes.filter(
+      (node) => node.type !== "task_trigger",
+    );
     return filteredNodes.map((node, index) => {
       const errors: string[] = [];
       const nodeType = node.type || "";
@@ -1146,17 +1162,18 @@ export default function FlowPreview({
   // Force all edges to use straight type and filter out ones connected to task_trigger
   const renderedEdges = useMemo(() => {
     if (!edges) return [];
-    const validNodeIds = new Set(renderedNodes.map(n => n.id));
+    const validNodeIds = new Set(renderedNodes.map((n) => n.id));
     return edges
-      .filter((edge) => validNodeIds.has(edge.source) && validNodeIds.has(edge.target))
+      .filter(
+        (edge) =>
+          validNodeIds.has(edge.source) && validNodeIds.has(edge.target),
+      )
       .map((edge) => ({ ...edge, type: "straight" }));
   }, [edges, renderedNodes]);
 
   const activeNode = useMemo(() => {
     return renderedNodes.find((n) => n.id === activePopoverNodeId);
   }, [renderedNodes, activePopoverNodeId]);
-
-
 
   const hasWorkflow = renderedNodes.length > 0;
 
@@ -1237,11 +1254,9 @@ export default function FlowPreview({
         />
       )}
 
-
-
       {/* Recipe suggestions — shown only if no workflow loaded */}
       {!hasWorkflow && (
-        <div className="relative z-10 max-w-md w-full border border-neutral-200 shadow-lg rounded-2xl p-5 bg-white select-none mx-4">
+        <div className="relative z-10 max-w-md w-full border border-neutral-200 shadow rounded-md p-5 bg-neutral-50 select-none mx-4">
           <div className="flex items-start gap-3 mb-4">
             <div className="h-9 w-9 rounded-xl bg-neutral-900 flex items-center justify-center shrink-0">
               <svg viewBox="0 0 36 48" width="16" height="20" fill="white">
@@ -1256,14 +1271,18 @@ export default function FlowPreview({
                 Pick a template and the AI will build your automation graph.
               </p>
             </div>
-            <button
+          </div>
+          <div className="flex items-center justify-end w-full mb-2">
+            <Button
               type="button"
+              variant={"ghost"}
+              size={"xs"}
               onClick={handleSuggestNew}
-              className="flex items-center gap-1 text-[10px] text-neutral-400 hover:text-neutral-700 font-medium transition-colors shrink-0 mt-0.5"
+              className="flex items-center "
             >
               <RefreshCw className="h-3 w-3" />
               Refresh
-            </button>
+            </Button>
           </div>
 
           <div className="flex flex-col gap-2">
@@ -1272,7 +1291,7 @@ export default function FlowPreview({
                 key={recipe.title}
                 type="button"
                 onClick={() => onSelectSuggestion?.(recipe.prompt, recipe.apps)}
-                className="flex items-center text-left p-3 rounded-xl border border-neutral-200 bg-neutral-50 hover:bg-white hover:border-neutral-300 hover:shadow-sm transition-all duration-200 group cursor-pointer w-full"
+                className="flex items-center text-left p-3 rounded-md border border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-sm transition-all duration-200 group cursor-pointer w-full"
               >
                 <div
                   className={`p-2 rounded-lg border ${recipe.bgClass} mr-3 transition-colors duration-200 shrink-0`}

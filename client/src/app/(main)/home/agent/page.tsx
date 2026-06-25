@@ -9,6 +9,8 @@ import {
   Bell,
   Bot,
   Brain,
+  Check,
+  ChevronDown,
   ChevronUp,
   Clock,
   FileText,
@@ -38,7 +40,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAgentStore } from "@/hooks/useAgentStore";
-import { connectorIcons } from "@/lib/static";
+import { connectorIcons, models } from "@/lib/static";
 import { api } from "../../../../../convex/_generated/api";
 import FlowPreview from "../../../../modules/Ai/components/FlowPreview";
 import ChatMessageItem, {
@@ -219,7 +221,11 @@ export default function AgentPage() {
           const result = await res.json();
 
           if (!res.ok || result.error || result.successful === false) {
-            throw new Error(result.error || (result.data && result.data.message) || "Execution unsuccessful");
+            throw new Error(
+              result.error ||
+                (result.data && result.data.message) ||
+                "Execution unsuccessful",
+            );
           }
 
           // Save traceResult on the node
@@ -230,7 +236,7 @@ export default function AgentPage() {
               nodes: prev.nodes.map((n) =>
                 n.id === currentNode.id
                   ? { ...n, data: { ...n.data, traceResult: result } }
-                  : n
+                  : n,
               ),
             };
           });
@@ -269,8 +275,16 @@ export default function AgentPage() {
               ...prev,
               nodes: prev.nodes.map((n) =>
                 n.id === currentNode.id
-                  ? { ...n, data: { ...n.data, traceResult: { error: err.message || "Execution failed" } } }
-                  : n
+                  ? {
+                      ...n,
+                      data: {
+                        ...n.data,
+                        traceResult: {
+                          error: err.message || "Execution failed",
+                        },
+                      },
+                    }
+                  : n,
               ),
             };
           });
@@ -422,6 +436,8 @@ export default function AgentPage() {
     setInputVal("");
     sendMessage(textToSend);
   };
+
+  const selected = models.find((m) => m.value === selectedModel) || models[0];
 
   return (
     <div className="h-[calc(100vh-4rem)] w-[calc(100%+3rem)] -mx-6 -my-6 flex overflow-hidden bg-background">
@@ -913,7 +929,7 @@ export default function AgentPage() {
                         title="Toggle Read & Write Mode"
                       >
                         <span
-                          className={`block w-3.5 h-3.5 bg-white rounded-full shadow-xs transition-transform duration-200 absolute top-0.5 left-0.5 ${
+                          className={`block w-3.5 h-3.5 bg-white rounded-full shadow-xs transition-transform duration-200 absolute top-[1px] left-0.5 ${
                             isReadWriteActive
                               ? "translate-x-3.5"
                               : "translate-x-0"
@@ -953,7 +969,7 @@ export default function AgentPage() {
                           onClick={() =>
                             setIsReadWriteActive(!isReadWriteActive)
                           }
-                          className={`w-7 h-4 rounded-full transition-colors duration-200 relative cursor-pointer shrink-0 outline-none ${
+                          className={`w-8 h-4.5 rounded-full transition-colors duration-200 relative cursor-pointer shrink-0 outline-none ${
                             isReadWriteActive ? "bg-emerald-500" : "bg-rose-500"
                           }`}
                         >
@@ -970,57 +986,101 @@ export default function AgentPage() {
                   </div>
 
                   {/* Right options / Actions */}
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 relative">
                     <Select
                       value={selectedModel}
                       onValueChange={setSelectedModel}
                     >
-                      <SelectTrigger className="h-8 px-2.5 bg-transparent hover:bg-muted/50 border-0 shadow-none focus:ring-0 text-xs font-medium text-muted-foreground flex items-center gap-1.5 rounded-sm cursor-pointer">
-                        <SelectValue placeholder="Select Model" />
+                      <SelectTrigger
+                        className="
+      h-9
+      px-3
+      border-0
+      shadow-none
+      bg-transparent
+      hover:bg-muted/40 
+      rounded-md
+      gap-2
+      focus:ring-0
+      cursor-pointer
+    "
+                      >
+                        <div className="flex items-center gap-2">
+                          <Image
+                            src={selected.logo}
+                            alt=""
+                            width={16}
+                            height={16}
+                            className="rounded-sm"
+                          />
+
+                          <span className="text-[13px] font-medium">
+                            {isNarrow ? selected.short : selected.label}
+                          </span>
+                        </div>
+
+                        {/* <ChevronDown className="h-3.5 w-3.5 opacity-60" /> */}
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="claude-sonnet-3.5">
-                          <span className="flex items-center gap-2 text-xs">
-                            <Sparkles className="h-3.5 w-3.5 text-orange-500" />
-                            {isNarrow ? "Sonnet 3.5" : "Claude Sonnet 3.5"}
-                          </span>
-                        </SelectItem>
-                        <SelectItem value="claude-opus-4.5" disabled>
-                          <div className="flex items-center justify-between w-full gap-8 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-2">
-                              <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
-                              {isNarrow ? "Opus 4.5" : "Claude Opus 4.5"}
-                            </span>
-                            <Lock className="h-3 w-3 text-muted-foreground/45 shrink-0" />
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="gpt-4.1-mini">
-                          <span className="flex items-center gap-2 text-xs">
-                            <Sparkles className="h-3.5 w-3.5 text-blue-500" />
-                            {isNarrow ? "4.1 mini" : "GPT-4.1 mini"}
-                          </span>
-                        </SelectItem>
-                        <SelectItem value="gpt-4.1" disabled>
-                          <div className="flex items-center justify-between w-full gap-8 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-2">
-                              <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
-                              {isNarrow ? "4.1" : "GPT-4.1"}
-                            </span>
-                            <Lock className="h-3 w-3 text-muted-foreground" />
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="gpt-5.1" disabled>
-                          <div className="flex items-center justify-between w-full gap-8 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-2">
-                              <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
-                              {isNarrow ? "5.1" : "GPT-5.1"}
-                            </span>
-                            <Lock className="h-3 w-3 text-muted-foreground" />
-                          </div>
-                        </SelectItem>
+
+                      <SelectContent
+                        position="popper"
+                        side="top"
+                        avoidCollisions={false}
+                        className="
+      w-[250px]
+      rounded-xl
+      p-1
+      shadow-xl
+    "
+                      >
+                        {models.map((model) => (
+                          <SelectItem
+                            key={model.value}
+                            value={model.value}
+                            disabled={model.disabled}
+                            className="
+          h-10
+          rounded-lg
+          px-2
+          cursor-pointer
+        "
+                          >
+                            <div className="flex w-full items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <Image
+                                  src={model.logo}
+                                  alt=""
+                                  width={18}
+                                  height={18}
+                                />
+
+                                <span
+                                  className={`text-[13px] ${
+                                    model.disabled
+                                      ? "text-muted-foreground"
+                                      : "font-medium"
+                                  }`}
+                                >
+                                  {isNarrow ? model.short : model.label}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center">
+                                {model.disabled ? (
+                                  <Lock className="h-3.5 w-3.5 text-muted-foreground/60" />
+                                ) : (
+                                  selectedModel === model.value && (
+                                    <Check className="h-4 w-4" />
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
 
+                    {/* ------ */}
                     <Button
                       type="button"
                       size="icon"
@@ -1102,8 +1162,11 @@ export default function AgentPage() {
                 </div>
                 {/* Right: Actions and Collapse trigger */}
                 <div className="flex items-center gap-3">
-                  {activeTab === "runs" && workflowData && workflowData.nodes && workflowData.nodes.length > 0 && (
-                    isWorkflowRunning ? (
+                  {activeTab === "runs" &&
+                    workflowData &&
+                    workflowData.nodes &&
+                    workflowData.nodes.length > 0 &&
+                    (isWorkflowRunning ? (
                       <Button
                         type="button"
                         variant="destructive"
@@ -1134,8 +1197,7 @@ export default function AgentPage() {
                         </svg>
                         Run
                       </Button>
-                    )
-                  )}
+                    ))}
 
                   <Button
                     type="button"
@@ -1177,7 +1239,9 @@ export default function AgentPage() {
                     onChangeNodes={handleNodesChange}
                     activeTab={activeTab}
                     isRunning={activeTab === "runs" && isWorkflowRunning}
-                    nodeStatuses={activeTab === "runs" ? nodeExecutionStatuses : {}}
+                    nodeStatuses={
+                      activeTab === "runs" ? nodeExecutionStatuses : {}
+                    }
                   />
                 </div>
               </div>
