@@ -70,15 +70,16 @@
 
 // function UnreadEmailsCard({ steps }: { steps: StepMeta[] }) {
 //   const gmailStep = steps.find((s) => s.key === "step_1");
-//   if (!gmailStep || gmailStep.status !== "success" || !gmailStep.result) return null;
+//   if (!gmailStep || gmailStep.status !== "success" || !gmailStep.result)
+//     return null;
 
 //   // Parse messages from the Gmail result shape
 //   const data = (gmailStep.result as any)?.data;
 //   const messages: any[] = data?.messages ?? [];
 
 //   // Filter only UNREAD
-//   const unread = messages.filter((m) =>
-//     Array.isArray(m.labelIds) && m.labelIds.includes("UNREAD")
+//   const unread = messages.filter(
+//     (m) => Array.isArray(m.labelIds) && m.labelIds.includes("UNREAD"),
 //   );
 
 //   if (unread.length === 0) {
@@ -107,9 +108,18 @@
 //         padding: "22px 24px",
 //       }}
 //     >
-//       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+//       <div
+//         style={{
+//           display: "flex",
+//           alignItems: "center",
+//           gap: 10,
+//           marginBottom: 20,
+//         }}
+//       >
 //         <span style={{ fontSize: 20 }}>📧</span>
-//         <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Unread Emails</h3>
+//         <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
+//           Unread Emails
+//         </h3>
 //         <span
 //           style={{
 //             background: "rgba(239,68,68,0.15)",
@@ -130,17 +140,15 @@
 //           // Extract subject from payload headers
 //           const headers: any[] = msg.payload?.headers ?? [];
 //           const subject =
-//             headers.find((h: any) => h.name?.toLowerCase() === "subject")?.value ||
-//             "(No subject)";
+//             headers.find((h: any) => h.name?.toLowerCase() === "subject")
+//               ?.value || "(No subject)";
 //           const from =
-//             headers.find((h: any) => h.name?.toLowerCase() === "from")?.value || "";
+//             headers.find((h: any) => h.name?.toLowerCase() === "from")?.value ||
+//             "";
 
 //           // Body: prefer messageText (plain text snippet), else payload body
 //           const bodyRaw: string =
-//             msg.messageText ||
-//             msg.snippet ||
-//             msg.payload?.body?.data ||
-//             "";
+//             msg.messageText || msg.snippet || msg.payload?.body?.data || "";
 
 //           // Clean up escaped newlines / excess whitespace
 //           const body = bodyRaw
@@ -187,7 +195,11 @@
 //                   flexWrap: "wrap",
 //                 }}
 //               >
-//                 {from && <span>From: <span style={{ color: "#7dd3fc" }}>{from}</span></span>}
+//                 {from && (
+//                   <span>
+//                     From: <span style={{ color: "#7dd3fc" }}>{from}</span>
+//                   </span>
+//                 )}
 //                 {ts && <span>{ts}</span>}
 //               </div>
 
@@ -308,12 +320,22 @@
 //   };
 
 //   const allConnected = REQUIRED_APPS.every((a) =>
-//     activeToolkits.includes(a.slug)
+//     activeToolkits.includes(a.slug),
 //   );
 
 //   if (userLoading) {
 //     return (
-//       <div style={{ minHeight: "100vh", background: "#0a0a0f", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontFamily: "Inter, sans-serif" }}>
+//       <div
+//         style={{
+//           minHeight: "100vh",
+//           background: "#0a0a0f",
+//           display: "flex",
+//           alignItems: "center",
+//           justifyContent: "center",
+//           color: "#64748b",
+//           fontFamily: "Inter, sans-serif",
+//         }}
+//       >
 //         Loading user…
 //       </div>
 //     );
@@ -324,14 +346,14 @@
 //     <div
 //       style={{
 //         minHeight: "100vh",
-//         background: "linear-gradient(135deg, #0a0a0f 0%, #0f0f1a 50%, #0a0a0f 100%)",
+//         background:
+//           "linear-gradient(135deg, #0a0a0f 0%, #0f0f1a 50%, #0a0a0f 100%)",
 //         padding: "48px 24px",
 //         fontFamily: "'Inter', 'Segoe UI', sans-serif",
 //         color: "#e2e8f0",
 //       }}
 //     >
 //       <div style={{ maxWidth: 780, margin: "0 auto" }}>
-
 //         {/* ── Header ── */}
 //         <div style={{ marginBottom: 36 }}>
 //           <div
@@ -366,7 +388,14 @@
 //           >
 //             Workflow Runner
 //           </h1>
-//           <p style={{ color: "#64748b", marginTop: 8, fontSize: 14, margin: "8px 0 0" }}>
+//           <p
+//             style={{
+//               color: "#64748b",
+//               marginTop: 8,
+//               fontSize: 14,
+//               margin: "8px 0 0",
+//             }}
+//           >
 //             Gmail → Google Calendar → Slack Channels → Slack History
 //           </p>
 //         </div>
@@ -388,7 +417,14 @@
 //             }}
 //           >
 //             <span style={{ color: "#64748b" }}>Convex User ID</span>
-//             <code style={{ color: "#a78bfa", fontWeight: 600, fontFamily: "monospace", fontSize: 12 }}>
+//             <code
+//               style={{
+//                 color: "#a78bfa",
+//                 fontWeight: 600,
+//                 fontFamily: "monospace",
+//                 fontSize: 12,
+//               }}
+//             >
 //               {convexUserId}
 //             </code>
 //           </div>
@@ -404,9 +440,25 @@
 //             marginBottom: 20,
 //           }}
 //         >
-//           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+//           <div
+//             style={{
+//               display: "flex",
+//               alignItems: "center",
+//               justifyContent: "space-between",
+//               marginBottom: 18,
+//             }}
+//           >
 //             <div>
-//               <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#94a3b8", letterSpacing: 0.5, textTransform: "uppercase" }}>
+//               <p
+//                 style={{
+//                   margin: 0,
+//                   fontSize: 13,
+//                   fontWeight: 700,
+//                   color: "#94a3b8",
+//                   letterSpacing: 0.5,
+//                   textTransform: "uppercase",
+//                 }}
+//               >
 //                 Step 1 — Connect Apps
 //               </p>
 //               <p style={{ margin: "4px 0 0", fontSize: 12, color: "#475569" }}>
@@ -452,14 +504,20 @@
 //                     padding: "12px 16px",
 //                   }}
 //                 >
-//                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+//                   <div
+//                     style={{ display: "flex", alignItems: "center", gap: 10 }}
+//                   >
 //                     <span style={{ fontSize: 20 }}>{app.icon}</span>
-//                     <span style={{ fontWeight: 600, fontSize: 14 }}>{app.label}</span>
+//                     <span style={{ fontWeight: 600, fontSize: 14 }}>
+//                       {app.label}
+//                     </span>
 //                     <span
 //                       style={{
 //                         fontSize: 11,
 //                         color: connected ? "#22c55e" : "#ef4444",
-//                         background: connected ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)",
+//                         background: connected
+//                           ? "rgba(34,197,94,0.12)"
+//                           : "rgba(239,68,68,0.12)",
 //                         border: `1px solid ${connected ? "#22c55e" : "#ef4444"}30`,
 //                         borderRadius: 5,
 //                         padding: "1px 8px",
@@ -489,7 +547,13 @@
 //                         transition: "all 0.2s",
 //                       }}
 //                     >
-//                       {isConnecting ? <><Spinner size={13} /> Connecting…</> : "Connect →"}
+//                       {isConnecting ? (
+//                         <>
+//                           <Spinner size={13} /> Connecting…
+//                         </>
+//                       ) : (
+//                         "Connect →"
+//                       )}
 //                     </button>
 //                   )}
 //                 </div>
@@ -525,22 +589,80 @@
 //             marginBottom: 20,
 //           }}
 //         >
-//           <p style={{ margin: "0 0 18px", fontSize: 13, fontWeight: 700, color: "#94a3b8", letterSpacing: 0.5, textTransform: "uppercase" }}>
+//           <p
+//             style={{
+//               margin: "0 0 18px",
+//               fontSize: 13,
+//               fontWeight: 700,
+//               color: "#94a3b8",
+//               letterSpacing: 0.5,
+//               textTransform: "uppercase",
+//             }}
+//           >
 //             Step 2 — Run Workflow
 //           </p>
 
 //           {/* Steps preview */}
-//           <div style={{ marginBottom: 18, display: "flex", flexDirection: "column", gap: 6 }}>
+//           <div
+//             style={{
+//               marginBottom: 18,
+//               display: "flex",
+//               flexDirection: "column",
+//               gap: 6,
+//             }}
+//           >
 //             {[
-//               { n: 1, tool: "GMAIL_FETCH_EMAILS", desc: "Fetch 10 unread inbox emails" },
-//               { n: 2, tool: "GOOGLECALENDAR_EVENTS_LIST", desc: "List 10 upcoming events" },
-//               { n: 3, tool: "SLACK_FETCH_CONVERSATION_HISTORY", desc: "Last 10 msgs from #all-wekraft" },
+//               {
+//                 n: 1,
+//                 tool: "GMAIL_FETCH_EMAILS",
+//                 desc: "Fetch 10 unread inbox emails",
+//               },
+//               {
+//                 n: 2,
+//                 tool: "GOOGLECALENDAR_EVENTS_LIST",
+//                 desc: "List 10 upcoming events",
+//               },
+//               {
+//                 n: 3,
+//                 tool: "SLACK_FETCH_CONVERSATION_HISTORY",
+//                 desc: "Last 10 msgs from #all-wekraft",
+//               },
 //             ].map((s) => (
-//               <div key={s.n} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-//                 <span style={{ width: 22, height: 22, borderRadius: "50%", background: "rgba(139,92,246,0.2)", color: "#a78bfa", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+//               <div
+//                 key={s.n}
+//                 style={{
+//                   display: "flex",
+//                   alignItems: "center",
+//                   gap: 10,
+//                   fontSize: 13,
+//                 }}
+//               >
+//                 <span
+//                   style={{
+//                     width: 22,
+//                     height: 22,
+//                     borderRadius: "50%",
+//                     background: "rgba(139,92,246,0.2)",
+//                     color: "#a78bfa",
+//                     fontSize: 11,
+//                     fontWeight: 700,
+//                     display: "flex",
+//                     alignItems: "center",
+//                     justifyContent: "center",
+//                     flexShrink: 0,
+//                   }}
+//                 >
 //                   {s.n}
 //                 </span>
-//                 <code style={{ color: "#7dd3fc", fontSize: 11, fontFamily: "monospace" }}>{s.tool}</code>
+//                 <code
+//                   style={{
+//                     color: "#7dd3fc",
+//                     fontSize: 11,
+//                     fontFamily: "monospace",
+//                   }}
+//                 >
+//                   {s.tool}
+//                 </code>
 //                 <span style={{ color: "#475569", fontSize: 12 }}>{s.desc}</span>
 //               </div>
 //             ))}
@@ -557,8 +679,8 @@
 //               background: !allConnected
 //                 ? "rgba(100,116,139,0.3)"
 //                 : loading
-//                 ? "rgba(139,92,246,0.4)"
-//                 : "linear-gradient(135deg, #7c3aed, #a855f7)",
+//                   ? "rgba(139,92,246,0.4)"
+//                   : "linear-gradient(135deg, #7c3aed, #a855f7)",
 //               color: !allConnected ? "#475569" : "#fff",
 //               fontSize: 15,
 //               fontWeight: 700,
@@ -568,12 +690,17 @@
 //               justifyContent: "center",
 //               gap: 10,
 //               transition: "all 0.2s ease",
-//               boxShadow: allConnected && !loading ? "0 4px 24px rgba(139,92,246,0.35)" : "none",
+//               boxShadow:
+//                 allConnected && !loading
+//                   ? "0 4px 24px rgba(139,92,246,0.35)"
+//                   : "none",
 //               letterSpacing: 0.4,
 //             }}
 //           >
 //             {loading ? (
-//               <><Spinner /> Running workflow…</>
+//               <>
+//                 <Spinner /> Running workflow…
+//               </>
 //             ) : !allConnected ? (
 //               "⚠️ Connect all apps first"
 //             ) : (
@@ -602,17 +729,35 @@
 //         {/* ── Raw Results ── */}
 //         {response && (
 //           <div>
-//             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-//               <span style={{ fontSize: 20 }}>{response.success ? "✅" : "❌"}</span>
+//             <div
+//               style={{
+//                 display: "flex",
+//                 alignItems: "center",
+//                 gap: 10,
+//                 marginBottom: 16,
+//               }}
+//             >
+//               <span style={{ fontSize: 20 }}>
+//                 {response.success ? "✅" : "❌"}
+//               </span>
 //               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
 //                 Workflow {response.success ? "Completed" : "Failed"}
 //               </h2>
-//               <span style={{ color: "#475569", fontSize: 13, marginLeft: "auto" }}>
+//               <span
+//                 style={{ color: "#475569", fontSize: 13, marginLeft: "auto" }}
+//               >
 //                 {response.steps?.length} steps
 //               </span>
 //             </div>
 
-//             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 32 }}>
+//             <div
+//               style={{
+//                 display: "flex",
+//                 flexDirection: "column",
+//                 gap: 10,
+//                 marginBottom: 32,
+//               }}
+//             >
 //               {response.steps?.map((step) => (
 //                 <div
 //                   key={step.key}
@@ -624,7 +769,11 @@
 //                   }}
 //                 >
 //                   <button
-//                     onClick={() => setExpandedStep(expandedStep === step.key ? null : step.key)}
+//                     onClick={() =>
+//                       setExpandedStep(
+//                         expandedStep === step.key ? null : step.key,
+//                       )
+//                     }
 //                     style={{
 //                       width: "100%",
 //                       background: "none",
@@ -638,21 +787,47 @@
 //                     }}
 //                   >
 //                     <StatusBadge status={step.status} />
-//                     <span style={{ color: "#94a3b8", fontSize: 12, fontWeight: 600 }}>
+//                     <span
+//                       style={{
+//                         color: "#94a3b8",
+//                         fontSize: 12,
+//                         fontWeight: 600,
+//                       }}
+//                     >
 //                       {step.key.replace("_", " ").toUpperCase()}
 //                     </span>
-//                     <code style={{ color: "#7dd3fc", fontSize: 12, fontFamily: "monospace", fontWeight: 700 }}>
+//                     <code
+//                       style={{
+//                         color: "#7dd3fc",
+//                         fontSize: 12,
+//                         fontFamily: "monospace",
+//                         fontWeight: 700,
+//                       }}
+//                     >
 //                       {step.tool}
 //                     </code>
-//                     <span style={{ marginLeft: "auto", color: "#334155", fontSize: 12 }}>
+//                     <span
+//                       style={{
+//                         marginLeft: "auto",
+//                         color: "#334155",
+//                         fontSize: 12,
+//                       }}
+//                     >
 //                       {expandedStep === step.key ? "▲ collapse" : "▼ expand"}
 //                     </span>
 //                   </button>
 
 //                   {expandedStep === step.key && (
-//                     <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "16px 18px" }}>
+//                     <div
+//                       style={{
+//                         borderTop: "1px solid rgba(255,255,255,0.06)",
+//                         padding: "16px 18px",
+//                       }}
+//                     >
 //                       {step.error ? (
-//                         <p style={{ color: "#fca5a5", fontSize: 13, margin: 0 }}>
+//                         <p
+//                           style={{ color: "#fca5a5", fontSize: 13, margin: 0 }}
+//                         >
 //                           <strong>Error:</strong> {step.error}
 //                         </p>
 //                       ) : (

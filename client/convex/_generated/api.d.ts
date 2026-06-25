@@ -9,7 +9,9 @@
  */
 
 import type * as activities from "../activities.js";
+import type * as crons from "../crons.js";
 import type * as http from "../http.js";
+import type * as importantActions from "../importantActions.js";
 import type * as user from "../user.js";
 
 import type {
@@ -20,7 +22,9 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   activities: typeof activities;
+  crons: typeof crons;
   http: typeof http;
+  importantActions: typeof importantActions;
   user: typeof user;
 }>;
 

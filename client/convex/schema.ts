@@ -67,4 +67,42 @@ export default defineSchema({
     .index("by_user_status", ["userId", "status"])
     .index("by_user_priority", ["userId", "priority"]),
   // .index("by_workflow", ["workflowId"]),
+
+  // Stores the last fetched important actions data from the 6-hour cron
+  importantActionsData: defineTable({
+    userId: v.string(),
+    fetchedAt: v.number(), // timestamp
+    gmailUnreadCount: v.number(),
+    gmailEmails: v.array(
+      v.object({
+        id: v.string(),
+        subject: v.optional(v.string()),
+        from: v.optional(v.string()),
+        snippet: v.optional(v.string()),
+        date: v.optional(v.string()),
+      }),
+    ),
+    gmailError: v.optional(v.string()),
+    calendarEvents: v.array(
+      v.object({
+        id: v.string(),
+        summary: v.optional(v.string()),
+        start: v.optional(v.string()),
+        end: v.optional(v.string()),
+      }),
+    ),
+    calendarError: v.optional(v.string()),
+    slackMessageCount: v.number(),
+    slackMessages: v.array(
+      v.object({
+        ts: v.optional(v.string()),
+        text: v.optional(v.string()),
+        user: v.optional(v.string()),
+      }),
+    ),
+    slackChannel: v.optional(v.string()),
+    slackError: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_fetchedAt", ["userId", "fetchedAt"]),
 });
