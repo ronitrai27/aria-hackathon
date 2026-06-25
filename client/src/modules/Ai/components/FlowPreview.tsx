@@ -2,35 +2,51 @@
 
 import {
   Background,
-  Controls,
+  BaseEdge,
+  getStraightPath,
   Handle,
-  MiniMap,
   Position,
   ReactFlow,
   useReactFlow,
 } from "@xyflow/react";
-import { Button } from "@/components/ui/button";
 import "@xyflow/react/dist/style.css";
 import {
+  AlertCircle,
   ArrowRight,
-  Brain,
+  Check,
   CheckCircle,
   FileText,
-  Play,
+  Loader2,
   RefreshCw,
+  Settings,
+  Settings2,
   Share2,
   Sparkles,
   Workflow,
+  X,
 } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { connectorIcons } from "@/lib/static";
 
 interface FlowPreviewProps {
   onSelectSuggestion?: (prompt: string, apps: string[]) => void;
   nodes?: any[];
   edges?: any[];
+  onChangeNodes?: (nodes: any[]) => void;
+  activeTab?: "editor" | "runs";
+  isRunning?: boolean;
+  nodeStatuses?: Record<string, "pending" | "running" | "success" | "failed">;
 }
+
+const AI_MODELS = [
+  { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+  { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" },
+  { value: "gpt-4o", label: "GPT-4o" },
+  { value: "gpt-4o-mini", label: "GPT-4o Mini" },
+  { value: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet" },
+  { value: "claude-3-haiku", label: "Claude 3 Haiku" },
+];
 
 const recipes = [
   {
@@ -86,9 +102,9 @@ const recipes = [
   {
     title: "Monthly Activity Summary",
     description:
-      "Summarize about my last 1 month activity -> create doc in Google Doc -> email.",
+      "Summarize about my last 1 month activity -> create doc -> email.",
     prompt:
-      "summarize about my last 1 month activity - create doc -> gogole doc - email.",
+      "summarize about my last 1 month activity - create doc -> google doc - email.",
     icon: FileText,
     colorClass: "text-purple-500",
     bgClass:
@@ -97,7 +113,8 @@ const recipes = [
   },
 ];
 
-// Helper to look up the correct connector icon
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 const getAppIcon = (slug: string): string => {
   const lower = slug.toLowerCase();
   if (lower.includes("gmail")) return connectorIcons["Gmail"] || "/logo.svg";
@@ -134,81 +151,593 @@ const getAppIcon = (slug: string): string => {
   return "/logo.svg";
 };
 
-// Custom Trigger Node Component
-function TriggerNode({ data }: { data: any }) {
+// ─── Shared Popover Wrapper ───────────────────────────────────────────────────
+
+function PopoverWrapper({
+  children,
+  onClose,
+}: {
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (
+        overlayRef.current &&
+        !overlayRef.current.contains(e.target as Node)
+      ) {
+        onClose();
+      }
+    }
+    const t = setTimeout(
+      () => document.addEventListener("mousedown", handleClick),
+      50,
+    );
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("mousedown", handleClick);
+    };
+  }, [onClose]);
+
   return (
-    <div className="w-[240px] rounded-xl border border-purple-200 bg-purple-50/50 dark:border-purple-500/30 dark:bg-purple-950/20 p-4 shadow-sm backdrop-blur-xs relative group hover:border-purple-400 dark:hover:border-purple-500/60 transition-all select-none">
-      <div className="flex items-center gap-2 mb-2.5 relative z-10">
-        <div className="p-1.5 rounded-lg bg-purple-100 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400">
-          <Play className="h-3.5 w-3.5 fill-current" />
-        </div>
-        <span className="text-[9px] font-bold tracking-wider text-purple-600 dark:text-purple-400 uppercase">
-          Trigger Event
-        </span>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/25 backdrop-blur-[2px]">
+      <div
+        ref={overlayRef}
+        className="bg-white border border-neutral-200 rounded-2xl shadow-2xl w-[560px] max-w-[95vw] overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+      >
+        {children}
       </div>
-      <h4 className="font-semibold text-sm text-foreground dark:text-neutral-100 relative z-10 truncate">
-        {data.label}
-      </h4>
-      <p className="text-[10px] text-muted-foreground mt-1 relative z-10 leading-snug">
-        Triggered dynamically via connected tasks webhook integrations.
-      </p>
-      <Handle
-        type="source"
-        position={Position.Right}
-        className="w-2.5 h-2.5 bg-purple-500 border-2 border-background shadow-xs"
-      />
     </div>
   );
 }
 
-// Custom AI Node Component
-function AINode({ data }: { data: any }) {
-  const aiConfig = data.ai_config || {};
-  const nodeType = data.type || "ai_research";
+// ─── AI Node Popover ─────────────────────────────────────────────────────────
 
-  // Format visual tag
-  const typeTag = nodeType.replace("ai_", "AI ").toUpperCase();
+function AINodePopover({
+  data,
+  nodeType,
+  onClose,
+  onSave,
+}: {
+  data: any;
+  nodeType: string;
+  onClose: () => void;
+  onSave: (newData: any, newType: string) => void;
+}) {
+  const aiConfig = data.ai_config || {};
+  const [prompt, setPrompt] = useState<string>(aiConfig.prompt || "");
+  const [model, setModel] = useState<string>(
+    aiConfig.model || "gemini-2.0-flash",
+  );
+  const [extra, setExtra] = useState<string>(aiConfig.extra_instructions || "");
+  const [role, setRole] = useState<string>(nodeType.replace("ai_", ""));
+
+  const handleSave = () => {
+    onSave(
+      {
+        ...data,
+        ai_config: {
+          ...aiConfig,
+          prompt,
+          model,
+          extra_instructions: extra,
+        },
+      },
+      `ai_${role}`,
+    );
+  };
 
   return (
-    <div className="w-[250px] rounded-xl border border-blue-200 bg-blue-50/50 dark:border-blue-500/30 dark:bg-blue-950/20 p-4 shadow-sm backdrop-blur-xs relative group hover:border-blue-400 dark:hover:border-blue-500/60 transition-all select-none">
-      <div className="absolute inset-0 rounded-xl bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none opacity-50" />
-      <div className="flex items-center gap-2 mb-2.5 relative z-10">
-        <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400">
-          <Sparkles className="h-3.5 w-3.5" />
+    <PopoverWrapper onClose={onClose}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100">
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center">
+            <Image
+              src="/logo.svg"
+              alt="AI"
+              width={16}
+              height={16}
+              className="object-contain"
+            />
+          </div>
+          <div>
+            <h3 className="font-semibold text-sm text-neutral-900">
+              {data.label || "AI Agent Node"}
+            </h3>
+            <p className="text-[11px] text-neutral-400 mt-0.5">
+              AI Node Configuration
+            </p>
+          </div>
         </div>
-        <span className="text-[9px] font-bold tracking-wider text-blue-600 dark:text-blue-400 uppercase">
-          {typeTag}
-        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="h-7 w-7 rounded-lg flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
-      <h4 className="font-semibold text-sm text-foreground dark:text-neutral-100 relative z-10 truncate">
-        {data.label}
+
+      {/* Body */}
+      <div className="px-6 py-5 space-y-5">
+        {/* Role/Type selection */}
+        <div>
+          <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+            AI Node Role
+          </label>
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all cursor-pointer"
+          >
+            <option value="research">Research</option>
+            <option value="summarize">Summarize</option>
+            <option value="classify">Classify</option>
+            <option value="extract">Extract</option>
+          </select>
+        </div>
+
+        {/* Prompt */}
+        <div>
+          <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+            Prompt
+          </label>
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            rows={5}
+            placeholder="Give the model detailed instructions. Insert relevant data for context."
+            className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-800 placeholder:text-neutral-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all leading-relaxed"
+          />
+        </div>
+
+        {/* Model */}
+        <div>
+          <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+            Model
+          </label>
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all cursor-pointer"
+          >
+            {AI_MODELS.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Extra instructions */}
+        <div>
+          <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+            Additional Instructions
+            <span className="ml-1.5 text-neutral-400 normal-case font-normal">
+              (optional)
+            </span>
+          </label>
+          <textarea
+            value={extra}
+            onChange={(e) => setExtra(e.target.value)}
+            rows={2.5}
+            placeholder="Anything else you want to specify for this AI step…"
+            className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-800 placeholder:text-neutral-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all leading-relaxed"
+          />
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-neutral-100 bg-neutral-50">
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-4 py-2 rounded-lg text-sm text-neutral-600 font-medium hover:bg-neutral-100 transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleSave}
+          className="px-5 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+        >
+          Save
+        </button>
+      </div>
+    </PopoverWrapper>
+  );
+}
+
+// ─── App Node Popover ─────────────────────────────────────────────────────────
+
+function AppNodePopover({
+  data,
+  onClose,
+  onSave,
+}: {
+  data: any;
+  onClose: () => void;
+  onSave: (newData: any) => void;
+}) {
+  const composioConfig = data.composio_config || {};
+  const slug = composioConfig.action_slug || "";
+  const iconSrc = getAppIcon(slug);
+  const actionParts = slug.split("_");
+  const rawAppName = actionParts[0] || "App";
+  const appName = rawAppName.charAt(0).toUpperCase() + rawAppName.slice(1);
+
+  const initialParams = composioConfig.params_mapping || {};
+  const [params, setParams] = useState<Record<string, string>>(
+    Object.fromEntries(
+      Object.entries(initialParams).map(([k, v]) => [k, String(v)]),
+    ),
+  );
+
+  const handleSave = () => {
+    onSave({
+      ...data,
+      composio_config: {
+        ...composioConfig,
+        params_mapping: params,
+      },
+    });
+  };
+
+  return (
+    <PopoverWrapper onClose={onClose}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100">
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded-lg bg-white border border-neutral-200 flex items-center justify-center">
+            <Image
+              src={iconSrc}
+              alt={appName}
+              width={20}
+              height={20}
+              className="object-contain"
+            />
+          </div>
+          <div>
+            <h3 className="font-semibold text-sm text-neutral-900">
+              {data.label}
+            </h3>
+            <p className="text-[11px] text-neutral-400 mt-0.5">
+              Integration · {appName}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="h-7 w-7 rounded-lg flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Body */}
+      <div className="px-6 py-5 max-h-[60vh] overflow-y-auto space-y-4">
+        {Object.keys(params).length > 0 ? (
+          <div>
+            <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-3">
+              Parameters Mapping
+            </label>
+            <div className="space-y-3">
+              {Object.entries(params).map(([key, val]) => (
+                <div key={key}>
+                  <label className="block text-[11px] text-neutral-500 mb-1 font-medium capitalize">
+                    {key.replace(/_/g, " ")}
+                  </label>
+                  <input
+                    type="text"
+                    value={val}
+                    onChange={(e) =>
+                      setParams((p) => ({ ...p, [key]: e.target.value }))
+                    }
+                    className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all font-mono"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="py-6 text-center text-sm text-neutral-400">
+            No parameters to configure for this integration.
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-neutral-100 bg-neutral-50">
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-4 py-2 rounded-lg text-sm text-neutral-600 font-medium hover:bg-neutral-100 transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleSave}
+          className="px-5 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+        >
+          Save
+        </button>
+      </div>
+    </PopoverWrapper>
+  );
+}
+
+// ─── Trigger Node ─────────────────────────────────────────────────────────────
+
+function TriggerNode({ data }: { data: any }) {
+  const isFirst = data._isFirst !== false;
+  if (isFirst) {
+    return (
+      <div className="w-[450px] rounded-xl border-2 border-blue-500 bg-blue-600 shadow-lg shadow-blue-500/25 px-4 py-3.5 select-none cursor-default">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-6 rounded-md bg-white/20 flex items-center justify-center">
+              <Image
+                src="/logo.svg"
+                alt="Aria"
+                width={14}
+                height={14}
+                className="object-contain"
+              />
+            </div>
+            <span className="text-[9px] font-bold tracking-widest text-blue-100 uppercase">
+              Start
+            </span>
+          </div>
+          {data.isRunsTab && data.isSimulationActive && (
+            <div className="h-6 w-6 flex items-center justify-center shrink-0">
+              {data.status === "running" && (
+                <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
+              )}
+              {data.status === "success" && (
+                <Check className="h-3.5 w-3.5 text-white font-bold" />
+              )}
+              {data.status === "failed" && (
+                <X className="h-3.5 w-3.5 text-red-205 font-bold" />
+              )}
+              {data.status === "pending" && (
+                <div className="h-1.5 w-1.5 rounded-full bg-white/40" />
+              )}
+            </div>
+          )}
+        </div>
+        <h4 className="font-semibold text-sm text-white leading-snug truncate">
+          {data.label || "Trigger"}
+        </h4>
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          className="!w-2 !h-2 !bg-blue-200 !border-2 !border-blue-600"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-[450px] rounded-md border border-neutral-200 bg-neutral-50 shadow-sm px-4 py-3.5 select-none cursor-default hover:shadow-md hover:border-neutral-300 transition-all">
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2">
+          <div className="h-6 w-6 rounded-md bg-white border border-neutral-200 flex items-center justify-center shrink-0">
+            <Image
+              src="/logo.svg"
+              alt="Aria"
+              width={14}
+              height={14}
+              className="object-contain"
+            />
+          </div>
+          <span className="text-[9px] font-bold tracking-widest text-neutral-400 uppercase">
+            Start
+          </span>
+        </div>
+        {data.isRunsTab && data.isSimulationActive && (
+          <div className="h-6 w-6 flex items-center justify-center shrink-0">
+            {data.status === "running" && (
+              <Loader2 className="h-3.5 w-3.5 text-blue-600 animate-spin" />
+            )}
+            {data.status === "success" && (
+              <Check className="h-3.5 w-3.5 text-emerald-600 font-bold" />
+            )}
+            {data.status === "failed" && (
+              <X className="h-3.5 w-3.5 text-red-600 font-bold" />
+            )}
+            {data.status === "pending" && (
+              <div className="h-1.5 w-1.5 rounded-full bg-neutral-300" />
+            )}
+          </div>
+        )}
+      </div>
+      <h4 className="font-semibold text-sm text-neutral-800 leading-snug truncate">
+        {data.label || "Trigger"}
       </h4>
-      {aiConfig.prompt && (
-        <p className="text-[10px] text-muted-foreground mt-2 relative z-10 p-2 rounded-lg bg-muted border border-border dark:bg-black/40 dark:border-white/5 line-clamp-3 leading-relaxed select-text font-medium">
-          {aiConfig.prompt}
-        </p>
-      )}
       <Handle
         type="target"
-        position={Position.Left}
-        className="w-2.5 h-2.5 bg-blue-500 border-2 border-background shadow-xs"
+        position={Position.Top}
+        className="!w-2 !h-2 !bg-neutral-300 !border-2 !border-white"
       />
       <Handle
         type="source"
-        position={Position.Right}
-        className="w-2.5 h-2.5 bg-blue-500 border-2 border-background shadow-xs"
+        position={Position.Bottom}
+        className="!w-2 !h-2 !bg-neutral-300 !border-2 !border-white"
       />
     </div>
   );
 }
 
-// Custom Composio App Node Component
+// ─── AI Node ─────────────────────────────────────────────────────────────────
+
+function AINode({ data }: { data: any }) {
+  const isFirst: boolean = data._isFirst === true;
+
+  const typeTag = (data.type || "ai_task")
+    .replace(/^ai_/, "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+  if (isFirst) {
+    return (
+      <div className="w-[450px] rounded-xl border-2 border-blue-500 bg-blue-600 shadow-lg shadow-blue-500/25 px-4 py-3.5 select-none cursor-default">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-6 rounded-md bg-white/20 flex items-center justify-center">
+              <Image
+                src="/logo.svg"
+                alt="AI"
+                width={14}
+                height={14}
+                className="object-contain"
+              />
+            </div>
+            <span className="text-[9px] font-bold tracking-widest text-blue-100 uppercase">
+              AI · {typeTag}
+            </span>
+          </div>
+          {data.isRunsTab && data.isSimulationActive ? (
+            <div className="h-6 w-6 flex items-center justify-center shrink-0">
+              {data.status === "running" && (
+                <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
+              )}
+              {data.status === "success" && (
+                <Check className="h-3.5 w-3.5 text-white font-bold" />
+              )}
+              {data.status === "failed" && (
+                <X className="h-3.5 w-3.5 text-red-205 font-bold" />
+              )}
+              {data.status === "pending" && (
+                <div className="h-1.5 w-1.5 rounded-full bg-white/40" />
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onOpenSettings?.();
+              }}
+              className="h-6 w-6 rounded-lg flex items-center justify-center text-blue-200 hover:text-white hover:bg-white/20 transition-colors"
+              title="Configure AI node"
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        <h4 className="font-semibold text-sm text-white leading-snug truncate">
+          {data.label}
+        </h4>
+        {data.isRunsTab &&
+          data.errors &&
+          data.errors.length > 0 &&
+          !data.isSimulationActive && (
+            <div className="mt-2.5 pt-2 border-t border-white/20 text-[10px] text-red-100 flex flex-col gap-1">
+              {data.errors.map((err: string, i: number) => (
+                <span key={i} className="flex items-center gap-1 font-medium">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-200" />
+                  {err}
+                </span>
+              ))}
+            </div>
+          )}
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          className="!w-2 !h-2 !bg-blue-200 !border-2 !border-blue-600"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-[450px] rounded-md border border-neutral-200 bg-neutral-50 shadow-sm px-4 py-3.5 select-none cursor-default hover:shadow-md hover:border-neutral-300 transition-all">
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-2">
+          <div className="h-6 w-6 rounded-md bg-neutral-900 flex items-center justify-center">
+            <Image
+              src="/logo.svg"
+              alt="AI"
+              width={13}
+              height={13}
+              className="object-contain"
+            />
+          </div>
+          <span className="text-[9px] font-bold tracking-widest text-neutral-400 uppercase">
+            AI · {typeTag}
+          </span>
+        </div>
+        {data.isRunsTab && data.isSimulationActive ? (
+          <div className="h-6 w-6 flex items-center justify-center shrink-0">
+            {data.status === "running" && (
+              <Loader2 className="h-3.5 w-3.5 text-blue-600 animate-spin" />
+            )}
+            {data.status === "success" && (
+              <Check className="h-3.5 w-3.5 text-emerald-600 font-bold" />
+            )}
+            {data.status === "failed" && (
+              <X className="h-3.5 w-3.5 text-red-600 font-bold" />
+            )}
+            {data.status === "pending" && (
+              <div className="h-1.5 w-1.5 rounded-full bg-neutral-300" />
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              data.onOpenSettings?.();
+            }}
+            className="h-6 w-6 rounded-lg flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+            title="Configure AI node"
+          >
+            <Settings className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      <h4 className="font-semibold text-sm text-neutral-800 leading-snug truncate">
+        {data.label}
+      </h4>
+      {data.isRunsTab &&
+        data.errors &&
+        data.errors.length > 0 &&
+        !data.isSimulationActive && (
+          <div className="mt-2.5 pt-2 border-t border-neutral-200 text-[10px] text-red-600 flex flex-col gap-1.5">
+            {data.errors.map((err: string, i: number) => (
+              <span key={i} className="flex items-center gap-1 font-medium">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-500" />
+                {err}
+              </span>
+            ))}
+          </div>
+        )}
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="!w-2 !h-2 !bg-neutral-300 !border-2 !border-white"
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!w-2 !h-2 !bg-neutral-300 !border-2 !border-white"
+      />
+    </div>
+  );
+}
+
+// ─── App Node ─────────────────────────────────────────────────────────────────
+
 function AppNode({ data }: { data: any }) {
   const composioConfig = data.composio_config || {};
   const slug = composioConfig.action_slug || "";
   const iconSrc = getAppIcon(slug);
 
-  // Clean action and app labels
   const actionParts = slug.split("_");
   const rawAppName = actionParts[0] || "App";
   const appName = rawAppName.charAt(0).toUpperCase() + rawAppName.slice(1);
@@ -217,12 +746,98 @@ function AppNode({ data }: { data: any }) {
     .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
 
+  const paramCount = Object.keys(composioConfig.params_mapping || {}).length;
+  const isFirst = data._isFirst === true;
+
+  if (isFirst) {
+    return (
+      <div className="w-[500px] rounded-md border bg-blue-100 shadow-sm shadow-blue-500/25 px-4 py-3 select-none cursor-default">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-6 justify-center items-center flex border rounded bg-white shrink-0">
+              <Image
+                src={iconSrc}
+                alt={appName}
+                width={18}
+                height={18}
+                className="object-contain"
+              />
+            </div>
+            <span className="text-sm font-semibold uppercase">{appName}</span>
+          </div>
+          {data.isRunsTab && data.isSimulationActive ? (
+            <div className="h-6 w-6 flex items-center justify-center shrink-0">
+              {data.status === "running" && (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              )}
+              {data.status === "success" && (
+                <Check className="h-3.5 w-3.5 font-bold" />
+              )}
+              {data.status === "failed" && (
+                <X className="h-3.5 w-3.5 font-bold" />
+              )}
+              {data.status === "pending" && (
+                <div className="h-1.5 w-1.5 rounded-full bg-white/40" />
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onOpenSettings?.();
+              }}
+              className="h-6 w-6 rounded-lg flex items-center justify-center  hover:bg-white/20 transition-colors"
+              title="Configure app node"
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        <h4 className="font-semibold text-xs leading-snug truncate">
+          {data.label}
+        </h4>
+        {actionName && (
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-[10px] text-blue-100 bg-blue-700/50 border border-blue-400/30 px-2 py-0.5 rounded-md font-medium truncate max-w-[130px]">
+              {actionName}
+            </span>
+            {paramCount > 0 && (
+              <div className="flex items-center gap-1 text-[10px] ">
+                {paramCount} paramter{paramCount !== 1 ? "s" : ""}{" "}
+                <Settings2 className="text-muted-foreground size-4" />
+              </div>
+            )}
+          </div>
+        )}
+        {data.isRunsTab &&
+          data.errors &&
+          data.errors.length > 0 &&
+          !data.isSimulationActive && (
+            <div className="mt-2.5 pt-2 border-t border-white/20 text-[10px] text-red-100 flex flex-col gap-1">
+              {data.errors.map((err: string, i: number) => (
+                <span key={i} className="flex items-center gap-1 font-medium">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-200" />
+                  {err}
+                </span>
+              ))}
+            </div>
+          )}
+        {/* <Handle type="target" position={Position.Top} className="" /> */}
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          className="!w-2 !h-2"
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="w-[260px] rounded-xl border border-emerald-200 bg-emerald-50/50 dark:border-emerald-500/30 dark:bg-emerald-950/20 p-4 shadow-sm backdrop-blur-xs relative group hover:border-emerald-400 dark:hover:border-emerald-500/60 transition-all select-none">
-      <div className="absolute inset-0 rounded-xl bg-gradient-to-b from-emerald-500/5 to-transparent pointer-events-none opacity-50" />
-      <div className="flex items-center gap-2 mb-2 relative z-10">
-        {iconSrc ? (
-          <div className="relative h-7 w-7 rounded bg-muted dark:bg-black/40 p-1 border border-border dark:border-white/5 flex items-center justify-center shrink-0">
+    <div className="w-[500px] rounded-md border border-neutral-200 bg-neutral-50 shadow-sm px-4 py-3 select-none cursor-default hover:shadow-md hover:border-neutral-300 transition-all">
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-2">
+          <div className="h-6 w-6 rounded bg-white border flex items-center justify-center shrink-0">
             <Image
               src={iconSrc}
               alt={appName}
@@ -231,100 +846,156 @@ function AppNode({ data }: { data: any }) {
               className="object-contain"
             />
           </div>
-        ) : (
-          <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-            <Workflow className="h-4 w-4" />
-          </div>
-        )}
-        <div className="flex flex-col">
-          <span className="text-[9px] font-bold tracking-wider text-emerald-600 dark:text-emerald-400 uppercase">
-            Integration App
-          </span>
-          <span className="text-[9px] text-muted-foreground -mt-0.5">
-            {appName}
-          </span>
+          <span className="text-sm font-semibold uppercase">{appName}</span>
         </div>
+        {data.isRunsTab && data.isSimulationActive ? (
+          <div className="h-6 w-6 flex items-center justify-center shrink-0">
+            {data.status === "running" && (
+              <Loader2 className="h-3.5 w-3.5 text-blue-600 animate-spin" />
+            )}
+            {data.status === "success" && (
+              <Check className="h-3.5 w-3.5 text-emerald-600 font-bold" />
+            )}
+            {data.status === "failed" && (
+              <X className="h-3.5 w-3.5 text-red-600 font-bold" />
+            )}
+            {data.status === "pending" && (
+              <div className="h-1.5 w-1.5 rounded-full bg-neutral-300" />
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              data.onOpenSettings?.();
+            }}
+            className="h-6 w-6 rounded-lg flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+            title="Configure app node"
+          >
+            <Settings className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
-      <h4 className="font-semibold text-sm text-foreground dark:text-neutral-100 mt-1 relative z-10 truncate">
+      <h4 className="font-semibold text-xs text-neutral-800 leading-snug truncate">
         {data.label}
       </h4>
       {actionName && (
-        <div className="text-[10px] text-emerald-700 bg-emerald-100/80 border border-emerald-200/50 dark:text-emerald-300 dark:bg-emerald-500/15 dark:border-emerald-500/25 px-2 py-0.5 rounded mt-2 inline-block font-semibold">
-          {actionName}
+        <div className="mt-2 flex items-center justify-between">
+          <span className="text-[10px] text-neutral-500 bg-neutral-100 border border-neutral-200 px-2 py-0.5 rounded-md font-medium truncate max-w-[130px]">
+            {actionName}
+          </span>
+          {paramCount > 0 && (
+            <div className="flex items-center gap-1 text-[10px] ">
+              {paramCount} paramter{paramCount !== 1 ? "s" : ""}{" "}
+              <Settings2 className="text-muted-foreground size-4" />
+            </div>
+          )}
         </div>
       )}
-      {composioConfig.params_mapping &&
-        Object.keys(composioConfig.params_mapping).length > 0 && (
-          <div className="mt-2.5 space-y-1 relative z-10 select-text">
-            <span className="text-[8px] text-muted-foreground font-bold tracking-wider uppercase">
-              PARAMETERS MAPPING
-            </span>
-            {Object.entries(composioConfig.params_mapping).map(([k, v]) => (
-              <div
-                key={k}
-                className="flex justify-between items-center text-[9px] p-1 px-1.5 rounded bg-muted border border-border dark:bg-black/30 dark:border-white/5 font-mono"
-              >
-                <span className="text-muted-foreground truncate max-w-[90px]">
-                  {k}
-                </span>
-                <span
-                  className="text-emerald-600 dark:text-emerald-400 truncate max-w-[120px] text-right font-medium"
-                  title={String(v)}
-                >
-                  {String(v)}
-                </span>
-              </div>
+      {data.isRunsTab &&
+        data.errors &&
+        data.errors.length > 0 &&
+        !data.isSimulationActive && (
+          <div className="mt-2.5 pt-2 border-t border-neutral-200 text-[10px] text-red-600 flex flex-col gap-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+            {data.errors.map((err: string, i: number) => (
+              <span key={i} className="flex items-center gap-1 font-semibold">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-500" />
+                {err}
+              </span>
             ))}
           </div>
         )}
       <Handle
         type="target"
-        position={Position.Left}
-        className="w-2.5 h-2.5 bg-emerald-500 border-2 border-background shadow-xs"
+        position={Position.Top}
+        className="!w-2 !h-2 !bg-neutral-300 !border-2 !border-white"
       />
       <Handle
         type="source"
-        position={Position.Right}
-        className="w-2.5 h-2.5 bg-emerald-500 border-2 border-background shadow-xs"
+        position={Position.Bottom}
+        className="!w-2 !h-2 !bg-neutral-300 !border-2 !border-white"
       />
     </div>
   );
 }
 
-// Helper component to auto-fit view when nodes change
-function FlowFitter({ nodes }: { nodes: any[] }) {
-  const { fitView } = useReactFlow();
+// ─── Straight Edge ────────────────────────────────────────────────────────────
 
+function StraightEdge({ id, sourceX, sourceY, targetX, targetY }: any) {
+  const [edgePath] = getStraightPath({ sourceX, sourceY, targetX, targetY });
+  return (
+    <BaseEdge
+      id={id}
+      path={edgePath}
+      style={{ stroke: "#d4d4d4", strokeWidth: 1.5 }}
+      markerEnd="url(#flowArrow)"
+    />
+  );
+}
+
+// ─── Auto Fit ─────────────────────────────────────────────────────────────────
+
+function FlowFitter({
+  nodes,
+  containerRef,
+}: {
+  nodes: any[];
+  containerRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const { setViewport } = useReactFlow();
   useEffect(() => {
-    if (nodes && nodes.length > 0) {
-      const timer = setTimeout(() => {
-        fitView({ padding: 0.2, duration: 400 });
+    if (nodes && nodes.length > 0 && containerRef.current) {
+      const t = setTimeout(() => {
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (rect) {
+          const nodeWidth = 500;
+          // Center horizontally
+          const x = (rect.width - nodeWidth) / 2;
+          // Start from the top (40px padding)
+          setViewport({ x, y: 30, zoom: 0.92 });
+        }
       }, 100);
-      return () => clearTimeout(timer);
+      return () => clearTimeout(t);
     }
-  }, [nodes, fitView]);
-
+  }, [nodes, setViewport, containerRef]);
   return null;
 }
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function FlowPreview({
   onSelectSuggestion,
   nodes,
   edges,
+  onChangeNodes,
+  activeTab = "editor",
+  isRunning = false,
+  nodeStatuses = {},
 }: FlowPreviewProps) {
   const [currentRecipes, setCurrentRecipes] = useState<typeof recipes>([]);
+  const [localNodes, setLocalNodes] = useState<any[]>([]);
+  const [activePopoverNodeId, setActivePopoverNodeId] = useState<string | null>(
+    null,
+  );
 
   const handleSuggestNew = () => {
     const shuffled = [...recipes].sort(() => 0.5 - Math.random());
     setCurrentRecipes(shuffled.slice(0, 3));
   };
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount
   useEffect(() => {
     handleSuggestNew();
   }, []);
 
-  // Register custom node layouts in React Flow
+  useEffect(() => {
+    if (nodes) {
+      setLocalNodes(nodes);
+    } else {
+      setLocalNodes([]);
+    }
+  }, [nodes]);
+
   const customNodeTypes = useMemo(
     () => ({
       task_trigger: TriggerNode,
@@ -337,116 +1008,186 @@ export default function FlowPreview({
     [],
   );
 
-  // Position nodes horizontally if they are stacking at default coordinate (100, 100)
+  const customEdgeTypes = useMemo(() => ({ straight: StraightEdge }), []);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Lay out nodes vertically (tight vertical spacing index * 140, always start from top, no need to center)
   const renderedNodes = useMemo(() => {
-    if (!nodes) return [];
-    return nodes.map((node, index) => {
-      const isDefault = node.position?.x === 100 && node.position?.y === 100;
-      if (isDefault) {
-        return {
-          ...node,
-          position: { x: index * 280 + 40, y: 200 },
-        };
+    return localNodes.map((node, index) => {
+      const errors: string[] = [];
+      const nodeType = node.type || "";
+      if (nodeType.startsWith("ai_")) {
+        const prompt = node.data?.ai_config?.prompt;
+        if (!prompt || !prompt.trim()) {
+          errors.push("prompt is empty");
+        }
+      } else if (nodeType === "composio_app") {
+        const params = node.data?.composio_config?.params_mapping || {};
+        const keys = Object.keys(params);
+        keys.forEach((k) => {
+          const val = params[k];
+          if (!val || !val.trim()) {
+            errors.push(`${k.replace(/_/g, " ")} is empty`);
+          }
+        });
       }
-      return node;
+
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          _isFirst: index === 0,
+          onOpenSettings: () => setActivePopoverNodeId(node.id),
+          isRunsTab: activeTab === "runs",
+          isSimulationActive: isRunning,
+          status: nodeStatuses?.[node.id] || "pending",
+          errors,
+        },
+        position: { x: 0, y: index * 140 },
+      };
     });
-  }, [nodes]);
+  }, [localNodes, activeTab, isRunning, nodeStatuses]);
+
+  // Force all edges to use straight type
+  const renderedEdges = useMemo(() => {
+    if (!edges) return [];
+    return edges.map((edge) => ({ ...edge, type: "straight" }));
+  }, [edges]);
+
+  const activeNode = useMemo(() => {
+    return renderedNodes.find((n) => n.id === activePopoverNodeId);
+  }, [renderedNodes, activePopoverNodeId]);
 
   const hasWorkflow = renderedNodes.length > 0;
 
   return (
-    <div className="w-full h-full relative flex items-center justify-center p-0">
-      {/* Background canvas */}
-      <div className="absolute inset-0 z-0 bg-background">
+    <div className="w-full h-full relative flex items-center justify-center">
+      {/* Canvas — white background */}
+      <div ref={containerRef} className="absolute inset-0 z-0 bg-white">
         <ReactFlow
           nodes={renderedNodes}
-          edges={edges || []}
+          edges={renderedEdges}
           nodeTypes={customNodeTypes}
+          edgeTypes={customEdgeTypes}
           proOptions={{ hideAttribution: true }}
-          fitView={hasWorkflow}
-          fitViewOptions={{ padding: 0.2 }}
+          fitView={false} // Disable auto-fitView so it doesn't vertically center the workflow
+          nodesDraggable={false}
+          nodesConnectable={false}
+          panOnDrag={false}
+          zoomOnScroll={false}
+          zoomOnPinch={false}
+          zoomOnDoubleClick={false}
+          preventScrolling={false}
+          selectionOnDrag={false}
         >
-          <Background
-            gap={22}
-            size={1}
-            color="var(--border)"
-            className="opacity-60"
-          />
-          <FlowFitter nodes={renderedNodes} />
-          {hasWorkflow && (
-            <>
-              <Controls className="!bg-background !border-border !text-foreground [&_button]:!border-border [&_button]:!bg-background hover:[&_button]:!bg-muted [&_svg]:!fill-foreground dark:!bg-zinc-900 dark:!border-zinc-800 dark:!text-white dark:[&_button]:!border-zinc-800 dark:[&_button]:!bg-zinc-900 dark:hover:[&_button]:!bg-zinc-800 dark:[&_svg]:!fill-white" />
-              <MiniMap
-                className="!bg-background/90 !border-border dark:!bg-zinc-900/90 dark:!border-zinc-800"
-                maskColor="rgba(0, 0, 0, 0.05)"
-                nodeColor={(node) => {
-                  if (node.type === "task_trigger") return "#8b5cf6";
-                  if (node.type?.startsWith("ai_")) return "#3b82f6";
-                  if (node.type === "composio_app") return "#10b981";
-                  return "#4b5563";
-                }}
-              />
-            </>
-          )}
+          <Background gap={24} size={1} color="#e5e5e5" />
+          <FlowFitter nodes={renderedNodes} containerRef={containerRef} />
+
+          {/* Arrow marker */}
+          <svg style={{ position: "absolute", width: 0, height: 0 }}>
+            <defs>
+              <marker
+                id="flowArrow"
+                markerWidth="8"
+                markerHeight="8"
+                refX="6"
+                refY="3"
+                orient="auto"
+              >
+                <path d="M0,0 L0,6 L8,3 z" fill="#c8c8c8" />
+              </marker>
+            </defs>
+          </svg>
         </ReactFlow>
       </div>
 
-      {/* Suggestion Recipes Glassmorphic Card (Shown only if no workflow is currently loaded) */}
-      {!hasWorkflow && (
-        <div className="relative z-10 max-w-md w-full border border-border/40 shadow rounded-lg p-5 bg-neutral-50 select-none mx-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-8  flex items-center justify-center shrink-0">
-                <Workflow className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="font-bold text-sm text-foreground">
-                  Select a Workflow Recipe
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
-                  Choose a prompt template below to let the AI agent build your
-                  automation graph.
-                </p>
-              </div>
-            </div>
-          </div>
+      {/* Popovers rendered at the root Level to bypass transformed container styling/scaling issues */}
+      {activeNode && activeNode.type?.startsWith("ai_") && (
+        <AINodePopover
+          data={activeNode.data}
+          nodeType={activeNode.type}
+          onClose={() => setActivePopoverNodeId(null)}
+          onSave={(newData, newType) => {
+            const updated = localNodes.map((n) =>
+              n.id === activeNode.id
+                ? { ...n, type: newType, data: { ...n.data, ...newData } }
+                : n,
+            );
+            setLocalNodes(updated);
+            onChangeNodes?.(updated);
+            setActivePopoverNodeId(null);
+          }}
+        />
+      )}
 
-          <div className="flex justify-end mb-1">
-            <Button
+      {activeNode && activeNode.type === "composio_app" && (
+        <AppNodePopover
+          data={activeNode.data}
+          onClose={() => setActivePopoverNodeId(null)}
+          onSave={(newData) => {
+            const updated = localNodes.map((n) =>
+              n.id === activeNode.id
+                ? { ...n, data: { ...n.data, ...newData } }
+                : n,
+            );
+            setLocalNodes(updated);
+            onChangeNodes?.(updated);
+            setActivePopoverNodeId(null);
+          }}
+        />
+      )}
+
+      {/* Recipe suggestions — shown only if no workflow loaded */}
+      {!hasWorkflow && (
+        <div className="relative z-10 max-w-md w-full border border-neutral-200 shadow-lg rounded-2xl p-5 bg-white select-none mx-4">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="h-9 w-9 rounded-xl bg-neutral-900 flex items-center justify-center shrink-0">
+              <svg viewBox="0 0 36 48" width="16" height="20" fill="white">
+                <path d="m0 6c10.1433 9.4404 25.8567 9.4404 36 0-9.4404 10.1433-9.4404 25.8567 0 36-10.1433-9.4404-25.8567-9.4404-36 0 9.44041-10.1433 9.44041-25.8567 0-36z" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-sm text-neutral-900">
+                Workflow Recipes
+              </h3>
+              <p className="text-xs text-neutral-500 mt-0.5 leading-snug">
+                Pick a template and the AI will build your automation graph.
+              </p>
+            </div>
+            <button
               type="button"
-              variant="ghost"
-              size="sm"
               onClick={handleSuggestNew}
-              className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+              className="flex items-center gap-1 text-[10px] text-neutral-400 hover:text-neutral-700 font-medium transition-colors shrink-0 mt-0.5"
             >
               <RefreshCw className="h-3 w-3" />
-              Suggest New
-            </Button>
+              Refresh
+            </button>
           </div>
 
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2">
             {currentRecipes.map((recipe) => (
               <button
                 key={recipe.title}
                 type="button"
                 onClick={() => onSelectSuggestion?.(recipe.prompt, recipe.apps)}
-                className="flex items-center text-left p-3 rounded-md border border-border bg-background hover:scale-[1.01] hover:-translate-y-0.5 shadow transition-all duration-300 group cursor-pointer w-full dark:border-zinc-800 dark:bg-zinc-950/40 dark:hover:bg-zinc-800/50 dark:hover:border-zinc-700"
+                className="flex items-center text-left p-3 rounded-xl border border-neutral-200 bg-neutral-50 hover:bg-white hover:border-neutral-300 hover:shadow-sm transition-all duration-200 group cursor-pointer w-full"
               >
                 <div
-                  className={`p-2.5 rounded-lg border ${recipe.bgClass} mr-3.5 transition-colors duration-300 shrink-0`}
+                  className={`p-2 rounded-lg border ${recipe.bgClass} mr-3 transition-colors duration-200 shrink-0`}
                 >
-                  <recipe.icon className={`h-4.5 w-4.5 ${recipe.colorClass}`} />
+                  <recipe.icon className={`h-4 w-4 ${recipe.colorClass}`} />
                 </div>
                 <div className="flex-1 min-w-0 pr-2">
-                  <h4 className="font-semibold text-xs text-foreground group-hover:text-primary transition-colors duration-300 truncate">
+                  <h4 className="font-semibold text-xs text-neutral-800 group-hover:text-neutral-900 truncate">
                     {recipe.title}
                   </h4>
-                  <p className="text-[10px] text-muted-foreground mt-0.5 truncate max-w-[280px]">
+                  <p className="text-[10px] text-neutral-400 mt-0.5 truncate">
                     {recipe.description}
                   </p>
                 </div>
-                <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 shrink-0 dark:bg-zinc-800/80">
-                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors dark:text-zinc-400 dark:group-hover:text-neutral-100" />
+                <div className="h-6 w-6 rounded-full bg-neutral-100 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <ArrowRight className="h-3 w-3 text-neutral-500" />
                 </div>
               </button>
             ))}

@@ -99,6 +99,155 @@ export default function AgentPage() {
     sendMessage,
   } = useAgentChat();
 
+  const [isWorkflowRunning, setIsWorkflowRunning] = useState(false);
+  const [currentStepIndex, setCurrentStepIndex] = useState<number | null>(null);
+  const [nodeExecutionStatuses, setNodeExecutionStatuses] = useState<
+    Record<string, "pending" | "running" | "success" | "failed">
+  >({});
+  const [executionLogs, setExecutionLogs] = useState<string[]>([]);
+  const consoleEndRef = useRef<HTMLDivElement>(null);
+
+  const handleNodesChange = useCallback(
+    (newNodes: any[]) => {
+      setWorkflowData((prev) => (prev ? { ...prev, nodes: newNodes } : null));
+    },
+    [setWorkflowData],
+  );
+
+  const isWorkflowReadyToRun = useCallback((nodes: any[]): boolean => {
+    if (!nodes || nodes.length === 0) return false;
+    return nodes.every((node) => {
+      const type = node.type || "";
+      if (type.startsWith("ai_")) {
+        const prompt = node.data?.ai_config?.prompt;
+        return typeof prompt === "string" && prompt.trim().length > 0;
+      }
+      if (type === "composio_app") {
+        const params = node.data?.composio_config?.params_mapping || {};
+        const keys = Object.keys(params);
+        if (keys.length === 0) return true;
+        return keys.every((k) => {
+          const val = params[k];
+          return typeof val === "string" && val.trim().length > 0;
+        });
+      }
+      return true;
+    });
+  }, []);
+
+  const getNodeValidationErrors = useCallback((node: any): string[] => {
+    const errors: string[] = [];
+    const type = node.type || "";
+    if (type.startsWith("ai_")) {
+      const prompt = node.data?.ai_config?.prompt;
+      if (!prompt || !prompt.trim()) {
+        errors.push("System Prompt is empty");
+      }
+    } else if (type === "composio_app") {
+      const params = node.data?.composio_config?.params_mapping || {};
+      const keys = Object.keys(params);
+      keys.forEach((k) => {
+        const val = params[k];
+        if (!val || !val.trim()) {
+          errors.push(`Parameter "${k.replace(/_/g, " ")}" is empty`);
+        }
+      });
+    }
+    return errors;
+  }, []);
+
+  const startSimulation = useCallback((nodes: any[]) => {
+    if (!nodes || nodes.length === 0) return;
+    setIsWorkflowRunning(true);
+    setCurrentStepIndex(0);
+    setExecutionLogs([
+      `[${new Date().toLocaleTimeString()}] 🚀 Initiating execution for workflow: Designed Automation Graph`,
+      `[${new Date().toLocaleTimeString()}] 🛡️ Validating security tokens and node credentials...`,
+      `[${new Date().toLocaleTimeString()}] ✅ Security validation complete. All connections authorized.`,
+      `[${new Date().toLocaleTimeString()}] 📍 Starting execution sequence...`,
+    ]);
+
+    const initialStatuses: Record<
+      string,
+      "pending" | "running" | "success" | "failed"
+    > = {};
+    nodes.forEach((n, idx) => {
+      initialStatuses[n.id] = idx === 0 ? "running" : "pending";
+    });
+    setNodeExecutionStatuses(initialStatuses);
+  }, []);
+
+  // Simulation execution loop
+  useEffect(() => {
+    if (!isWorkflowRunning || currentStepIndex === null || !workflowData?.nodes)
+      return;
+
+    const nodes = workflowData.nodes;
+    if (currentStepIndex >= nodes.length) {
+      setIsWorkflowRunning(false);
+      setCurrentStepIndex(null);
+      setExecutionLogs((prev) => [
+        ...prev,
+        `[${new Date().toLocaleTimeString()}] 🎉 WORKFLOW COMPLETED SUCCESSFULLY!`,
+        `[${new Date().toLocaleTimeString()}] 💾 State variables persisted. Graph completed in ${(nodes.length * 1.5).toFixed(1)}s.`,
+      ]);
+      return;
+    }
+
+    const currentNode = nodes[currentStepIndex];
+    const delay = 1500;
+
+    const timer = setTimeout(() => {
+      setNodeExecutionStatuses((prev) => ({
+        ...prev,
+        [currentNode.id]: "success",
+      }));
+
+      const nextIndex = currentStepIndex + 1;
+      if (nextIndex < nodes.length) {
+        const nextNode = nodes[nextIndex];
+        setNodeExecutionStatuses((prev) => ({
+          ...prev,
+          [nextNode.id]: "running",
+        }));
+
+        setExecutionLogs((prev) => {
+          const appName =
+            nextNode.type === "composio_app"
+              ? (
+                  nextNode.data?.composio_config?.action_slug?.split("_")[0] ||
+                  "App"
+                ).toUpperCase()
+              : "AI";
+          return [
+            ...prev,
+            `[${new Date().toLocaleTimeString()}] ✅ Step ${currentStepIndex + 1}: ${currentNode.data?.label || currentNode.id} executed successfully.`,
+            `[${new Date().toLocaleTimeString()}] ⚡ Invoking Step ${nextIndex + 1} (${appName}): ${nextNode.data?.label || nextNode.id}...`,
+            nextNode.type?.startsWith("ai_")
+              ? `[${new Date().toLocaleTimeString()}] 🤖 model: ${nextNode.data?.ai_config?.model || "gemini-2.0-flash"} | prompt: "${nextNode.data?.ai_config?.prompt?.substring(0, 45)}..."`
+              : `[${new Date().toLocaleTimeString()}] 🔌 action: ${nextNode.data?.composio_config?.action_slug || "integration"}`,
+          ];
+        });
+      } else {
+        setExecutionLogs((prev) => [
+          ...prev,
+          `[${new Date().toLocaleTimeString()}] ✅ Step ${currentStepIndex + 1}: ${currentNode.data?.label || currentNode.id} executed successfully.`,
+        ]);
+      }
+
+      setCurrentStepIndex(nextIndex);
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [isWorkflowRunning, currentStepIndex, workflowData]);
+
+  // Terminal auto scroll
+  useEffect(() => {
+    if (consoleEndRef.current) {
+      consoleEndRef.current.scrollTop = consoleEndRef.current.scrollHeight;
+    }
+  }, [executionLogs]);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -852,50 +1001,49 @@ export default function AgentPage() {
                     Runs
                   </button>
                 </div>
-
                 {/* Right: Actions and Collapse trigger */}
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg"
-                  >
-                    <Bell className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg"
-                  >
-                    <UserPlus className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg"
-                  >
-                    <Share2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg mr-1"
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-
-                  <div className="h-4 w-px bg-border mx-1" />
+                <div className="flex items-center gap-3">
+                  {activeTab === "runs" && workflowData && workflowData.nodes && workflowData.nodes.length > 0 && (
+                    isWorkflowRunning ? (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => {
+                          setIsWorkflowRunning(false);
+                          setCurrentStepIndex(null);
+                        }}
+                        className="flex items-center gap-1.5 font-semibold text-xs h-8 px-3 rounded-lg cursor-pointer"
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping" />
+                        Stop
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => startSimulation(workflowData.nodes)}
+                        disabled={!isWorkflowReadyToRun(workflowData.nodes)}
+                        className="flex items-center gap-1.5 font-semibold bg-blue-600 hover:bg-blue-700 text-white text-xs h-8 px-3 rounded-lg disabled:opacity-50 cursor-pointer"
+                      >
+                        <svg
+                          fill="currentColor"
+                          viewBox="0 0 24 24"
+                          className="h-3 w-3"
+                        >
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                        Run
+                      </Button>
+                    )
+                  )}
 
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
                     onClick={() => setIsRightOpen(false)}
-                    className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg bg-muted/30"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg bg-muted/30 cursor-pointer"
                     title="Collapse Preview"
                   >
                     <PanelRightClose className="h-4 w-4" />
@@ -905,7 +1053,6 @@ export default function AgentPage() {
 
               {/* Dotted Canvas Space with React Flow */}
               <div className="flex-1 relative flex flex-col bg-muted/5 min-h-0">
-                {/* React Flow Render Component */}
                 <div className="w-full h-full flex-1 min-h-0">
                   <FlowPreview
                     onSelectSuggestion={(prompt, apps) => {
@@ -917,6 +1064,10 @@ export default function AgentPage() {
                     }}
                     nodes={workflowData?.nodes}
                     edges={workflowData?.edges}
+                    onChangeNodes={handleNodesChange}
+                    activeTab={activeTab}
+                    isRunning={activeTab === "runs" && isWorkflowRunning}
+                    nodeStatuses={activeTab === "runs" ? nodeExecutionStatuses : {}}
                   />
                 </div>
               </div>

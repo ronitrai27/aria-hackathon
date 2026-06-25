@@ -185,15 +185,7 @@ def agent_supervisor_node(state: AgentState) -> Command:
         if composio_slugs else ""
     )
 
-    # ── Print full structured JSON to console ─────────────────────────────────
-    logger.info("[Agent Supervisor] ╔══════════════════════════════════════════════╗")
-    logger.info("[Agent Supervisor] ║   FINAL WORKFLOW JSON — NODES & EDGES        ║")
-    logger.info("[Agent Supervisor] ╚══════════════════════════════════════════════╝")
-    if schema:
-        logger.info("\n" + _json.dumps(schema, indent=2))
-    else:
-        logger.warning("[Agent Supervisor] No workflow schema found in state!")
-    logger.info("[Agent Supervisor] ═══════════════════════════════════════════════")
+    logger.info(f"[Agent Supervisor] ✅ Workflow JSON schema built — {len(schema.get('nodes', [])) if schema else 0} nodes, {len(schema.get('edges', [])) if schema else 0} edges.")
 
     final_msg = (
         f"Successfully built the workflow '{workflow_name}' with {len(schema.get('nodes', [])) if schema else 0} nodes "
@@ -278,10 +270,8 @@ def workflow_builder_node(state: AgentState) -> dict:
                 action_slug = step.composio_action_slug.strip().lower()
                 if (action_slug.startswith('"') and action_slug.endswith('"')) or (action_slug.startswith("'") and action_slug.endswith("'")):
                     action_slug = action_slug[1:-1].strip()
-                node_data["composio_config"] = {
-                    "action_slug": action_slug,
-                    "params_mapping": step.composio_params_mapping or {},
-                }
+                
+                params_mapping = dict(step.composio_params_mapping or {})
                 
                 # Fetch live schema parameter fields for parameters form rendering on UI
                 logger.info(f"[workflow_builder]   Node [{step.id}] Composio node: {action_slug} — fetching live schema...")
@@ -289,6 +279,28 @@ def workflow_builder_node(state: AgentState) -> dict:
                 if parameter_schema:
                     node_data["parameter_schema"] = parameter_schema
                     logger.info(f"[workflow_builder]   Node [{step.id}] Schema ready — {len(parameter_schema.get('properties', {}))} params available")
+                    
+                    # Back-fill important & required fields
+                    properties = parameter_schema.get("properties", {})
+                    required_fields = parameter_schema.get("required", [])
+                    important_fields = ["to", "subject", "body", "content", "channel", "message", "text", "title"]
+                    
+                    keys_to_include = set(params_mapping.keys())
+                    for r in required_fields:
+                        if r in properties:
+                            keys_to_include.add(r)
+                    for f in important_fields:
+                        if f in properties:
+                            keys_to_include.add(f)
+                            
+                    for key in keys_to_include:
+                        if key not in params_mapping:
+                            params_mapping[key] = ""
+                            
+                node_data["composio_config"] = {
+                    "action_slug": action_slug,
+                    "params_mapping": params_mapping,
+                }
             
             elif step.type == "task_trigger":
                 logger.info(f"[workflow_builder]   Node [{step.id}] Trigger node: {label_clean}")
@@ -296,7 +308,7 @@ def workflow_builder_node(state: AgentState) -> dict:
             react_flow_nodes.append({
                 "id": step.id,
                 "type": step.type,
-                "position": {"x": 250, "y": i * 160 + 80},
+                "position": {"x": 220, "y": i * 220 + 80},
                 "data": node_data
             })
             
@@ -304,7 +316,9 @@ def workflow_builder_node(state: AgentState) -> dict:
             react_flow_edges.append({
                 "id": f"e-{conn.source}-{conn.target}",
                 "source": conn.source,
-                "target": conn.target
+                "target": conn.target,
+                "type": "straight",
+                "style": {"stroke": "#94a3b8", "strokeWidth": 2}
             })
             logger.info(f"[workflow_builder]   Edge: {conn.source} --> {conn.target}")
             
