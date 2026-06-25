@@ -28,4 +28,43 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_uuid", ["clientUuid"]),
+
+  // tasks.....
+
+  tasks: defineTable({
+    userId: v.string(),
+    title: v.string(),
+    description: v.optional(v.string()),
+    status: v.union(
+      v.literal("not-started"),
+      v.literal("in-progress"),
+      v.literal("completed"),
+      v.literal("on-hold"),
+      v.literal("delayed"),
+    ),
+    priority: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
+    estimation: v.object({
+      startDate: v.number(),
+      endDate: v.number(),
+    }),
+    finalCompletedAt: v.optional(v.number()),
+    attachments: v.optional(
+      v.array(
+        v.object({
+          name: v.string(),
+          url: v.string(),
+          size: v.optional(v.number()),
+        }),
+      ),
+    ),
+    // Link to workflow
+    // workflowId: v.optional(v.id("workflows")),
+    aiGenerated: v.optional(v.boolean()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"])
+    .index("by_user_priority", ["userId", "priority"]),
+  // .index("by_workflow", ["workflowId"]),
 });
