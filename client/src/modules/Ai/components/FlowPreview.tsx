@@ -30,6 +30,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { connectorIcons } from "@/lib/static";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface FlowPreviewProps {
   onSelectSuggestion?: (prompt: string, apps: string[]) => void;
@@ -474,6 +475,8 @@ function AppNodePopover({
   );
 }
 
+
+
 // ─── Trigger Node ─────────────────────────────────────────────────────────────
 
 function TriggerNode({ data }: { data: any }) {
@@ -818,9 +821,34 @@ function AppNode({ data }: { data: any }) {
                   <span>Missing parameter</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-medium">
-                  <Check className="size-3.5 text-emerald-600" />
-                  <span>All parameters configured</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-medium">
+                    <Check className="size-3.5 text-emerald-600" />
+                    <span>All parameters configured</span>
+                  </div>
+                  {data.traceResult && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[10px] font-bold text-blue-600 hover:text-blue-800 underline ml-2 cursor-pointer"
+                        >
+                          Trace Result
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-96 p-4 rounded-xl border border-neutral-200 bg-white shadow-xl z-[9999]" align="end" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center justify-between border-b pb-2">
+                            <span className="font-semibold text-xs text-neutral-900">Execution Trace Result</span>
+                          </div>
+                          <pre className="text-[10px] bg-neutral-50 p-2.5 rounded-lg border border-neutral-200 overflow-x-auto overflow-y-auto max-h-60 font-mono text-neutral-800 leading-relaxed max-w-full whitespace-pre-wrap">
+                            {JSON.stringify(data.traceResult, null, 2)}
+                          </pre>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  )}
                 </div>
               )
             ) : (
@@ -917,9 +945,34 @@ function AppNode({ data }: { data: any }) {
                 <span>Missing parameter</span>
               </div>
             ) : (
-              <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-semibold">
-                <Check className="size-3.5 text-emerald-500" />
-                <span>All parameters configured</span>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-semibold">
+                  <Check className="size-3.5 text-emerald-500" />
+                  <span>All parameters configured</span>
+                </div>
+                {data.traceResult && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800 underline ml-2 cursor-pointer"
+                      >
+                        Trace Result
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-96 p-4 rounded-xl border border-neutral-200 bg-white shadow-xl z-[9999]" align="end" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between border-b pb-2">
+                          <span className="font-semibold text-xs text-neutral-900">Execution Trace Result</span>
+                        </div>
+                        <pre className="text-[10px] bg-neutral-50 p-2.5 rounded-lg border border-neutral-200 overflow-x-auto overflow-y-auto max-h-60 font-mono text-neutral-800 leading-relaxed max-w-full whitespace-pre-wrap">
+                          {JSON.stringify(data.traceResult, null, 2)}
+                        </pre>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
             )
           ) : (
@@ -1082,6 +1135,7 @@ export default function FlowPreview({
           isRunsTab: activeTab === "runs",
           isSimulationActive: isRunning,
           status: nodeStatuses?.[node.id] || "pending",
+          traceResult: node.data?.traceResult,
           errors,
         },
         position: { x: 0, y: index * 140 },
@@ -1098,6 +1152,8 @@ export default function FlowPreview({
   const activeNode = useMemo(() => {
     return renderedNodes.find((n) => n.id === activePopoverNodeId);
   }, [renderedNodes, activePopoverNodeId]);
+
+
 
   const hasWorkflow = renderedNodes.length > 0;
 
@@ -1177,6 +1233,8 @@ export default function FlowPreview({
           }}
         />
       )}
+
+
 
       {/* Recipe suggestions — shown only if no workflow loaded */}
       {!hasWorkflow && (

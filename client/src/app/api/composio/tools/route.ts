@@ -113,7 +113,7 @@ export async function GET(request: Request) {
     try {
       const url = `${base}/api/v3.1/tools?toolkit_slug=${encodeURIComponent(
         toolkitSlug,
-      )}&limit=20`;
+      )}&limit=200`;
 
       const response = await fetch(url, {
         headers: {

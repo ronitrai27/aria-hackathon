@@ -197,6 +197,105 @@ export default function AgentPage() {
     const currentNode = nodes[currentStepIndex];
     const delay = 1500;
 
+    if (currentNode.type === "composio_app") {
+      const actionSlug = currentNode.data?.composio_config?.action_slug;
+      const params = currentNode.data?.composio_config?.params_mapping || {};
+
+      const runComposio = async () => {
+        setExecutionLogs((prev) => [
+          ...prev,
+          `[${new Date().toLocaleTimeString()}] 🔌 [Composio] Executing ${actionSlug} for user ${user?._id}...`,
+        ]);
+        try {
+          const res = await fetch("/api/composio/execute", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: user?._id || "user_test",
+              actionSlug,
+              arguments: params,
+            }),
+          });
+          const result = await res.json();
+
+          if (!res.ok || result.error || result.successful === false) {
+            throw new Error(result.error || (result.data && result.data.message) || "Execution unsuccessful");
+          }
+
+          // Save traceResult on the node
+          setWorkflowData((prev) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              nodes: prev.nodes.map((n) =>
+                n.id === currentNode.id
+                  ? { ...n, data: { ...n.data, traceResult: result } }
+                  : n
+              ),
+            };
+          });
+
+          setNodeExecutionStatuses((prev) => ({
+            ...prev,
+            [currentNode.id]: "success",
+          }));
+
+          setExecutionLogs((prev) => [
+            ...prev,
+            `[${new Date().toLocaleTimeString()}] ✅ Step ${currentStepIndex + 1}: ${currentNode.data?.label || currentNode.id} executed successfully.`,
+          ]);
+
+          const nextIndex = currentStepIndex + 1;
+          if (nextIndex < nodes.length) {
+            const nextNode = nodes[nextIndex];
+            setNodeExecutionStatuses((prev) => ({
+              ...prev,
+              [nextNode.id]: "running",
+            }));
+            const appName = nextNode.type === "composio_app" ? "App" : "AI";
+            setExecutionLogs((prev) => [
+              ...prev,
+              `[${new Date().toLocaleTimeString()}] ⚡ Invoking Step ${nextIndex + 1} (${appName}): ${nextNode.data?.label || nextNode.id}...`,
+            ]);
+          }
+          setCurrentStepIndex(nextIndex);
+        } catch (err: any) {
+          console.error("Execution error:", err);
+
+          // Save traceResult as error
+          setWorkflowData((prev) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              nodes: prev.nodes.map((n) =>
+                n.id === currentNode.id
+                  ? { ...n, data: { ...n.data, traceResult: { error: err.message || "Execution failed" } } }
+                  : n
+              ),
+            };
+          });
+
+          setNodeExecutionStatuses((prev) => ({
+            ...prev,
+            [currentNode.id]: "failed",
+          }));
+
+          setExecutionLogs((prev) => [
+            ...prev,
+            `[${new Date().toLocaleTimeString()}] ❌ Step ${currentStepIndex + 1}: ${currentNode.data?.label || currentNode.id} failed: ${err.message}`,
+          ]);
+
+          // Stop execution on failure
+          setIsWorkflowRunning(false);
+          setCurrentStepIndex(null);
+        }
+      };
+
+      runComposio();
+      return;
+    }
+
+    // Default simulation for non-composio nodes
     const timer = setTimeout(() => {
       setNodeExecutionStatuses((prev) => ({
         ...prev,
