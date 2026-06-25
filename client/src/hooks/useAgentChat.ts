@@ -94,14 +94,8 @@ export function useAgentChat() {
               if (eventName === "worker_status") {
                 const worker = payload.worker;
                 const status = payload.status;
-                let detailsMsg =
+                const detailsMsg =
                   payload.details?.message || `${worker} is ${status}...`;
-
-                if (worker === "router") {
-                  detailsMsg = "Checking User Intent...";
-                } else if (worker === "workflow_builder") {
-                  detailsMsg = "Designing workflow structure...";
-                }
 
                 const existingIdx = accumulatedSteps.findIndex(
                   (s) => s.worker === worker,
@@ -123,6 +117,10 @@ export function useAgentChat() {
               } else if (eventName === "worker_action") {
                 const worker = payload.worker;
                 const action = payload.action;
+
+                // Skip raw agent thought/text — it shows as the final assistant message, not in the stepper
+                if (action === "thought") continue;
+
                 let detailsMsg =
                   payload.details?.message || `${worker} action: ${action}...`;
 

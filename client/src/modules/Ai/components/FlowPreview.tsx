@@ -16,6 +16,7 @@ import {
   Bot,
   Check,
   CheckCircle,
+  Eye,
   FileText,
   Loader2,
   RefreshCw,
@@ -826,18 +827,19 @@ function AppNode({ data }: { data: any }) {
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-medium">
                     <Check className="size-3.5 text-emerald-600" />
-                    <span>All parameters configured</span>
+                    <span>All params configured</span>
                   </div>
                   {data.traceResult && (
                     <Popover>
                       <PopoverTrigger asChild>
-                        <button
+                        <Button
                           type="button"
+                          variant={"outline"}
                           onClick={(e) => e.stopPropagation()}
-                          className="text-[10px] font-bold text-blue-600 hover:text-blue-800 underline ml-2 cursor-pointer"
+                          className="text-[10px] p-1.5! ml-2 cursor-pointer"
                         >
-                          Trace Result
-                        </button>
+                          Trace Result <Eye className="size-3.5" />
+                        </Button>
                       </PopoverTrigger>
                       <PopoverContent
                         className="w-96 p-4 rounded-xl border border-neutral-200 bg-white shadow-xl z-[9999]"
@@ -931,7 +933,7 @@ function AppNode({ data }: { data: any }) {
               e.stopPropagation();
               data.onOpenSettings?.();
             }}
-            className="h-6 w-6 rounded-lg flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+            className="h-6 w-6 rounded-lg flex items-center justify-center  hover:bg-neutral-100 transition-colors"
             title="Configure app node"
           >
             <Settings className="h-3.5 w-3.5" />
@@ -956,18 +958,19 @@ function AppNode({ data }: { data: any }) {
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-semibold">
                   <Check className="size-3.5 text-emerald-500" />
-                  <span>All parameters configured</span>
+                  <span>All params configured</span>
                 </div>
                 {data.traceResult && (
                   <Popover>
                     <PopoverTrigger asChild>
-                      <button
+                      <Button
                         type="button"
+                        variant={"outline"}
                         onClick={(e) => e.stopPropagation()}
-                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800 underline ml-2 cursor-pointer"
+                        className="text-[10px] p-1.5! ml-2 cursor-pointer"
                       >
-                        Trace Result
-                      </button>
+                        Trace Result <Eye className="size-3.5" />
+                      </Button>
                     </PopoverTrigger>
                     <PopoverContent
                       className="w-96 p-4 rounded-xl border border-neutral-200 bg-white shadow-xl z-[9999]"
@@ -1136,7 +1139,8 @@ export default function FlowPreview({
         const keys = Object.keys(params);
         keys.forEach((k) => {
           const val = params[k];
-          if (!val || !val.trim()) {
+          const valStr = val === null || val === undefined ? "" : String(val);
+          if (!valStr.trim()) {
             errors.push(`${k.replace(/_/g, " ")} is empty`);
           }
         });
@@ -1154,7 +1158,7 @@ export default function FlowPreview({
           traceResult: node.data?.traceResult,
           errors,
         },
-        position: { x: 0, y: index * 140 },
+        position: { x: 0, y: index * 160 },
       };
     });
   }, [localNodes, activeTab, isRunning, nodeStatuses]);
@@ -1206,12 +1210,12 @@ export default function FlowPreview({
               <marker
                 id="flowArrow"
                 markerWidth="8"
-                markerHeight="8"
+                markerHeight="10"
                 refX="6"
-                refY="3"
+                refY="4"
                 orient="auto"
               >
-                <path d="M0,0 L0,6 L8,3 z" fill="#c8c8c8" />
+                <path d="M0,0 L0,8 L8,4 z" fill="#c8c8c8" />
               </marker>
             </defs>
           </svg>

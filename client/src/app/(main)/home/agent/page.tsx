@@ -131,7 +131,8 @@ export default function AgentPage() {
         if (keys.length === 0) return true;
         return keys.every((k) => {
           const val = params[k];
-          return typeof val === "string" && val.trim().length > 0;
+          const valStr = val === null || val === undefined ? "" : String(val);
+          return valStr.trim().length > 0;
         });
       }
       return true;
@@ -151,7 +152,8 @@ export default function AgentPage() {
       const keys = Object.keys(params);
       keys.forEach((k) => {
         const val = params[k];
-        if (!val || !val.trim()) {
+        const valStr = val === null || val === undefined ? "" : String(val);
+        if (!valStr.trim()) {
           errors.push(`Parameter "${k.replace(/_/g, " ")}" is empty`);
         }
       });
