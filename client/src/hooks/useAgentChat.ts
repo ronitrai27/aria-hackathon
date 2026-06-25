@@ -4,6 +4,8 @@ import {
   formatMessageContent,
 } from "@/modules/Ai/components/ChatMessage";
 import { useAgentStore } from "./useAgentStore";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 
 export function useAgentChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -17,7 +19,10 @@ export function useAgentChat() {
   } | null>(null);
   const [isRightOpen, setIsRightOpen] = useState(false);
   const { activeMode } = useAgentStore();
-  const [threadId] = useState(() => `thread_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
+  const [threadId] = useState(
+    () => `thread_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+  );
+  const user = useQuery(api.user.getCurrentUser);
 
   const sendMessage = useCallback(async (textToSend: string) => {
     if (!textToSend.trim()) return;
@@ -32,15 +37,6 @@ export function useAgentChat() {
       message: string;
     }> = [];
 
-    // 1. Initial status step
-    const initialStep = {
-      worker: "router",
-      status: "running",
-      message: "Analyzing query and checking user intent...",
-    };
-    accumulatedSteps.push(initialStep);
-    setActiveSteps([initialStep]);
-
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -51,6 +47,7 @@ export function useAgentChat() {
           message: textToSend,
           thread_id: threadId,
           mode: activeMode,
+          userId: user?._id,
         }),
       });
 
@@ -89,7 +86,10 @@ export function useAgentChat() {
           if (dataStr) {
             try {
               const payload = JSON.parse(dataStr);
-              console.log(`[useAgentChat] Received SSE event: "${eventName}"`, payload);
+              console.log(
+                `[useAgentChat] Received SSE event: "${eventName}"`,
+                payload,
+              );
 
               if (eventName === "worker_status") {
                 const worker = payload.worker;
@@ -145,7 +145,8 @@ export function useAgentChat() {
                   const model = payload.details?.model || "";
                   detailsMsg = `AI node [${nodeId}] (${nodeType}) configured with ${model}`;
                 } else if (action === "configuring_ai_nodes") {
-                  detailsMsg = payload.details?.message || "Configuring AI nodes...";
+                  detailsMsg =
+                    payload.details?.message || "Configuring AI nodes...";
                 }
 
                 const stepKey = `${worker}_${action}`;
@@ -172,7 +173,10 @@ export function useAgentChat() {
                 // If it is the workflow builder, update the canvas with the nodes and edges
                 if (worker === "workflow_builder" && payload.output?.nodes) {
                   console.log("=========================================");
-                  console.log("Full JSON Architecture:", JSON.stringify(payload.output, null, 2));
+                  console.log(
+                    "Full JSON Architecture:",
+                    JSON.stringify(payload.output, null, 2),
+                  );
                   console.log("=========================================");
                   setWorkflowData({
                     nodes: payload.output.nodes,
@@ -251,7 +255,7 @@ export function useAgentChat() {
       setIsGenerating(false);
       setActiveSteps([]);
     }
-  }, []);
+  }, [activeMode, user?._id, threadId]);
 
   return {
     messages,

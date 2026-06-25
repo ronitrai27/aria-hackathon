@@ -117,10 +117,10 @@ export default function ChatMessageItem({ message }: ChatMessageItemProps) {
       )}
       <div className="flex flex-col gap-1 w-full max-w-[82%]">
         <div
-          className={`rounded-2xl p-4 text-sm leading-relaxed shadow-xs ${
+          className={`rounded-2xl text-sm leading-relaxed ${
             isUser
-              ? "bg-zinc-100 border border-zinc-200 text-zinc-900 dark:bg-zinc-800/90 dark:border-zinc-700/40 dark:text-neutral-100 rounded-tr-sm ml-auto"
-              : "bg-muted/40 border border-border text-foreground dark:bg-zinc-900/60 dark:border-zinc-800/80 dark:text-neutral-200 rounded-tl-sm"
+              ? "p-4 bg-zinc-100 border border-zinc-200 text-zinc-900 dark:bg-zinc-800/90 dark:border-zinc-700/40 dark:text-neutral-100 rounded-tr-sm ml-auto shadow-xs"
+              : "py-2 px-1 text-foreground dark:text-neutral-200 rounded-tl-sm"
           }`}
         >
           {formatMessageContent(message.content)}

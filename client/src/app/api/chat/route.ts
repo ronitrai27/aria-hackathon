@@ -9,11 +9,13 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     const backendUrl = process.env.AGENT_BACKEND_URL || "http://localhost:8000";
+    const mode = body.mode || "agent";
+    const path = mode === "brain" ? "/brain" : "/agent";
 
-    console.log(`[API /api/chat] Forwarding request to: ${backendUrl}/api/chat`);
+    console.log(`[API /api/chat] Forwarding request to: ${backendUrl}${path}`);
     console.log(`[API /api/chat] Body:`, JSON.stringify(body));
 
-    const response = await fetch(`${backendUrl}/api/chat`, {
+    const response = await fetch(`${backendUrl}${path}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

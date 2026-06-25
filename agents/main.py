@@ -1,6 +1,6 @@
 """
-FastAPI server for Workflow Designer Agent
-Exposes /api/chat route matching NextJS proxy URL.
+Central FastAPI Server for AI Agents (Workflow Designer / Brain)
+Exposes /agent and /brain endpoints, acting as a gateway to our LangGraph instances.
 """
 
 import os
@@ -8,11 +8,11 @@ import sys
 from pathlib import Path
 
 # Add project root to sys.path to allow absolute imports
-ROOT = Path(__file__).resolve().parent.parent.parent.parent
+ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -28,7 +28,7 @@ from src.app.agent.sse_emitter import format_sse
 from dotenv import load_dotenv
 load_dotenv(ROOT / ".env", override=True)
 
-app = FastAPI(title="Workflow Designer Agent Backend")
+app = FastAPI(title="Aria Agents Central Server")
 
 # Setup CORS
 app.add_middleware(
@@ -90,20 +90,21 @@ class ChatRequest(BaseModel):
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "mode": "workflow_designer"}
+    return {"status": "ok", "mode": "central_gateway"}
 
 
 @app.post("/agent")
 @app.post("/api/chat")
-def chat_endpoint(body: ChatRequest):
+def agent_chat_endpoint(body: ChatRequest, request: Request):
     """
-    POST route for streaming agent completions via SSE.
+    POST route for streaming Workflow Designer (/agent) completions via SSE.
     """
     message = body.message
     thread_id = body.thread_id or f"thread_default"
     uid = body.userId or body.user_id or "default_user"
+    route_path = request.url.path
 
-    print(f"\n[POST /api/chat] Received request: thread_id={thread_id}, uid={uid}, message='{message[:40]}...'", flush=True)
+    print(f"\n[POST {route_path}] Match /agent Route. userId: {uid}, query: '{message}', thread_id: {thread_id}", flush=True)
 
     def event_stream():
         try:
@@ -296,6 +297,37 @@ def chat_endpoint(body: ChatRequest):
     )
 
 
+@app.post("/brain")
+def brain_chat_endpoint(body: ChatRequest, request: Request):
+    """
+    Placeholder endpoint for /brain route, which will be integrated in future tasks.
+    """
+    message = body.message
+    uid = body.userId or body.user_id or "default_user"
+    print(f"\n[POST /brain] Match /brain Route (Placeholder). userId: {uid}, query: '{message}'", flush=True)
+
+    def brain_event_stream():
+        yield format_sse("worker_status", {
+            "worker": "router",
+            "status": "completed",
+            "details": {"message": "Brain Query intent checked."}
+        })
+        yield format_sse("supervisor_data", {
+            "status": "done",
+            "final_response": f"Brain agent placeholder response. You asked: {message}"
+        })
+
+    return StreamingResponse(
+        brain_event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("src.app.agent.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

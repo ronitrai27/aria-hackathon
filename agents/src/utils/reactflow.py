@@ -106,54 +106,61 @@ def workflow_to_reactflow(workflow: dict) -> dict:
     nodes: list[dict] = []
     edges: list[dict] = []
 
-    # ── Start node ────────────────────────────────────────────────────────
-    nodes.append(
-        _make_node(
-            node_id="start",
-            node_type="input",
-            label=workflow.get("name", "Workflow"),
-            position_y=0,
-            extra_data={"description": workflow.get("description", "")},
-        )
-    )
-
     # ── Step nodes ────────────────────────────────────────────────────────
     steps = workflow.get("steps", [])
     for i, step in enumerate(steps):
         node_id = f"step_{i + 1}"
         tool_name = step.get("tool_name", "UNKNOWN")
         is_ai = _is_ai_node(tool_name)
+        fields = step.get("fields", [])
+        
+        # Build parameter mapping dictionaries
+        params_mapping = {f.get("name"): f.get("value", "") for f in fields if isinstance(f, dict)}
 
-        # Determine node type:
-        #   "ai"      → for AI_SUMMARIZE, AI_EXTRACT, AI_CLASSIFY, AI_RESEARCH
-        #   "default" → for regular Composio tool steps
-        node_type = "ai" if is_ai else "default"
-
-        # Build data payload
-        extra_data: dict[str, Any] = {
-            "description": step.get("step_description", ""),
-            "fields": step.get("fields", []),
-            "tool_name": tool_name,
-        }
-
-        # For AI nodes, also embed the operation type (summarize/extract/classify/research)
         if is_ai:
-            # "AI_SUMMARIZE" → "summarize"
             operation = tool_name.replace("AI_", "").lower()
-            extra_data["ai_operation"] = operation
+            node_type = f"ai_{operation}"
+            
+            # Extract main prompt text
+            prompt_val = params_mapping.get("topic") if operation == "research" else params_mapping.get("input_text")
+            if prompt_val is None:
+                prompt_val = ""
+                
+            extra_data = {
+                "description": step.get("step_description", ""),
+                "fields": fields,
+                "tool_name": tool_name,
+                "ai_config": {
+                    "prompt": prompt_val,
+                    "model": "gpt-4.1-mini",
+                    "extra_instructions": ""
+                }
+            }
+        else:
+            node_type = "composio_app"
+            extra_data = {
+                "description": step.get("step_description", ""),
+                "fields": fields,
+                "tool_name": tool_name,
+                "composio_config": {
+                    "action_slug": tool_name,
+                    "params_mapping": params_mapping
+                }
+            }
 
         nodes.append(
             _make_node(
                 node_id=node_id,
                 node_type=node_type,
                 label=tool_name,
-                position_y=(i + 1) * Y_SPACING,
+                position_y=i * Y_SPACING,
                 extra_data=extra_data,
             )
         )
 
         # ── Edge from previous node ───────────────────────────────────────
-        source = "start" if i == 0 else f"step_{i}"
-        edges.append(_make_edge(source, node_id))
+        if i > 0:
+            source = f"step_{i}"
+            edges.append(_make_edge(source, node_id))
 
     return {"nodes": nodes, "edges": edges}
