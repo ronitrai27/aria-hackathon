@@ -225,13 +225,14 @@ function AINodePopover({
   const aiConfig = data.ai_config || {};
   const [prompt, setPrompt] = useState<string>(aiConfig.prompt || "");
   const [provider, setProvider] = useState<"claude" | "openai">(
-    aiConfig.provider || (aiConfig.model?.includes("gpt") ? "openai" : "claude")
+    aiConfig.provider ||
+      (aiConfig.model?.includes("gpt") ? "openai" : "claude"),
   );
   const [citations, setCitations] = useState<boolean>(
-    aiConfig.citations !== undefined ? aiConfig.citations : false
+    aiConfig.citations !== undefined ? aiConfig.citations : false,
   );
   const [format, setFormat] = useState<"plain" | "rich">(
-    aiConfig.format || "rich"
+    aiConfig.format || "rich",
   );
   const [extra, setExtra] = useState<string>(aiConfig.extra_instructions || "");
   const [role, setRole] = useState<string>(nodeType.replace("ai_", ""));
@@ -257,7 +258,6 @@ function AINodePopover({
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/45 backdrop-blur-[4px]">
       <div className="bg-white border border-neutral-200 rounded-3xl shadow-2xl w-[920px] max-w-[95vw] h-[640px] max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
-        
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
           <div className="flex items-center gap-3">
@@ -290,7 +290,6 @@ function AINodePopover({
 
         {/* Content Split Panel */}
         <div className="flex-1 flex overflow-hidden">
-          
           {/* Left Column (58% width) - Prompt, insertion buttons, Provider selector, Citations toggle */}
           <div className="w-[58%] border-r border-neutral-100 p-6 flex flex-col justify-between overflow-y-auto">
             <div className="space-y-4">
@@ -299,8 +298,11 @@ function AINodePopover({
                   Prompt
                 </label>
                 <p className="text-[11px] text-neutral-500 mb-2 leading-normal font-medium">
-                  Give the model detailed instructions. Insert relevant data for context.{" "}
-                  <span className="text-blue-600 hover:underline cursor-pointer">See examples</span>
+                  Give the model detailed instructions. Insert relevant data for
+                  context.{" "}
+                  <span className="text-blue-600 hover:underline cursor-pointer">
+                    See examples
+                  </span>
                 </p>
                 <div className="border border-neutral-200 rounded-xl bg-neutral-50/50 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-400 transition-all">
                   <textarea
@@ -357,14 +359,24 @@ function AINodePopover({
                         className="object-contain rounded"
                       />
                       <div>
-                        <span className="text-xs font-bold text-neutral-800">Claude</span>
-                        <p className="text-[9px] text-neutral-400">Sonnet 4.5</p>
+                        <span className="text-xs font-bold text-neutral-800">
+                          Claude
+                        </span>
+                        <p className="text-[9px] text-neutral-400">
+                          Sonnet 4.5
+                        </p>
                       </div>
                     </div>
-                    <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${
-                      provider === "claude" ? "border-blue-500 bg-blue-500" : "border-neutral-300"
-                    }`}>
-                      {provider === "claude" && <Check className="h-2.5 w-2.5 text-white stroke-[3px]" />}
+                    <div
+                      className={`h-4 w-4 rounded-full border flex items-center justify-center ${
+                        provider === "claude"
+                          ? "border-blue-500 bg-blue-500"
+                          : "border-neutral-300"
+                      }`}
+                    >
+                      {provider === "claude" && (
+                        <Check className="h-2.5 w-2.5 text-white stroke-[3px]" />
+                      )}
                     </div>
                   </div>
 
@@ -385,14 +397,22 @@ function AINodePopover({
                         className="object-contain rounded"
                       />
                       <div>
-                        <span className="text-xs font-bold text-neutral-800">OpenAI</span>
+                        <span className="text-xs font-bold text-neutral-800">
+                          OpenAI
+                        </span>
                         <p className="text-[9px] text-neutral-400">GPT-4o</p>
                       </div>
                     </div>
-                    <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${
-                      provider === "openai" ? "border-blue-500 bg-blue-500" : "border-neutral-300"
-                    }`}>
-                      {provider === "openai" && <Check className="h-2.5 w-2.5 text-white stroke-[3px]" />}
+                    <div
+                      className={`h-4 w-4 rounded-full border flex items-center justify-center ${
+                        provider === "openai"
+                          ? "border-blue-500 bg-blue-500"
+                          : "border-neutral-300"
+                      }`}
+                    >
+                      {provider === "openai" && (
+                        <Check className="h-2.5 w-2.5 text-white stroke-[3px]" />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -423,7 +443,6 @@ function AINodePopover({
                 />
               </button>
             </div>
-
           </div>
 
           {/* Right Column (42% width) - Mode, Format selection, Additional instructions, Human-in-the-loop */}
@@ -461,13 +480,21 @@ function AINodePopover({
                         : "border-neutral-200 bg-white hover:bg-neutral-50"
                     }`}
                   >
-                    <div className={`mt-0.5 h-4 w-4 rounded-full border flex items-center justify-center ${
-                      format === "plain" ? "border-blue-500" : "border-neutral-300"
-                    }`}>
-                      {format === "plain" && <div className="h-2 w-2 rounded-full bg-blue-500" />}
+                    <div
+                      className={`mt-0.5 h-4 w-4 rounded-full border flex items-center justify-center ${
+                        format === "plain"
+                          ? "border-blue-500"
+                          : "border-neutral-300"
+                      }`}
+                    >
+                      {format === "plain" && (
+                        <div className="h-2 w-2 rounded-full bg-blue-500" />
+                      )}
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-neutral-800 block">Plain text</span>
+                      <span className="text-xs font-bold text-neutral-800 block">
+                        Plain text
+                      </span>
                       <span className="text-[10px] text-neutral-400 leading-normal block mt-0.5">
                         Simple, unformatted text
                       </span>
@@ -482,15 +509,25 @@ function AINodePopover({
                         : "border-neutral-200 bg-white hover:bg-neutral-50"
                     }`}
                   >
-                    <div className={`mt-0.5 h-4 w-4 rounded-full border flex items-center justify-center ${
-                      format === "rich" ? "border-blue-500" : "border-neutral-300"
-                    }`}>
-                      {format === "rich" && <div className="h-2 w-2 rounded-full bg-blue-500" />}
+                    <div
+                      className={`mt-0.5 h-4 w-4 rounded-full border flex items-center justify-center ${
+                        format === "rich"
+                          ? "border-blue-500"
+                          : "border-neutral-300"
+                      }`}
+                    >
+                      {format === "rich" && (
+                        <div className="h-2 w-2 rounded-full bg-blue-500" />
+                      )}
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-neutral-800 block">Rich text</span>
+                      <span className="text-xs font-bold text-neutral-800 block">
+                        Rich text
+                      </span>
                       <span className="text-[10px] text-neutral-400 leading-normal block mt-0.5 font-medium">
-                        Text with formatting (bold/italic, bullets, links, headings etc). Great for documents, emails and Slack messages
+                        Text with formatting (bold/italic, bullets, links,
+                        headings etc). Great for documents, emails and Slack
+                        messages
                       </span>
                     </div>
                   </div>
@@ -510,7 +547,6 @@ function AINodePopover({
                   className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-xs text-neutral-800 placeholder:text-neutral-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all leading-normal"
                 />
               </div>
-
             </div>
 
             {/* Test Prompt Button */}
@@ -522,9 +558,7 @@ function AINodePopover({
                 Test prompt
               </button>
             </div>
-
           </div>
-
         </div>
 
         {/* Footer */}
@@ -544,7 +578,6 @@ function AINodePopover({
             Done
           </button>
         </div>
-
       </div>
     </div>
   );
@@ -868,7 +901,7 @@ function AINode({ data }: { data: any }) {
     <div className="w-[500px] rounded-md border border-neutral-200 bg-neutral-50 shadow-sm px-4 py-3 select-none cursor-default hover:shadow-md hover:border-neutral-300 transition-all">
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
-          <div className="h-6 w-6 rounded-md bg-neutral-900 flex items-center justify-center shrink-0">
+          <div className="h-6 w-6 rounded border bg-white flex items-center justify-center shrink-0">
             <Image
               src="/logo.svg"
               alt="AI"
@@ -920,7 +953,7 @@ function AINode({ data }: { data: any }) {
           {typeTag}
         </span>
         <div className="flex items-center gap-1 text-[10px] text-neutral-500">
-          Model: {data.ai_config?.model || "gemini-2.0-flash"}
+          Model: {data.ai_config?.model || "gpt-4.1-nano"}
         </div>
       </div>
       {data.isRunsTab &&

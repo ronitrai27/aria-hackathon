@@ -45,6 +45,7 @@ import ChatMessageItem, {
 import { useAgentChat } from "@/hooks/useAgentChat";
 import AgentChatMessages from "./AgentChatMessages";
 import WorkflowPanel from "../../../../modules/workflows/components/WorkflowPanel";
+import WorkflowChoiceDialog from "../../../../modules/WorkflowChoiceDialog";
 
 const suggestions = [
   {
@@ -106,6 +107,65 @@ export default function AgentPage() {
   const [savedWorkflowId, setSavedWorkflowId] = useState<string | null>(null);
   const [isStarred, setIsStarred] = useState(false);
   const [workflowTitle, setWorkflowTitle] = useState("Untitled");
+
+  // Workflow-choice intercept state (Q2: edit vs new when workflow is open)
+  const [showWorkflowChoice, setShowWorkflowChoice] = useState(false);
+  const [pendingPrompt, setPendingPrompt] = useState("");
+  const [isEditingWorkflow, setIsEditingWorkflow] = useState(false);
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  /** Extract app names from workflow nodes and match against connectorIcons keys */
+  function extractAppsFromWorkflow(nodes: any[]): string[] {
+    const knownApps = Object.keys(connectorIcons); // ["Gmail", "Slack", "GitHub", ...]
+    const found = new Set<string>();
+
+    for (const node of nodes) {
+      // The key field is data.tool_name or data.label — e.g. "GMAIL_SEND_EMAIL"
+      // Extract the app prefix: "GMAIL_SEND_EMAIL" → "GMAIL"
+      const toolName: string =
+        node.data?.tool_name ||
+        node.data?.label ||
+        node.data?.composio_config?.action_slug ||
+        "";
+
+      if (toolName) {
+        const prefix = toolName.split("_")[0].toLowerCase(); // e.g. "gmail"
+        for (const app of knownApps) {
+          // Normalize: "Google Meet" → "googlemeet", "Gmail" → "gmail"
+          const normalized = app.toLowerCase().replace(/\s+/g, "");
+          if (normalized === prefix || normalized.startsWith(prefix) || prefix.startsWith(normalized)) {
+            found.add(app);
+          }
+        }
+      }
+    }
+    return Array.from(found);
+  }
+
+  /** Build an edit-context prompt the agent can use */
+  function buildEditPrompt(userRequest: string): string {
+    if (!workflowData) return userRequest;
+    const summary = (workflowData.nodes || [])
+      .filter((n: any) => n.type !== "task_trigger")
+      .map((n: any) => {
+        const config = n.data?.ai_config || n.data?.composio_config || n.data?.parameters || {};
+        return `  - ${n.type || "node"}: ${JSON.stringify(config)}`;
+      })
+      .join("\n");
+
+    const fullStructure = JSON.stringify(workflowData, null, 2);
+
+    return [
+      `[EDIT WORKFLOW]`,
+      `Workflow ID: ${savedWorkflowId ?? "unsaved"}`,
+      `Title: ${workflowTitle}`,
+      `Current nodes:\n${summary || "  (none)"}`,
+      `Full Structure JSON:`,
+      fullStructure,
+      ``,
+      `User request: ${userRequest}`,
+    ].join("\n");
+  }
 
   // Auto-save debounced effect
   useEffect(() => {
@@ -461,7 +521,10 @@ export default function AgentPage() {
   const hasUnconnectedApps = unconnectedApps.length > 0;
   const hasNoAppsSelected = isAgentMode && selectedSuggestionApps.length === 0;
 
-  const handleSend = async (overrideText?: string) => {
+  const handleSend = async (
+    overrideText?: string,
+    skipWorkflowCheck = false,
+  ) => {
     if (
       isAgentMode &&
       (hasUnconnectedApps || selectedSuggestionApps.length === 0)
@@ -470,14 +533,75 @@ export default function AgentPage() {
     const textToSend = overrideText || inputVal;
     if (!textToSend.trim()) return;
 
+    const isEditIntent =
+      isEditingWorkflow ||
+      textToSend.toLowerCase().startsWith("edit this workflow as") ||
+      textToSend.toLowerCase().startsWith("edit this worklow as");
+
+    // Q2: If a workflow is open and user is sending a NEW free-form message,
+    // intercept and ask: edit current workflow OR start fresh?
+    if (
+      !skipWorkflowCheck &&
+      isAgentMode &&
+      workflowData &&
+      workflowData.nodes.length > 0 &&
+      !overrideText &&
+      !isEditIntent
+    ) {
+      setPendingPrompt(textToSend);
+      setShowWorkflowChoice(true);
+      return;
+    }
+
     setInputVal("");
-    sendMessage(textToSend);
+    setShowWorkflowChoice(false);
+
+    if (isEditIntent && workflowData) {
+      const enriched = buildEditPrompt(textToSend);
+      setIsEditingWorkflow(false);
+      sendMessage(enriched, textToSend);
+    } else {
+      sendMessage(textToSend);
+    }
   };
 
   const selected = models.find((m) => m.value === selectedModel) || models[0];
 
   return (
     <div className="h-[calc(100vh-4rem)] w-[calc(100%+3rem)] -mx-6 -my-6 flex overflow-hidden bg-background">
+      {/* Workflow choice dialog */}
+      <WorkflowChoiceDialog
+        open={showWorkflowChoice}
+        workflowTitle={workflowTitle}
+        onEditCurrent={() => {
+          const apps = extractAppsFromWorkflow(workflowData?.nodes ?? []);
+          if (apps.length > 0) setSelectedSuggestionApps(apps);
+          
+          let finalPrompt = "edit this workflow as -> ";
+          if (pendingPrompt) {
+            const cleanPrompt = pendingPrompt.replace(/^(edit this workflow as ->|edit this workflow as|edit this worklow as ->|edit this worklow as)\s*/i, "");
+            finalPrompt += cleanPrompt;
+          }
+          
+          setInputVal(finalPrompt);
+          setIsEditingWorkflow(true);
+          setShowWorkflowChoice(false);
+          setPendingPrompt("");
+          setTimeout(() => {
+            if (textareaRef.current) textareaRef.current.focus();
+          }, 50);
+        }}
+        onStartFresh={() => {
+          setWorkflowData(null);
+          setWorkflowTitle("Untitled");
+          setIsStarred(false);
+          setSavedWorkflowId(null);
+          setShowWorkflowChoice(false);
+          setInputVal("");
+          sendMessage(pendingPrompt);
+        }}
+        onClose={() => { setShowWorkflowChoice(false); setPendingPrompt(""); }}
+      />
       {/* Global CSS overrides for Allotment dividers and custom morph animations */}
       <style>{`
         .allotment-module_sash__By-6u::after {
@@ -660,7 +784,7 @@ export default function AgentPage() {
                 </button>
               </div>
 
-              {/* Textarea container */}
+
               <div
                 className={`relative w-full bg-muted/30 border border-border rounded-2xl focus-within:border-ring/50 focus-within:ring-2 focus-within:ring-ring/15 transition-all shadow-sm ${
                   isNarrow ? "p-2.5" : "p-3"
@@ -681,10 +805,10 @@ export default function AgentPage() {
                       handleSend();
                     }
                   }}
-                  className={`w-full resize-none bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:border-0 p-1 pr-12 text-foreground placeholder:text-muted-foreground/80 ${
+                  className={`w-full resize-none bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:border-0 p-1 pr-12 text-foreground placeholder:text-muted-foreground/80 overflow-y-auto ${
                     isNarrow
-                      ? "min-h-[60px] text-sm"
-                      : "min-h-[80px] text-base md:text-sm"
+                      ? "min-h-[60px] max-h-[120px] text-sm"
+                      : "min-h-[80px] max-h-[140px] text-base md:text-sm"
                   }`}
                 />
 
@@ -1143,7 +1267,17 @@ export default function AgentPage() {
             }}
             onEditWorkflow={(text) => {
               if (activeMode === "brain") setActiveMode("agent");
-              setInputVal(text);
+              const apps = extractAppsFromWorkflow(workflowData?.nodes ?? []);
+              if (apps.length > 0) setSelectedSuggestionApps(apps);
+              
+              let finalPrompt = "edit this workflow as -> ";
+              if (text) {
+                const cleanPrompt = text.replace(/^(edit this workflow as ->|edit this workflow as|edit this worklow as ->|edit this worklow as)\s*/i, "");
+                finalPrompt += cleanPrompt;
+              }
+              
+              setInputVal(finalPrompt);
+              setIsEditingWorkflow(true);
               setTimeout(() => {
                 if (textareaRef.current) textareaRef.current.focus();
               }, 50);

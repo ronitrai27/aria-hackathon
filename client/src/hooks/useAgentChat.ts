@@ -24,10 +24,10 @@ export function useAgentChat() {
   );
   const user = useQuery(api.user.getCurrentUser);
 
-  const sendMessage = useCallback(async (textToSend: string) => {
+  const sendMessage = useCallback(async (textToSend: string, userDisplayMsg?: string) => {
     if (!textToSend.trim()) return;
 
-    setMessages((prev) => [...prev, { role: "user", content: textToSend }]);
+    setMessages((prev) => [...prev, { role: "user", content: userDisplayMsg || textToSend }]);
     setIsGenerating(true);
     setActiveSteps([]);
 
