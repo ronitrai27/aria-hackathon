@@ -47,13 +47,18 @@ export async function POST(req: NextRequest) {
 
     // 1. Fetch raw browser data from Convex
     // Fetch up to 250 items to have plenty of raw entries to group
-    console.log("[Recap API] Fetching recent browser data from Convex client...");
+    console.log(
+      "[Recap API] Fetching recent browser data from Convex client...",
+    );
     const rawData = (await convex.query(api.activities.getRecentBrowserData, {
       userId,
       limit: 250,
     })) as RawBrowserItem[];
 
-    console.log("[Recap API] Convex query completed. Total raw items returned:", rawData.length);
+    console.log(
+      "[Recap API] Convex query completed. Total raw items returned:",
+      rawData.length,
+    );
 
     if (!rawData || rawData.length === 0) {
       console.log("[Recap API] Convex returned zero items for this user.");
@@ -68,15 +73,17 @@ export async function POST(req: NextRequest) {
 
     // 2. Clean & Group raw activity logs
     const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-    
+
     // Check if there is any data from the last 24 hours.
     // If not, we relax the filter and allow older entries so the feature still shows value.
     const hasRecentData = rawData.some((item) => item.openedAt >= oneDayAgo);
     const timeFilter = hasRecentData ? oneDayAgo : 0;
-    
+
     console.log(
       `[Recap API] Timeframe filter choice: ${
-        timeFilter > 0 ? "last 24 hours only" : "all history (relaxing filter because 0 entries match last 24h)"
+        timeFilter > 0
+          ? "last 24 hours only"
+          : "all history (relaxing filter because 0 entries match last 24h)"
       }`,
     );
 
@@ -130,10 +137,15 @@ export async function POST(req: NextRequest) {
       .sort((a, b) => b.totalDurationMs - a.totalDurationMs)
       .slice(0, 40);
 
-    console.log("[Recap API] Grouped and filtered activities count:", sortedActivities.length);
+    console.log(
+      "[Recap API] Grouped and filtered activities count:",
+      sortedActivities.length,
+    );
 
     if (sortedActivities.length === 0) {
-      console.log("[Recap API] Zero significant items after filtering short duration logs.");
+      console.log(
+        "[Recap API] Zero significant items after filtering short duration logs.",
+      );
       return NextResponse.json({
         summary: "Not enough significant activity recorded today.",
         items: [
@@ -203,7 +215,11 @@ Rules:
 5. Limit the output to 6-10 items max. Ensure valid JSON parsing.
 `;
 
-    console.log("[Recap API] Prompting AI model gpt-4.1-nano with details of", sortedActivities.length, "activities...");
+    console.log(
+      "[Recap API] Prompting AI model gpt-4.1-nano with details of",
+      sortedActivities.length,
+      "activities...",
+    );
     const { text } = await generateText({
       model,
       system: systemPrompt,

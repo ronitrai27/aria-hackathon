@@ -20,7 +20,10 @@ export async function POST(request: Request) {
     }
 
     const client = new Composio({ apiKey });
-    console.log(`[Composio Execute] action: ${actionSlug}, userId: ${userId}, args:`, args);
+    console.log(
+      `[Composio Execute] action: ${actionSlug}, userId: ${userId}, args:`,
+      args,
+    );
 
     const result = await client.tools.execute(actionSlug, {
       userId,

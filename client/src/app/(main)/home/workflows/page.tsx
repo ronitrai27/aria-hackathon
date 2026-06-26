@@ -49,6 +49,14 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 // List of colorful icons for workflows
 const ICONS = [
@@ -101,6 +109,12 @@ export default function WorkflowsPage() {
 
   // Row selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState<{
+    isOpen: boolean;
+    type: "single" | "bulk";
+    id?: string;
+    name?: string;
+  }>({ isOpen: false, type: "single" });
 
   // Toggle single selection
   const handleToggleSelect = (id: string) => {
@@ -111,7 +125,7 @@ export default function WorkflowsPage() {
 
   // Toggle select all on current page
   const handleToggleSelectAll = () => {
-    const pageIds = paginatedWorkflows.map((w) => w._id);
+    const pageIds = paginatedWorkflows.map((w) => w._id as string);
     const allSelected =
       pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id));
     if (allSelected) {
@@ -128,35 +142,9 @@ export default function WorkflowsPage() {
   };
 
   // Bulk Delete
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     if (!selectedIds.length) return;
-    if (
-      !confirm(
-        `Are you sure you want to delete ${selectedIds.length} selected workflow(s)?`,
-      )
-    )
-      return;
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const id of selectedIds) {
-      try {
-        await deleteWorkflow({ id: id as any });
-        successCount++;
-      } catch (error) {
-        failCount++;
-      }
-    }
-
-    if (successCount > 0) {
-      toast.success(`Successfully deleted ${successCount} workflow(s)`);
-    }
-    if (failCount > 0) {
-      toast.error(`Failed to delete ${failCount} workflow(s)`);
-    }
-
-    setSelectedIds([]);
+    setConfirmDelete({ isOpen: true, type: "bulk" });
   };
 
   // Working filter logic
@@ -224,14 +212,41 @@ export default function WorkflowsPage() {
   };
 
   // Delete Workflow
-  const handleDelete = async (id: any, name: string) => {
-    if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
-    try {
-      await deleteWorkflow({ id });
-      toast.success("Workflow deleted successfully");
-    } catch (error) {
-      toast.error("Failed to delete workflow");
+  const handleDelete = (id: any, name: string) => {
+    setConfirmDelete({ isOpen: true, type: "single", id, name });
+  };
+
+  const executeDelete = async () => {
+    if (confirmDelete.type === "single" && confirmDelete.id) {
+      try {
+        await deleteWorkflow({ id: confirmDelete.id as any });
+        toast.success("Workflow deleted successfully");
+      } catch (error) {
+        toast.error("Failed to delete workflow");
+      }
+    } else if (confirmDelete.type === "bulk") {
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const id of selectedIds) {
+        try {
+          await deleteWorkflow({ id: id as any });
+          successCount++;
+        } catch (error) {
+          failCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`Successfully deleted ${successCount} workflow(s)`);
+      }
+      if (failCount > 0) {
+        toast.error(`Failed to delete ${failCount} workflow(s)`);
+      }
+
+      setSelectedIds([]);
     }
+    setConfirmDelete({ isOpen: false, type: "single" });
   };
 
   // Custom scheduling formatter matching the image
@@ -246,11 +261,28 @@ export default function WorkflowsPage() {
     if (name === "Data Sync Pipeline") return "Every 6 hours";
 
     if (!scheduled) return "On event";
-    const freq =
-      scheduled.frequency.charAt(0).toUpperCase() +
-      scheduled.frequency.slice(1);
-    if (scheduled.frequency === "daily") return `Every day, ${scheduled.time}`;
-    return `Every ${scheduled.frequency}, ${scheduled.time}`;
+
+    const formatTime12h = (timeStr: string) => {
+      const parts = timeStr.split(":");
+      if (parts.length < 2) return timeStr;
+      let hours = parseInt(parts[0], 10);
+      const minutes = parts[1];
+      if (isNaN(hours)) return timeStr;
+      const ampm = hours >= 12 ? "PM" : "AM";
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      return `${hours}:${minutes} ${ampm}`;
+    };
+
+    const timeFormatted = formatTime12h(scheduled.time);
+    const freq = scheduled.frequency.toLowerCase();
+
+    if (freq === "once") return `Once, ${timeFormatted}`;
+    if (freq === "daily") return `Daily, ${timeFormatted}`;
+    if (freq === "weekly") return `Weekly, ${timeFormatted}`;
+    if (freq === "monthly") return `Monthly, ${timeFormatted}`;
+
+    return `${scheduled.frequency.charAt(0).toUpperCase() + scheduled.frequency.slice(1)}, ${timeFormatted}`;
   };
 
   return (
@@ -280,7 +312,7 @@ export default function WorkflowsPage() {
       </div>
 
       {/* ── Hero banner ─────────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-2xl bg-[#f0eeff] border border-violet-100 px-8 py-4 flex items-center justify-between min-h-[220px] dark:bg-violet-950/10 dark:border-violet-900/50">
+      <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-transparent via-purple-50 to-purple-200 border border-border px-6 py-4 flex items-center justify-between min-h-[200px] dark:bg-violet-950/10 dark:border-violet-900/50">
         {/* Left — text + CTAs */}
         <div className="relative z-10 min-w-[400px]! space-y-3">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 leading-snug">
@@ -312,15 +344,15 @@ export default function WorkflowsPage() {
           <Image
             src="/idk.svg"
             alt="Workflow"
-            width={380}
-            height={380}
+            width={360}
+            height={360}
             className="absolute -top-24 right-0 opacity-90"
           />
         </div>
       </div>
 
       {/* ── Control bar (Filters & Count Limit Indicator) ── */}
-      <div className="flex flex-wrap items-center justify-between gap-4 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-4 py-2 border  rounded-md px-5">
         <div className="flex flex-wrap items-center gap-3">
           {/* Working Search Bar */}
           <div className="relative w-72">
@@ -414,7 +446,7 @@ export default function WorkflowsPage() {
             <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden dark:bg-gray-800">
               <div
                 className={`h-full rounded-full transition-all duration-300 ${
-                  isLimitReached ? "bg-red-500" : "bg-violet-600"
+                  isLimitReached ? "bg-red-500" : "bg-purple-400"
                 }`}
                 style={{
                   width: `${Math.min((workflowsCount / freeLimit) * 100, 100)}%`,
@@ -454,8 +486,8 @@ export default function WorkflowsPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-sm">
             <thead>
-              <tr className="border-b bg-gray-50 text-sm font-medium">
-                <th className="py-4 px-4 w-12 text-center">
+              <tr className="border-b text-xs text-neutral-800 uppercase ">
+                <th className="py-4 px-4 w-12 text-center font-medium">
                   <Checkbox
                     className="rounded"
                     checked={
@@ -467,12 +499,24 @@ export default function WorkflowsPage() {
                     onCheckedChange={handleToggleSelectAll}
                   />
                 </th>
-                <th className="py-4 px-4">Workflow</th>
-                <th className="py-4 px-4 text-center">Steps</th>
-                <th className="py-4 px-4">Last run</th>
-                <th className="py-4 px-4">Scheduled</th>
-                <th className="py-4 px-4">Created at</th>
-                <th className="py-4 px-4 text-right pr-6">Actions</th>
+                <th className="py-4 px-4 font-medium text-muted-foreground/80 normal-case">
+                  Workflow
+                </th>
+                <th className="py-4 px-4 text-center font-medium text-muted-foreground/80 normal-case">
+                  Steps
+                </th>
+                <th className="py-4 px-4 font-medium text-muted-foreground/80 normal-case">
+                  Last run
+                </th>
+                <th className="py-4 px-4 font-medium text-muted-foreground/80 normal-case">
+                  Scheduled
+                </th>
+                <th className="py-4 px-4 font-medium text-muted-foreground/80 normal-case">
+                  Created at
+                </th>
+                <th className="py-4 px-4 text-right pr-6 font-medium text-muted-foreground/80 normal-case">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -547,13 +591,18 @@ export default function WorkflowsPage() {
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-3">
                           <div
-                            className={`p-2.5 rounded-lg flex items-center justify-center shrink-0 ${bgClass}`}
+                            className={`p-2.5 rounded-sm flex items-center justify-center shrink-0 ${bgClass}`}
                           >
-                            <IconComponent className="h-5 w-5 text-black!" />
+                            <IconComponent className="h-4 w-4 text-neutral-700!" />
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="capitalize text-foreground text-sm hover:underline cursor-pointer">
+                              <span
+                                onClick={() =>
+                                  router.push(`/home/agent?workflowId=${w._id}`)
+                                }
+                                className="capitalize text-foreground text-sm hover:underline cursor-pointer"
+                              >
                                 {w.name}
                               </span>
                               <span
@@ -612,6 +661,14 @@ export default function WorkflowsPage() {
                                 handleToggleStatus(w._id, w.status || "draft")
                               }
                             />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(w._id, w.name)}
+                              className="h-8 w-8 text-neutral-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
                       </td>
@@ -678,6 +735,49 @@ export default function WorkflowsPage() {
           </div>
         </div>
       )}
+
+      {/* Confirmation Dialog for Workflow Deletions */}
+      <Dialog
+        open={confirmDelete.isOpen}
+        onOpenChange={(open) =>
+          !open && setConfirmDelete((prev) => ({ ...prev, isOpen: false }))
+        }
+      >
+        <DialogContent className="sm:max-w-md rounded-xl p-6 shadow-lg border bg-white dark:bg-neutral-900">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-base font-bold text-neutral-900 dark:text-neutral-50">
+              {confirmDelete.type === "single"
+                ? "Delete Workflow"
+                : "Delete Selected Workflows"}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
+              {confirmDelete.type === "single"
+                ? `Are you sure you want to delete "${confirmDelete.name}"? This action cannot be undone.`
+                : `Are you sure you want to delete ${selectedIds.length} selected workflow(s)? This action cannot be undone.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex items-center justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setConfirmDelete({ isOpen: false, type: "single" })
+              }
+              className="text-xs h-9 px-4 rounded-lg cursor-pointer border border-neutral-200"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={executeDelete}
+              className="text-xs h-9 px-4 rounded-lg bg-red-600 hover:bg-red-700 text-white cursor-pointer"
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

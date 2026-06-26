@@ -18,7 +18,13 @@ export function StatusStepper({
         <span className="text-[10px] font-bold text-muted-foreground dark:text-zinc-400 tracking-wider uppercase flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
           {steps.some((s) =>
-            ["memory_worker", "task_worker", "upload_worker", "reflect_worker", "brain_subgraph"].includes(s.worker)
+            [
+              "memory_worker",
+              "task_worker",
+              "upload_worker",
+              "reflect_worker",
+              "brain_subgraph",
+            ].includes(s.worker),
           )
             ? "Brain Action Trace Logs"
             : "Agent Action Trace Logs"}

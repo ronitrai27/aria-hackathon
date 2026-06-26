@@ -119,7 +119,7 @@ export default defineSchema({
     lastRun: v.optional(v.number()), // timestamp of last execution
     scheduled: v.optional(
       v.object({
-        time: v.string(),      // e.g. "09:00"
+        time: v.string(), // e.g. "09:00"
         frequency: v.string(), // "once" | "daily" | "weekly" | "monthly"
       }),
     ),

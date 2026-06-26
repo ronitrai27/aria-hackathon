@@ -55,7 +55,9 @@ import { CreateTaskDialog } from "./CreateTaskDialog";
 // ─── Column header icons (matching WeKraft's KANBAN_COLUMN_ICONS) ─────────────
 const COLUMN_ICONS: Record<TaskStatus, React.ReactNode> = {
   "not-started": <CircleDashed className="w-4 h-4 text-neutral-400 shrink-0" />,
-  "in-progress": <CircleDot className="w-4 h-4 text-blue-500 animate-pulse shrink-0" />,
+  "in-progress": (
+    <CircleDot className="w-4 h-4 text-blue-500 animate-pulse shrink-0" />
+  ),
   "on-hold": <CirclePause className="w-4 h-4 text-yellow-500 shrink-0" />,
   delayed: <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />,
   completed: <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />,
@@ -87,13 +89,7 @@ const priorityBars: Record<string, React.ReactNode> = {
 };
 
 // ─── Kanban Card ──────────────────────────────────────────────────────────────
-const TaskCard = ({
-  task,
-  isOverlay,
-}: {
-  task: Task;
-  isOverlay?: boolean;
-}) => {
+const TaskCard = ({ task, isOverlay }: { task: Task; isOverlay?: boolean }) => {
   const overdue =
     task.estimation?.endDate < Date.now() && task.status !== "completed";
 
@@ -101,7 +97,8 @@ const TaskCard = ({
     <Card
       className={cn(
         "group cursor-pointer p-0 transition-all duration-300 border border-border shadow-sm hover:shadow-xl dark:bg-muted bg-card backdrop-blur-sm rounded-md",
-        isOverlay && "border-primary shadow-2xl ring-4 ring-primary/5 scale-[1.02]",
+        isOverlay &&
+          "border-primary shadow-2xl ring-4 ring-primary/5 scale-[1.02]",
       )}
     >
       <div className="p-3">
@@ -113,9 +110,13 @@ const TaskCard = ({
                   <TooltipTrigger asChild>
                     <Info className="w-3.5 h-3.5 dark:text-primary/70 text-primary shrink-0" />
                   </TooltipTrigger>
-                  <TooltipContent side="top" className="px-2 py-1 bg-neutral-900 border border-neutral-800 text-neutral-200">
+                  <TooltipContent
+                    side="top"
+                    className="px-2 py-1 bg-neutral-900 border border-neutral-800 text-neutral-200"
+                  >
                     <p className="text-[11px] font-medium">
-                      Overdue: due on {format(task.estimation.endDate, "MMM d, yyyy")}
+                      Overdue: due on{" "}
+                      {format(task.estimation.endDate, "MMM d, yyyy")}
                     </p>
                   </TooltipContent>
                 </Tooltip>
@@ -356,25 +357,27 @@ export const KanbanTab = ({ tasks }: KanbanTabProps) => {
   );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const updateTask = useMutation((api as any).tasks.updateTask).withOptimisticUpdate(
-    (localStore, args) => {
-      const currentTasks = localStore.getQuery((api as any).tasks.getTasks) as Task[] | undefined;
+  const updateTask = useMutation(
+    (api as any).tasks.updateTask,
+  ).withOptimisticUpdate((localStore, args) => {
+    const currentTasks = localStore.getQuery((api as any).tasks.getTasks) as
+      | Task[]
+      | undefined;
 
-      if (currentTasks !== undefined) {
-        const updated = currentTasks.map((task) =>
-          task._id === args.id
-            ? {
-                ...task,
-                status: args.status !== undefined ? args.status : task.status,
-                updatedAt: Date.now(),
-              }
-            : task,
-        );
+    if (currentTasks !== undefined) {
+      const updated = currentTasks.map((task) =>
+        task._id === args.id
+          ? {
+              ...task,
+              status: args.status !== undefined ? args.status : task.status,
+              updatedAt: Date.now(),
+            }
+          : task,
+      );
 
-        localStore.setQuery((api as any).tasks.getTasks, {}, updated);
-      }
+      localStore.setQuery((api as any).tasks.getTasks, {}, updated);
     }
-  );
+  });
 
   const toggleColumn = (status: string) => {
     setCollapsedColumns((prev) => {
@@ -426,7 +429,7 @@ export const KanbanTab = ({ tasks }: KanbanTabProps) => {
           success: `Moved to ${STATUS_CONFIG[newStatus].label}`,
           error: (err: any) =>
             err.data?.message || err.message || "Failed to update status",
-        }
+        },
       );
     }
 
@@ -450,7 +453,11 @@ export const KanbanTab = ({ tasks }: KanbanTabProps) => {
           <div className="flex items-center gap-4 mt-2">
             <CreateTaskDialog
               trigger={
-                <Button variant="default" size="sm" className="rounded-full text-[11px]">
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="rounded-full text-[11px]"
+                >
                   <Plus className="w-4 h-4" /> Add Task
                 </Button>
               }

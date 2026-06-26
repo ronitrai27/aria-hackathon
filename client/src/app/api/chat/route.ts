@@ -26,7 +26,10 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error(`[API /api/chat] Backend error ${response.status}:`, errText);
+      console.error(
+        `[API /api/chat] Backend error ${response.status}:`,
+        errText,
+      );
       return new Response(JSON.stringify({ error: errText }), {
         status: response.status,
         headers: { "Content-Type": "application/json" },
@@ -51,7 +54,9 @@ export async function POST(req: NextRequest) {
         while (true) {
           const { done, value } = await reader.read();
           if (done) {
-            console.log(`[API /api/chat] SSE stream ended. Total chunks: ${chunkCount}`);
+            console.log(
+              `[API /api/chat] SSE stream ended. Total chunks: ${chunkCount}`,
+            );
             await writer.close();
             break;
           }

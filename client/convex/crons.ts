@@ -9,7 +9,8 @@ export const runScheduledFetch = internalAction({
   handler: async (ctx) => {
     // We use fetch to call the Next.js API from inside Convex
     // The site URL is configured via environment variable
-    const siteUrl = process.env.NEXT_PUBLIC_CONVEX_SITE_URL || process.env.SITE_URL;
+    const siteUrl =
+      process.env.NEXT_PUBLIC_CONVEX_SITE_URL || process.env.SITE_URL;
 
     if (!siteUrl) {
       console.error("[Cron] SITE_URL is not configured");

@@ -67,7 +67,9 @@ import { CreateTaskDialog } from "./CreateTaskDialog";
 
 const STATUS_ICONS: Record<TaskStatus, React.ReactNode> = {
   "not-started": <CircleDashed className="w-4 h-4 text-neutral-400 shrink-0" />,
-  "in-progress": <CircleDot className="w-4 h-4 text-blue-500 animate-pulse shrink-0" />,
+  "in-progress": (
+    <CircleDot className="w-4 h-4 text-blue-500 animate-pulse shrink-0" />
+  ),
   "on-hold": <CirclePause className="w-4 h-4 text-yellow-500 shrink-0" />,
   delayed: <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />,
   completed: <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />,
@@ -297,7 +299,7 @@ const TaskGroup = ({
           status === "in-progress" && "border-l-4 border-blue-400",
           status === "on-hold" && "border-l-4 border-yellow-500",
           status === "delayed" && "border-l-4 border-red-500",
-          status === "completed" && "border-l-4 border-emerald-500"
+          status === "completed" && "border-l-4 border-emerald-500",
         )}
       >
         <div
@@ -368,7 +370,8 @@ const TaskGroup = ({
                   </TableHead>
                   <TableHead className="text-[13px] dark:text-primary text-foreground font-medium px-4 border-b dark:border-neutral-700 border-neutral-200">
                     <div className="flex items-center gap-2">
-                      <ChartNoAxesColumnIncreasing className="w-4 h-4" /> Priority
+                      <ChartNoAxesColumnIncreasing className="w-4 h-4" />{" "}
+                      Priority
                     </div>
                   </TableHead>
                   <TableHead className="w-[50px]" />
@@ -508,9 +511,7 @@ export const ListTab = ({
           title={STATUS_CONFIG[status].label}
           tasks={grouped[status]}
           status={status}
-          defaultExpanded={
-            tasks.length === 0 || grouped[status].length > 0
-          }
+          defaultExpanded={tasks.length === 0 || grouped[status].length > 0}
           selectedTaskIds={selectedTaskIds}
           setSelectedTaskIds={setSelectedTaskIds}
           onTaskClick={handleTaskClick}

@@ -248,18 +248,18 @@ export async function POST(request: Request) {
       gmail: {
         unreadCount: gmailEmails.length,
         emails: gmailEmails,
-        error: stepMeta.find(s => s.key === "step_1")?.error,
+        error: stepMeta.find((s) => s.key === "step_1")?.error,
       },
       calendar: {
         eventCount: calendarEvents.length,
         events: calendarEvents,
-        error: stepMeta.find(s => s.key === "step_2")?.error,
+        error: stepMeta.find((s) => s.key === "step_2")?.error,
       },
       slack: {
         messageCount: slackMessages.length,
         messages: slackMessages,
         channel: slackChannel,
-        error: stepMeta.find(s => s.key === "step_3")?.error,
+        error: stepMeta.find((s) => s.key === "step_3")?.error,
       },
       // Raw step results for debugging
       steps: stepMeta,

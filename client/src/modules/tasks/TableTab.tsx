@@ -61,8 +61,12 @@ import {
 } from "lucide-react";
 
 const STATUS_ICONS: Record<TaskStatus, React.ReactNode> = {
-  "not-started": <CircleDashed className="w-3.5 h-3.5 text-neutral-400 shrink-0" />,
-  "in-progress": <CircleDot className="w-3.5 h-3.5 text-blue-500 animate-pulse shrink-0" />,
+  "not-started": (
+    <CircleDashed className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+  ),
+  "in-progress": (
+    <CircleDot className="w-3.5 h-3.5 text-blue-500 animate-pulse shrink-0" />
+  ),
   "on-hold": <CirclePause className="w-3.5 h-3.5 text-yellow-500 shrink-0" />,
   delayed: <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />,
   completed: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />,
@@ -124,8 +128,9 @@ export const TableTab = ({
   setSelectedTaskIds,
 }: TableTabProps) => {
   const [page, setPage] = useState(0);
-  const [selectedTaskForSheet, setSelectedTaskForSheet] =
-    useState<Task | null>(null);
+  const [selectedTaskForSheet, setSelectedTaskForSheet] = useState<Task | null>(
+    null,
+  );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const deleteTask = useMutation((api as any).tasks.deleteTask);
@@ -151,10 +156,7 @@ export const TableTab = ({
   };
 
   const totalPages = Math.ceil(tasks.length / PAGE_SIZE);
-  const paginatedTasks = tasks.slice(
-    page * PAGE_SIZE,
-    (page + 1) * PAGE_SIZE,
-  );
+  const paginatedTasks = tasks.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const toggleTask = (taskId: Id<"tasks">) => {
     setSelectedTaskIds((prev) =>
@@ -228,7 +230,8 @@ export const TableTab = ({
                       Empty Workspace
                     </p>
                     <p className="text-muted-foreground text-sm text-center max-w-xs">
-                      Create your first task and start managing your work the right way.
+                      Create your first task and start managing your work the
+                      right way.
                     </p>
                     <div className="flex items-center gap-4 mt-2">
                       <CreateTaskDialog

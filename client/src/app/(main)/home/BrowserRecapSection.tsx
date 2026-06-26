@@ -18,57 +18,64 @@ export function BrowserRecapSection() {
   const [recapError, setRecapError] = useState<string | null>(null);
   const [recapFetchedAt, setRecapFetchedAt] = useState<number | null>(null);
 
-  const fetchBrowserRecap = useCallback(async (userId: string, force = false) => {
-    setLoadingRecap(true);
-    setRecapError(null);
+  const fetchBrowserRecap = useCallback(
+    async (userId: string, force = false) => {
+      setLoadingRecap(true);
+      setRecapError(null);
 
-    const cacheKey = `browser_recap_${userId}`;
-    if (!force) {
-      const cached = localStorage.getItem(cacheKey);
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          const age = Date.now() - parsed.timestamp;
-          const isFallback = 
-            parsed.data?.summary?.includes("Not enough significant") || 
-            parsed.data?.summary?.includes("No recent browsing") ||
-            !parsed.data?.topSites || 
-            parsed.data.topSites.length === 0;
+      const cacheKey = `browser_recap_${userId}`;
+      if (!force) {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            const age = Date.now() - parsed.timestamp;
+            const isFallback =
+              parsed.data?.summary?.includes("Not enough significant") ||
+              parsed.data?.summary?.includes("No recent browsing") ||
+              !parsed.data?.topSites ||
+              parsed.data.topSites.length === 0;
 
-          if (age < 12 * 60 * 60 * 1000 && !isFallback) { // 12 hours cache
-            setRecapData(parsed.data);
-            setRecapFetchedAt(parsed.timestamp);
-            setLoadingRecap(false);
-            return;
+            if (age < 12 * 60 * 60 * 1000 && !isFallback) {
+              // 12 hours cache
+              setRecapData(parsed.data);
+              setRecapFetchedAt(parsed.timestamp);
+              setLoadingRecap(false);
+              return;
+            }
+          } catch (e) {
+            localStorage.removeItem(cacheKey);
           }
-        } catch (e) {
-          localStorage.removeItem(cacheKey);
         }
       }
-    }
 
-    try {
-      const res = await fetch("/api/ai-vercel/browser", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-      if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
+      try {
+        const res = await fetch("/api/ai-vercel/browser", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId }),
+        });
+        if (!res.ok) {
+          throw new Error(`Server returned ${res.status}`);
+        }
+        const data = await res.json();
+        console.log("[BrowserRecap Client] Loaded activity recap data:", data);
+        setRecapData(data);
+        const now = Date.now();
+        setRecapFetchedAt(now);
+        localStorage.setItem(
+          cacheKey,
+          JSON.stringify({ timestamp: now, data }),
+        );
+      } catch (err: any) {
+        console.error("Error fetching browser recap:", err);
+        setRecapError(err.message || "Failed to load activity recap.");
+      } finally {
+        setLoadingRecap(false);
       }
-      const data = await res.json();
-      console.log("[BrowserRecap Client] Loaded activity recap data:", data);
-      setRecapData(data);
-      const now = Date.now();
-      setRecapFetchedAt(now);
-      localStorage.setItem(cacheKey, JSON.stringify({ timestamp: now, data }));
-    } catch (err: any) {
-      console.error("Error fetching browser recap:", err);
-      setRecapError(err.message || "Failed to load activity recap.");
-    } finally {
-      setLoadingRecap(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (user?.id) {
@@ -126,7 +133,11 @@ export function BrowserRecapSection() {
           <div className="flex items-center gap-2">
             {recapFetchedAt && (
               <span className="text-[10px] text-muted-foreground hidden sm:inline">
-                Synced: {new Date(recapFetchedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                Synced:{" "}
+                {new Date(recapFetchedAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
               </span>
             )}
             <Button
@@ -138,7 +149,10 @@ export function BrowserRecapSection() {
               className="w-8 h-8 rounded-lg hover:bg-purple-500/10 hover:text-purple-600 shrink-0 transition-colors"
               title="Force refresh activity metrics"
             >
-              <RefreshCw size={14} className={loadingRecap ? "animate-spin text-purple-500" : ""} />
+              <RefreshCw
+                size={14}
+                className={loadingRecap ? "animate-spin text-purple-500" : ""}
+              />
             </Button>
           </div>
         </div>
@@ -157,7 +171,9 @@ export function BrowserRecapSection() {
           </div>
         ) : recapError ? (
           <div className="p-6 text-center border border-dashed border-border rounded-lg bg-neutral-50/55">
-            <span className="text-sm text-red-500 font-medium">⚠ {recapError}</span>
+            <span className="text-sm text-red-500 font-medium">
+              ⚠ {recapError}
+            </span>
             <Button
               type="button"
               onClick={handleRecapRefresh}
@@ -197,7 +213,9 @@ export function BrowserRecapSection() {
           </div>
         ) : (
           <div className="p-6 text-center border border-dashed border-border rounded-lg bg-neutral-50/50">
-            <p className="text-sm text-muted-foreground">No recap data loaded yet.</p>
+            <p className="text-sm text-muted-foreground">
+              No recap data loaded yet.
+            </p>
             <Button
               type="button"
               onClick={handleRecapRefresh}
@@ -241,19 +259,32 @@ export function BrowserRecapSection() {
           </div>
         ) : recapError ? (
           <div className="p-6 text-center border border-dashed border-border rounded-lg bg-neutral-50/50 flex-1 flex flex-col items-center justify-center">
-            <span className="text-sm text-muted-foreground">Unable to map top sites.</span>
+            <span className="text-sm text-muted-foreground">
+              Unable to map top sites.
+            </span>
           </div>
         ) : recapData && recapData.topSites && recapData.topSites.length > 0 ? (
           <div className="flex flex-col gap-4">
             <div className="space-y-3.5">
               {recapData.topSites.map((site) => {
-                const percent = Math.max(8, Math.round((site.durationMs / maxDuration) * 100));
+                const percent = Math.max(
+                  8,
+                  Math.round((site.durationMs / maxDuration) * 100),
+                );
                 return (
                   <div key={site.domain} className="space-y-1 group">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-foreground hover:text-purple-600 transition-colors flex items-center gap-1.5 cursor-pointer" onClick={() => window.open(`https://${site.domain}`, '_blank')}>
+                      <span
+                        className="font-medium text-foreground hover:text-purple-600 transition-colors flex items-center gap-1.5 cursor-pointer"
+                        onClick={() =>
+                          window.open(`https://${site.domain}`, "_blank")
+                        }
+                      >
                         {site.domain}
-                        <ChevronRight size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <ChevronRight
+                          size={12}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        />
                       </span>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>{site.visits} visits</span>
@@ -276,7 +307,9 @@ export function BrowserRecapSection() {
           </div>
         ) : (
           <div className="p-6 text-center border border-dashed border-border rounded-lg bg-neutral-50/50 flex-1 flex flex-col items-center justify-center">
-            <p className="text-sm text-muted-foreground">No active domains recorded.</p>
+            <p className="text-sm text-muted-foreground">
+              No active domains recorded.
+            </p>
           </div>
         )}
       </div>
