@@ -36,6 +36,7 @@ import {
   CircleDot,
   CirclePause,
   CheckCircle2,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -83,6 +84,34 @@ const priorityConfig: Record<
   },
 };
 
+// ─── Priority bars ─────────────────────────────────────────────────────────────
+const priorityBars: Record<string, React.ReactNode> = {
+  low: (
+    <div className="flex items-end gap-px h-3 mb-0.5 shrink-0">
+      <div className="w-[4px] h-5 bg-yellow-500 rounded-[1px]" />
+      <div className="w-[4px] h-4 dark:bg-neutral-400 bg-accent rounded-[1px]" />
+      <div className="w-[4px] h-3 dark:bg-neutral-400 bg-accent rounded-[1px]" />
+      <div className="w-[4px] h-[8px] dark:bg-neutral-400 bg-accent rounded-[1px]" />
+    </div>
+  ),
+  medium: (
+    <div className="flex items-end gap-px h-3 mb-0.5 shrink-0">
+      <div className="w-[4px] h-5 bg-green-500 rounded-[1px]" />
+      <div className="w-[4px] h-4 bg-green-500 rounded-[1px]" />
+      <div className="w-[4px] h-3 dark:bg-neutral-400 bg-accent rounded-[1px]" />
+      <div className="w-[4px] h-[8px] dark:bg-neutral-400 bg-accent rounded-[1px]" />
+    </div>
+  ),
+  high: (
+    <div className="flex items-end gap-px h-3 mb-0.5 shrink-0">
+      <div className="w-[4px] h-5 bg-red-500 rounded-[1px]" />
+      <div className="w-[4px] h-4 bg-red-500 rounded-[1px]" />
+      <div className="w-[4px] h-3 bg-red-500 rounded-[1px]" />
+      <div className="w-[4px] h-[8px] dark:bg-neutral-400 bg-accent rounded-[1px]" />
+    </div>
+  ),
+};
+
 interface CreateTaskDialogProps {
   trigger: React.ReactNode;
 }
@@ -93,10 +122,7 @@ export function CreateTaskDialog({ trigger }: CreateTaskDialogProps) {
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<TaskStatus>("not-started");
   const [priority, setPriority] = useState<TaskPriority>("medium");
-  const [date, setDate] = useState<DateRange | undefined>({
-    from: undefined,
-    to: undefined,
-  });
+  const [date, setDate] = useState<DateRange | undefined>(undefined);
   const [isPending, setIsPending] = useState(false);
   const [duplicateError, setDuplicateError] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -109,7 +135,7 @@ export function CreateTaskDialog({ trigger }: CreateTaskDialogProps) {
     setDescription("");
     setStatus("not-started");
     setPriority("medium");
-    setDate({ from: undefined, to: undefined });
+    setDate(undefined);
     setDuplicateError(false);
   };
 
@@ -161,9 +187,9 @@ export function CreateTaskDialog({ trigger }: CreateTaskDialogProps) {
       }}
     >
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="w-full sm:max-w-[540px] bg-card border border-border shadow-2xl p-0 overflow-hidden text-foreground rounded-xl">
+      <DialogContent className="w-full min-w-[600px] bg-card border border-border shadow-2xl p-0 overflow-hidden text-foreground rounded-xl">
         {/* Header Breadcrumb */}
-        <DialogHeader className="px-6 py-4 flex flex-row items-center justify-between border-b border-border bg-muted/20">
+        <DialogHeader className="px-6 py-4 flex flex-row items-center justify-between border-b border-border bg-neutral-100 dark:bg-neutral-950">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium select-none">
             <span className="hover:text-foreground transition-colors cursor-pointer">
               My Tasks
@@ -192,7 +218,7 @@ export function CreateTaskDialog({ trigger }: CreateTaskDialogProps) {
                 if (e.key === "Enter") handleCreate();
               }}
               className={cn(
-                "h-10 text-sm bg-muted/10 border border-border/80 rounded-lg focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary",
+                "h-10 text-sm bg-neutral-50 dark:bg-neutral-900 border border-border/80 rounded-lg focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary",
                 duplicateError &&
                   "border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500",
               )}
@@ -216,10 +242,11 @@ export function CreateTaskDialog({ trigger }: CreateTaskDialogProps) {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
-                    className="h-10 gap-2 rounded-lg text-xs bg-muted/10 border-border/80 hover:bg-muted/20 text-muted-foreground hover:text-foreground font-semibold transition-all shrink-0 px-4"
+                    className="h-10 gap-2 rounded-lg text-xs bg-neutral-50 dark:bg-neutral-900 border-border/80 hover:bg-muted/20 text-muted-foreground hover:text-foreground font-semibold transition-all shrink-0 px-4"
                   >
                     <StatusDot status={status} />
                     <span>{STATUS_CONFIG[status].label}</span>
+                    <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5 shrink-0" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
@@ -241,7 +268,7 @@ export function CreateTaskDialog({ trigger }: CreateTaskDialogProps) {
                     <DropdownMenuItem
                       key={s}
                       onClick={() => setStatus(s)}
-                      className="gap-2.5 cursor-pointer text-xs py-2 px-3 focus:bg-primary/5 hover:bg-primary/5 rounded-md"
+                      className="gap-2.5 cursor-pointer text-xs py-2 px-3 focus:bg-accent hover:bg-accent rounded-md"
                     >
                       <StatusDot status={s} />
                       <span>{STATUS_CONFIG[s].label}</span>
@@ -255,18 +282,11 @@ export function CreateTaskDialog({ trigger }: CreateTaskDialogProps) {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
-                    className={cn(
-                      "h-10 gap-2 rounded-lg text-xs bg-muted/10 border-border/80 hover:bg-muted/20 text-muted-foreground hover:text-foreground font-semibold transition-all shrink-0 px-4",
-                      priorityConfig[priority].textColor,
-                    )}
+                    className="h-10 gap-2 rounded-lg text-xs bg-neutral-50 dark:bg-neutral-900 border-border/80 hover:bg-muted/20 text-muted-foreground hover:text-foreground font-semibold transition-all shrink-0 px-4"
                   >
-                    <Flag
-                      className={cn(
-                        "w-3.5 h-3.5",
-                        priorityConfig[priority].iconColor,
-                      )}
-                    />
-                    <span>{priorityConfig[priority].label} Priority</span>
+                    {priorityBars[priority]}
+                    <span className="capitalize">{priority} Priority</span>
+                    <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5 shrink-0" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
@@ -280,17 +300,10 @@ export function CreateTaskDialog({ trigger }: CreateTaskDialogProps) {
                     <DropdownMenuItem
                       key={p}
                       onClick={() => setPriority(p)}
-                      className="gap-2.5 cursor-pointer text-xs py-2 px-3 focus:bg-primary/5 hover:bg-primary/5 rounded-md"
+                      className="gap-2.5 cursor-pointer text-xs py-2 px-3 focus:bg-accent hover:bg-accent rounded-md"
                     >
-                      <Flag
-                        className={cn(
-                          "w-3.5 h-3.5",
-                          priorityConfig[p].iconColor,
-                        )}
-                      />
-                      <span className={priorityConfig[p].textColor}>
-                        {priorityConfig[p].label}
-                      </span>
+                      {priorityBars[p]}
+                      <span className="capitalize">{p}</span>
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
@@ -304,25 +317,24 @@ export function CreateTaskDialog({ trigger }: CreateTaskDialogProps) {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className={cn(
-                      "h-10 gap-2 rounded-lg text-xs bg-muted/10 border-border/80 hover:bg-muted/20 text-muted-foreground hover:text-foreground font-semibold transition-all shrink-0 px-4",
-                      date?.from &&
-                        "text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/20",
-                    )}
+                    className="h-10 gap-2 rounded-lg text-xs bg-neutral-50 dark:bg-neutral-900 border-border/80 hover:bg-muted/20 text-muted-foreground hover:text-foreground font-semibold transition-all shrink-0 px-4"
                   >
                     <CalendarRange className="w-3.5 h-3.5 text-muted-foreground/80" />
-                    {date?.from ? (
-                      date.to ? (
-                        <>
-                          {format(date.from, "MMM dd")} –{" "}
-                          {format(date.to, "MMM dd")}
-                        </>
+                    <span>
+                      {date?.from ? (
+                        date.to ? (
+                          <>
+                            {format(date.from, "MMM dd")} –{" "}
+                            {format(date.to, "MMM dd")}
+                          </>
+                        ) : (
+                          format(date.from, "MMM dd")
+                        )
                       ) : (
-                        format(date.from, "MMM dd")
-                      )
-                    ) : (
-                      "Select Dates"
-                    )}
+                        "Select Duration"
+                      )}
+                    </span>
+                    <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5 shrink-0" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent
@@ -356,13 +368,13 @@ export function CreateTaskDialog({ trigger }: CreateTaskDialogProps) {
               placeholder="Add details, notes or description..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="min-h-[140px] text-sm bg-muted/10 border border-border/80 rounded-lg focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary resize-none placeholder:text-muted-foreground/40 p-3 leading-relaxed"
+              className="min-h-[140px] text-sm bg-neutral-50 dark:bg-neutral-900 border border-border/80 rounded-lg focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary resize-none placeholder:text-muted-foreground/40 p-3 leading-relaxed"
             />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-3 bg-muted/10">
+        <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-3 bg-neutral-100 dark:bg-neutral-950">
           <Button
             variant="ghost"
             onClick={() => setOpen(false)}

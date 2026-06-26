@@ -290,7 +290,16 @@ const TaskGroup = ({
   return (
     <div>
       {/* Group Header */}
-      <div className="flex items-center justify-between mb-4 px-4 dark:bg-neutral-800 bg-neutral-200/55 py-1.5 rounded-md">
+      <div
+        className={cn(
+          "flex items-center justify-between mb-4 px-4 dark:bg-neutral-800 bg-neutral-200/55 py-1.5 rounded-md",
+          status === "not-started" && "border-l-4 border-neutral-400",
+          status === "in-progress" && "border-l-4 border-blue-400",
+          status === "on-hold" && "border-l-4 border-yellow-500",
+          status === "delayed" && "border-l-4 border-red-500",
+          status === "completed" && "border-l-4 border-emerald-500"
+        )}
+      >
         <div
           className="flex items-center gap-3 cursor-pointer w-full select-none"
           onClick={() => setIsExpanded(!isExpanded)}
@@ -302,7 +311,7 @@ const TaskGroup = ({
             )}
           />
           {STATUS_ICONS[status]}
-          <h2 className="text-base tracking-tight flex items-center gap-2">
+          <h2 className="text-base tracking-tight flex items-center gap-2 font-semibold text-neutral-800 dark:text-neutral-200">
             {title}
             <span className="text-[10px] font-medium text-muted-foreground dark:bg-muted bg-neutral-100 px-1.5 py-0.5 rounded">
               {tasks.length}
@@ -407,11 +416,11 @@ const TaskGroup = ({
                         </span>
                       </TableCell>
                       <TableCell className="p-2.5 border-r border-b dark:border-neutral-700 border-neutral-200 max-w-[180px]">
-                        <p className="text-xs text-muted-foreground dark:group-hover:text-primary group-hover:text-foreground transition-colors line-clamp-1 max-w-[180px] truncate">
+                        <p className="text-xs text-neutral-600 dark:text-neutral-300 dark:group-hover:text-primary group-hover:text-foreground transition-colors line-clamp-1 max-w-[180px] truncate font-medium">
                           {task.description || "No description provided yet..."}
                         </p>
                       </TableCell>
-                      <TableCell className="p-2.5 whitespace-nowrap text-xs text-muted-foreground dark:group-hover:text-primary group-hover:text-foreground border-r border-b dark:border-neutral-700 border-neutral-200 transition-colors">
+                      <TableCell className="p-2.5 whitespace-nowrap text-xs text-neutral-600 dark:text-neutral-300 dark:group-hover:text-primary group-hover:text-foreground border-r border-b dark:border-neutral-700 border-neutral-200 transition-colors font-medium">
                         <div className="flex items-center justify-center gap-2">
                           <Clock className="w-3.5 h-3.5" />
                           <span>

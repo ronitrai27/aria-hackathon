@@ -31,6 +31,79 @@ function Calendar({
 }) {
   const defaultClassNames = getDefaultClassNames();
 
+  const defaultComponents = React.useMemo(
+    () => ({
+      Root: ({
+        className,
+        rootRef,
+        ...props
+      }: React.HTMLAttributes<HTMLDivElement> & {
+        rootRef?: React.Ref<HTMLDivElement>;
+      }) => {
+        return (
+          <div
+            data-slot="calendar"
+            ref={rootRef}
+            className={cn(className)}
+            {...props}
+          />
+        );
+      },
+      Chevron: ({
+        className,
+        orientation,
+        ...props
+      }: React.ComponentProps<typeof ChevronDownIcon> & {
+        orientation?: "left" | "right" | "up" | "down";
+      }) => {
+        if (orientation === "left") {
+          return (
+            <ChevronLeftIcon className={cn("size-4", className)} {...props} />
+          );
+        }
+
+        if (orientation === "right") {
+          return (
+            <ChevronRightIcon
+              className={cn("size-4", className)}
+              {...props}
+            />
+          );
+        }
+
+        return (
+          <ChevronDownIcon className={cn("size-4", className)} {...props} />
+        );
+      },
+      DayButton: ({
+        ...props
+      }: React.ComponentProps<typeof DayButton> & {
+        locale?: Partial<Locale>;
+      }) => <CalendarDayButton locale={locale} {...props} />,
+      WeekNumber: ({
+        children,
+        ...props
+      }: React.HTMLAttributes<HTMLTableCellElement>) => {
+        return (
+          <td {...props}>
+            <div className="flex size-(--cell-size) items-center justify-center text-center">
+              {children}
+            </div>
+          </td>
+        );
+      },
+    }),
+    [locale],
+  );
+
+  const mergedComponents = React.useMemo(
+    () => ({
+      ...defaultComponents,
+      ...components,
+    }),
+    [defaultComponents, components],
+  );
+
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
@@ -137,51 +210,7 @@ function Calendar({
         hidden: cn("invisible", defaultClassNames.hidden),
         ...classNames,
       }}
-      components={{
-        Root: ({ className, rootRef, ...props }) => {
-          return (
-            <div
-              data-slot="calendar"
-              ref={rootRef}
-              className={cn(className)}
-              {...props}
-            />
-          );
-        },
-        Chevron: ({ className, orientation, ...props }) => {
-          if (orientation === "left") {
-            return (
-              <ChevronLeftIcon className={cn("size-4", className)} {...props} />
-            );
-          }
-
-          if (orientation === "right") {
-            return (
-              <ChevronRightIcon
-                className={cn("size-4", className)}
-                {...props}
-              />
-            );
-          }
-
-          return (
-            <ChevronDownIcon className={cn("size-4", className)} {...props} />
-          );
-        },
-        DayButton: ({ ...props }) => (
-          <CalendarDayButton locale={locale} {...props} />
-        ),
-        WeekNumber: ({ children, ...props }) => {
-          return (
-            <td {...props}>
-              <div className="flex size-(--cell-size) items-center justify-center text-center">
-                {children}
-              </div>
-            </td>
-          );
-        },
-        ...components,
-      }}
+      components={mergedComponents}
       {...props}
     />
   );

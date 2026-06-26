@@ -307,7 +307,7 @@ export const TableTab = ({
                     <TableCell className="px-4 border-r border-b dark:border-neutral-700 border-neutral-200">
                       <Badge
                         className={cn(
-                          "px-2.5 py-0.5 rounded-full text-[12px] flex items-center gap-1.5 border font-medium capitalize whitespace-nowrap dark:bg-primary/10 bg-primary/5 dark:text-primary text-primary/80",
+                          "px-2.5 py-0.5 rounded-full text-[12px] flex items-center gap-1.5 border font-semibold capitalize whitespace-nowrap dark:bg-neutral-800/80 bg-neutral-100/80 dark:text-neutral-200 text-neutral-800 border-neutral-300 dark:border-neutral-700",
                         )}
                       >
                         {STATUS_ICONS[task.status as TaskStatus]}
@@ -315,8 +315,8 @@ export const TableTab = ({
                           task.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="px-4 text-[12px] font-medium text-muted-foreground dark:group-hover:text-primary group-hover:text-foreground transition-colors border-r border-b dark:border-neutral-700 border-neutral-200">
-                      <span className="flex items-center justify-center gap-1.5 opacity-80">
+                    <TableCell className="px-4 text-[12px] font-semibold text-neutral-600 dark:text-neutral-300 dark:group-hover:text-primary group-hover:text-foreground transition-colors border-r border-b dark:border-neutral-700 border-neutral-200">
+                      <span className="flex items-center justify-center gap-1.5">
                         {format(task.estimation.startDate, "MMM d")} —{" "}
                         {format(task.estimation.endDate, "MMM d")}
                       </span>

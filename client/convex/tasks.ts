@@ -170,3 +170,24 @@ export const deleteTasks = mutation({
     }
   },
 });
+
+// -----------------------------------------------------------
+/** Toggle a task's status between "on-hold" and "in-progress". */
+export const toggleTaskHold = mutation({
+  args: { id: v.id("tasks") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const task = await ctx.db.get(args.id);
+    if (!task || task.userId !== identity.subject)
+      throw new Error("Task not found or access denied");
+
+    const newStatus = task.status === "on-hold" ? "in-progress" : "on-hold";
+    await ctx.db.patch(args.id, {
+      status: newStatus,
+      updatedAt: Date.now(),
+      finalCompletedAt: undefined,
+    });
+    return newStatus;
+  },
+});

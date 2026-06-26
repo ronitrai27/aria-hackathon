@@ -15,6 +15,7 @@ import {
   KanbanSquare,
   Trash2,
   SlidersHorizontal,
+  Filter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,13 +91,13 @@ export function TasksPage() {
   });
 
   return (
-    <div className="flex flex-col gap-6 w-full h-full p-4 relative">
+    <div className="flex flex-col gap-6 w-full h-full p-2 relative">
       {/* ─── Page Header ─── */}
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <CheckSquare className="w-6 h-6 text-purple-600" />
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            <CheckSquare className="w-6 h-6 " />
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
               My Tasks
             </h1>
           </div>
@@ -117,7 +118,7 @@ export function TasksPage() {
       {/* ─── Tabs & Filters Row ─── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-2 gap-4">
         {/* Tab Switcher */}
-        <div className="flex items-center gap-1 bg-muted/40 p-1 rounded-xl border border-border/40 w-fit">
+        <div className="flex items-center gap-1 bg-muted p-1 rounded border border-border/40 w-fit">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -130,10 +131,10 @@ export function TasksPage() {
                   setActiveTab(tab.id as "List" | "Table" | "Kanban");
                 }}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 select-none cursor-pointer outline-none",
+                  "flex items-center gap-2 px-6 py-1.5 rounded-sm! text-sm font-medium transition-all duration-200 select-none cursor-pointer outline-none",
                   isActive
-                    ? "bg-purple-100/60 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300 shadow-2xs font-semibold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/30",
+                    ? "bg-white border border-border font-semibold"
+                    : "text-foreground hover:bg-muted/30",
                 )}
               >
                 <Icon className="w-4 h-4" />
@@ -146,13 +147,13 @@ export function TasksPage() {
         {/* Filters & Actions */}
         <div className="flex items-center gap-3 flex-wrap">
           {/* Search */}
-          <div className="relative w-full sm:w-[220px]">
+          <div className="relative w-full sm:w-[280px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <Input
               placeholder="Search tasks…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-9 text-sm bg-muted/40 border-border focus-visible:ring-1 focus-visible:ring-purple-500"
+              className="pl-8 h-9 text-sm bg-muted border-border focus-visible:ring-0 rounded-md"
             />
           </div>
 
@@ -168,7 +169,7 @@ export function TasksPage() {
                     "text-purple-600 border-purple-300 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-900",
                 )}
               >
-                <Flag className="w-3.5 h-3.5" />
+                <Filter className="w-3.5 h-3.5" />
                 {priorityFilter === "all"
                   ? "Priority"
                   : `${priorityFilter.charAt(0).toUpperCase() + priorityFilter.slice(1)}`}

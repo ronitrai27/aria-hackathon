@@ -28,7 +28,14 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import type { DateRange } from "react-day-picker";
 import { format } from "date-fns";
-import { AlertCircle, ChevronRight, Flag, Loader2, CalendarRange } from "lucide-react";
+import {
+  AlertCircle,
+  ChevronRight,
+  Flag,
+  Loader2,
+  CalendarRange,
+  ChevronDown,
+} from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Task, TaskPriority, TaskStatus } from "./taskTypes";
@@ -36,7 +43,14 @@ import { STATUS_CONFIG } from "./taskTypes";
 
 function StatusDot({ status }: { status: TaskStatus }) {
   const cfg = STATUS_CONFIG[status];
-  return <span className={cn("inline-block w-2.5 h-2.5 rounded-full shrink-0 shadow-sm", cfg.accent)} />;
+  return (
+    <span
+      className={cn(
+        "inline-block w-2.5 h-2.5 rounded-full shrink-0 shadow-sm",
+        cfg.accent,
+      )}
+    />
+  );
 }
 
 const priorityConfig: Record<
@@ -61,6 +75,34 @@ const priorityConfig: Record<
     iconColor: "text-blue-500",
     bg: "bg-blue-500/10 dark:bg-blue-500/20",
   },
+};
+
+// ─── Priority bars ─────────────────────────────────────────────────────────────
+const priorityBars: Record<string, React.ReactNode> = {
+  low: (
+    <div className="flex items-end gap-px h-3 mb-0.5 shrink-0">
+      <div className="w-[4px] h-5 bg-yellow-500 rounded-[1px]" />
+      <div className="w-[4px] h-4 dark:bg-neutral-400 bg-accent rounded-[1px]" />
+      <div className="w-[4px] h-3 dark:bg-neutral-400 bg-accent rounded-[1px]" />
+      <div className="w-[4px] h-[8px] dark:bg-neutral-400 bg-accent rounded-[1px]" />
+    </div>
+  ),
+  medium: (
+    <div className="flex items-end gap-px h-3 mb-0.5 shrink-0">
+      <div className="w-[4px] h-5 bg-green-500 rounded-[1px]" />
+      <div className="w-[4px] h-4 bg-green-500 rounded-[1px]" />
+      <div className="w-[4px] h-3 dark:bg-neutral-400 bg-accent rounded-[1px]" />
+      <div className="w-[4px] h-[8px] dark:bg-neutral-400 bg-accent rounded-[1px]" />
+    </div>
+  ),
+  high: (
+    <div className="flex items-end gap-px h-3 mb-0.5 shrink-0">
+      <div className="w-[4px] h-5 bg-red-500 rounded-[1px]" />
+      <div className="w-[4px] h-4 bg-red-500 rounded-[1px]" />
+      <div className="w-[4px] h-3 bg-red-500 rounded-[1px]" />
+      <div className="w-[4px] h-[8px] dark:bg-neutral-400 bg-accent rounded-[1px]" />
+    </div>
+  ),
 };
 
 interface EditTaskDialogProps {
@@ -142,11 +184,13 @@ export function EditTaskDialog({ trigger, task }: EditTaskDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="w-full sm:max-w-[540px] bg-card border border-border shadow-2xl p-0 overflow-hidden text-foreground rounded-xl">
+      <DialogContent className="w-full min-w-[600px] bg-card border border-border shadow-2xl p-0 overflow-hidden text-foreground rounded-xl">
         {/* Header Breadcrumb */}
-        <DialogHeader className="px-6 py-4 flex flex-row items-center justify-between border-b border-border bg-muted/20">
+        <DialogHeader className="px-6 py-4 flex flex-row items-center justify-between border-b border-border bg-neutral-100 dark:bg-neutral-950">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium select-none">
-            <span className="hover:text-foreground transition-colors cursor-pointer">My Tasks</span>
+            <span className="hover:text-foreground transition-colors cursor-pointer">
+              My Tasks
+            </span>
             <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60" />
             <span className="text-foreground font-semibold">Edit Task</span>
           </div>
@@ -168,8 +212,9 @@ export function EditTaskDialog({ trigger, task }: EditTaskDialogProps) {
                 if (duplicateError) setDuplicateError(false);
               }}
               className={cn(
-                "h-10 text-sm bg-muted/10 border border-border/80 rounded-lg focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary",
-                duplicateError && "border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500"
+                "h-10 text-sm bg-neutral-50 dark:bg-neutral-900 border border-border/80 rounded-lg focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary",
+                duplicateError &&
+                  "border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500",
               )}
             />
             {duplicateError && (
@@ -191,21 +236,33 @@ export function EditTaskDialog({ trigger, task }: EditTaskDialogProps) {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
-                    className="h-10 gap-2 rounded-lg text-xs bg-muted/10 border-border/80 hover:bg-muted/20 text-muted-foreground hover:text-foreground font-semibold transition-all shrink-0 px-4"
+                    className="h-10 gap-2 rounded-lg text-xs bg-neutral-50 dark:bg-neutral-900 border-border/80 hover:bg-muted/20 text-muted-foreground hover:text-foreground font-semibold transition-all shrink-0 px-4"
                   >
                     <StatusDot status={status} />
                     <span>{STATUS_CONFIG[status].label}</span>
+                    <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5 shrink-0" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-popover border border-border shadow-lg rounded-lg min-w-[140px]" align="start">
+                <DropdownMenuContent
+                  className="bg-popover border border-border shadow-lg rounded-lg min-w-[140px]"
+                  align="start"
+                >
                   <div className="text-[10px] uppercase font-bold tracking-wider px-3 py-1.5 text-muted-foreground/60 border-b border-border/60">
                     Status
                   </div>
-                  {(["not-started", "in-progress", "on-hold", "delayed", "completed"] as TaskStatus[]).map((s) => (
+                  {(
+                    [
+                      "not-started",
+                      "in-progress",
+                      "on-hold",
+                      "delayed",
+                      "completed",
+                    ] as TaskStatus[]
+                  ).map((s) => (
                     <DropdownMenuItem
                       key={s}
                       onClick={() => setStatus(s)}
-                      className="gap-2.5 cursor-pointer text-xs py-2 px-3 focus:bg-primary/5 hover:bg-primary/5 rounded-md"
+                      className="gap-2.5 cursor-pointer text-xs py-2 px-3 focus:bg-accent hover:bg-accent rounded-md"
                     >
                       <StatusDot status={s} />
                       <span>{STATUS_CONFIG[s].label}</span>
@@ -219,16 +276,17 @@ export function EditTaskDialog({ trigger, task }: EditTaskDialogProps) {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
-                    className={cn(
-                      "h-10 gap-2 rounded-lg text-xs bg-muted/10 border-border/80 hover:bg-muted/20 text-muted-foreground hover:text-foreground font-semibold transition-all shrink-0 px-4",
-                      priorityConfig[priority].textColor
-                    )}
+                    className="h-10 gap-2 rounded-lg text-xs bg-neutral-50 dark:bg-neutral-900 border-border/80 hover:bg-muted/20 text-muted-foreground hover:text-foreground font-semibold transition-all shrink-0 px-4"
                   >
-                    <Flag className={cn("w-3.5 h-3.5", priorityConfig[priority].iconColor)} />
-                    <span>{priorityConfig[priority].label} Priority</span>
+                    {priorityBars[priority]}
+                    <span className="capitalize">{priority} Priority</span>
+                    <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5 shrink-0" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-popover border border-border shadow-lg rounded-lg min-w-[140px]" align="start">
+                <DropdownMenuContent
+                  className="bg-popover border border-border shadow-lg rounded-lg min-w-[140px]"
+                  align="start"
+                >
                   <div className="text-[10px] uppercase font-bold tracking-wider px-3 py-1.5 text-muted-foreground/60 border-b border-border/60">
                     Priority
                   </div>
@@ -236,38 +294,47 @@ export function EditTaskDialog({ trigger, task }: EditTaskDialogProps) {
                     <DropdownMenuItem
                       key={p}
                       onClick={() => setPriority(p)}
-                      className="gap-2.5 cursor-pointer text-xs py-2 px-3 focus:bg-primary/5 hover:bg-primary/5 rounded-md"
+                      className="gap-2.5 cursor-pointer text-xs py-2 px-3 focus:bg-accent hover:bg-accent rounded-md"
                     >
-                      <Flag className={cn("w-3.5 h-3.5", priorityConfig[p].iconColor)} />
-                      <span className={priorityConfig[p].textColor}>{priorityConfig[p].label}</span>
+                      {priorityBars[p]}
+                      <span className="capitalize">{p}</span>
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
 
               {/* Duration Range Picker */}
-              <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+              <Popover
+                open={isDatePickerOpen}
+                onOpenChange={setIsDatePickerOpen}
+              >
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className={cn(
-                      "h-10 gap-2 rounded-lg text-xs bg-muted/10 border-border/80 hover:bg-muted/20 text-muted-foreground hover:text-foreground font-semibold transition-all shrink-0 px-4",
-                      date?.from && "text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/20"
-                    )}
+                    className="h-10 gap-2 rounded-lg text-xs bg-neutral-50 dark:bg-neutral-900 border-border/80 hover:bg-muted/20 text-muted-foreground hover:text-foreground font-semibold transition-all shrink-0 px-4"
                   >
                     <CalendarRange className="w-3.5 h-3.5 text-muted-foreground/80" />
-                    {date?.from ? (
-                      date.to ? (
-                        <>{format(date.from, "MMM dd")} – {format(date.to, "MMM dd")}</>
+                    <span>
+                      {date?.from ? (
+                        date.to ? (
+                          <>
+                            {format(date.from, "MMM dd")} –{" "}
+                            {format(date.to, "MMM dd")}
+                          </>
+                        ) : (
+                          format(date.from, "MMM dd")
+                        )
                       ) : (
-                        format(date.from, "MMM dd")
-                      )
-                    ) : (
-                      "Select Dates"
-                    )}
+                        "Select Duration"
+                      )}
+                    </span>
+                    <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5 shrink-0" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 bg-popover border border-border shadow-xl rounded-lg" align="start">
+                <PopoverContent
+                  className="w-auto p-0 bg-popover border border-border shadow-xl rounded-lg"
+                  align="start"
+                >
                   <Calendar
                     mode="range"
                     defaultMonth={date?.from ?? new Date()}
@@ -295,13 +362,13 @@ export function EditTaskDialog({ trigger, task }: EditTaskDialogProps) {
               placeholder="Add details, notes or description..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="min-h-[140px] text-sm bg-muted/10 border border-border/80 rounded-lg focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary resize-none placeholder:text-muted-foreground/40 p-3 leading-relaxed"
+              className="min-h-[140px] text-sm bg-neutral-50 dark:bg-neutral-900 border border-border/80 rounded-lg focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary resize-none placeholder:text-muted-foreground/40 p-3 leading-relaxed"
             />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-3 bg-muted/10">
+        <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-3 bg-neutral-100 dark:bg-neutral-950">
           <Button
             variant="ghost"
             onClick={() => setOpen(false)}

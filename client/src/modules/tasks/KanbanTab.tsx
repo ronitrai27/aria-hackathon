@@ -356,7 +356,25 @@ export const KanbanTab = ({ tasks }: KanbanTabProps) => {
   );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const updateTask = useMutation((api as any).tasks.updateTask);
+  const updateTask = useMutation((api as any).tasks.updateTask).withOptimisticUpdate(
+    (localStore, args) => {
+      const currentTasks = localStore.getQuery((api as any).tasks.getTasks) as Task[] | undefined;
+
+      if (currentTasks !== undefined) {
+        const updated = currentTasks.map((task) =>
+          task._id === args.id
+            ? {
+                ...task,
+                status: args.status !== undefined ? args.status : task.status,
+                updatedAt: Date.now(),
+              }
+            : task,
+        );
+
+        localStore.setQuery((api as any).tasks.getTasks, {}, updated);
+      }
+    }
+  );
 
   const toggleColumn = (status: string) => {
     setCollapsedColumns((prev) => {
@@ -401,12 +419,15 @@ export const KanbanTab = ({ tasks }: KanbanTabProps) => {
 
     const task = tasks.find((t) => t._id === activeTaskId);
     if (task && newStatus && task.status !== newStatus) {
-      try {
-        await updateTask({ id: task._id as Id<"tasks">, status: newStatus });
-        toast.success(`Moved to ${STATUS_CONFIG[newStatus].label}`);
-      } catch {
-        toast.error("Failed to update status");
-      }
+      toast.promise(
+        updateTask({ id: task._id as Id<"tasks">, status: newStatus }),
+        {
+          loading: "Updating status...",
+          success: `Moved to ${STATUS_CONFIG[newStatus].label}`,
+          error: (err: any) =>
+            err.data?.message || err.message || "Failed to update status",
+        }
+      );
     }
 
     setActiveTask(null);
