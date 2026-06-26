@@ -108,3 +108,27 @@ export const toggleConnector = mutation({
     return nextConnecters;
   },
 });
+
+/**
+ * Atomically replace the full connecters list.
+ * Used by ConnectorDropdown to sync Composio → Convex in one mutation.
+ */
+export const setConnectors = mutation({
+  args: { names: v.array(v.string()) },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("id", identity.subject))
+      .unique();
+    if (!user) {
+      throw new Error("User not found");
+    }
+    await ctx.db.patch(user._id, { connecters: args.names });
+    return args.names;
+  },
+});
+

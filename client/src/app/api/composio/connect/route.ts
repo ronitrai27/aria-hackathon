@@ -1,6 +1,25 @@
 import { Composio } from "@composio/core";
 import { NextResponse } from "next/server";
 
+// ─── Canonical slug map ────────────────────────────────────────────────────────
+// Maps display names (from ConnectorDropdown) → Composio toolkit slugs
+const SLUG_MAP: Record<string, string> = {
+  calendar: "googlecalendar",
+  "google meet": "googlemeet",
+  "google docs": "googledocs",
+  "google sheets": "googlesheets",
+  "hacker news": "hackernews",
+  hubspot: "hubspot",
+  linkedin: "linkedin",
+  typeform: "typeform",
+  youtube: "youtube",
+};
+
+export function toComposioSlug(appName: string): string {
+  const key = appName.toLowerCase().trim();
+  return SLUG_MAP[key] ?? key.replace(/\s+/g, ""); // fallback: strip spaces
+}
+
 export async function POST(request: Request) {
   try {
     const { userId, appName } = await request.json();
@@ -20,13 +39,25 @@ export async function POST(request: Request) {
     }
 
     const client = new Composio({ apiKey });
-    // Normalize app/toolkit slug
-    const toolkitSlug =
-      appName.toLowerCase() === "calendar"
-        ? "googlecalendar"
-        : appName.toLowerCase();
+    const toolkitSlug = toComposioSlug(appName);
 
-    // 1. Find or create the auth config for this toolkit
+    // 1. Check if already connected (active account exists in Composio)
+    const existingAccounts = await client.connectedAccounts.list({
+      userIds: [userId],
+    });
+    const alreadyActive = existingAccounts.items.find((acc) => {
+      const slug =
+        acc.toolkit?.slug ||
+        (typeof acc.toolkit === "string" ? acc.toolkit : "");
+      return slug.toLowerCase() === toolkitSlug && acc.status === "ACTIVE";
+    });
+
+    if (alreadyActive) {
+      // Already connected in Composio — return sentinel so UI syncs Convex DB
+      return NextResponse.json({ alreadyConnected: true });
+    }
+
+    // 2. Find or create the auth config for this toolkit
     const configs = await client.authConfigs.list();
     let configId = "";
     const existingConfig = configs.items.find((c) => {
@@ -45,11 +76,12 @@ export async function POST(request: Request) {
       configId = newConfig.id;
     }
 
-    // 2. Generate redirect link
+    // 3. Generate redirect link (allowMultiple prevents "multiple accounts" error)
     const origin = new URL(request.url).origin;
     const callbackUrl = `${origin}/home/agent`;
     const linkRes = await client.connectedAccounts.link(userId, configId, {
       callbackUrl,
+      allowMultiple: true,
     });
 
     return NextResponse.json({ redirectUrl: linkRes.redirectUrl });

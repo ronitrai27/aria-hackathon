@@ -50,6 +50,18 @@ export function ConnectionDialog() {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
 
+      // Already connected in Composio — just sync Convex DB
+      if (data.alreadyConnected) {
+        if (!connectedApps.includes(appName)) {
+          await toggleConnector({ name: appName });
+        }
+        toast.success(`${appName} is already connected! Synced successfully.`);
+        setIsLoading(false);
+        setStatusText("");
+        closeConnectionDialog();
+        return;
+      }
+
       // Open connection URL
       const win = window.open(data.redirectUrl, "_blank");
       if (!win) {

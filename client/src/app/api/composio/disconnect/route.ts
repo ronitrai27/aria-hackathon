@@ -1,6 +1,24 @@
 import { Composio } from "@composio/core";
 import { NextResponse } from "next/server";
 
+// ─── Slug map (same as connect route) ─────────────────────────────────────────
+const SLUG_MAP: Record<string, string> = {
+  calendar: "googlecalendar",
+  "google meet": "googlemeet",
+  "google docs": "googledocs",
+  "google sheets": "googlesheets",
+  "hacker news": "hackernews",
+  hubspot: "hubspot",
+  linkedin: "linkedin",
+  typeform: "typeform",
+  youtube: "youtube",
+};
+
+function toComposioSlug(appName: string): string {
+  const key = appName.toLowerCase().trim();
+  return SLUG_MAP[key] ?? key.replace(/\s+/g, "");
+}
+
 export async function POST(request: Request) {
   try {
     const { userId, appName } = await request.json();
@@ -20,11 +38,7 @@ export async function POST(request: Request) {
     }
 
     const client = new Composio({ apiKey });
-    // Normalize app/toolkit slug
-    const toolkitSlug =
-      appName.toLowerCase() === "calendar"
-        ? "googlecalendar"
-        : appName.toLowerCase();
+    const toolkitSlug = toComposioSlug(appName);
 
     // 1. List accounts for the user and toolkit
     const accounts = await client.connectedAccounts.list({
@@ -32,7 +46,7 @@ export async function POST(request: Request) {
       toolkitSlugs: [toolkitSlug],
     });
 
-    // 2. Delete all active/matching connected accounts
+    // 2. Delete all matching connected accounts
     let deletedAny = false;
     for (const account of accounts.items) {
       await client.connectedAccounts.delete(account.id);

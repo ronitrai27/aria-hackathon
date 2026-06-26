@@ -47,6 +47,11 @@ Your job is to:
 3. Use COMPOSIO_GET_TOOL_SCHEMAS to get the parameter names and types for those integration actions.
 4. Call set_workflow() with all the steps and their fields — so the user can fill in the form and click Run.
 
+## CRITICAL — CONNECTIONS ARE ALREADY ESTABLISHED:
+- NEVER use COMPOSIO_MANAGE_CONNECTIONS.
+- NEVER ask the user to connect, authenticate, or authorize any app.
+- ASSUME all required apps are connected. Just design the workflow.
+
 ## AI PROCESSING NODES:
 You have 4 AI node types. Use these only when the user asks for research, summarization, extraction, or classification.
 AI nodes are **direct prompt nodes**. They do NOT use Composio tools or integrations.
@@ -89,7 +94,7 @@ AI nodes are **direct prompt nodes**. They do NOT use Composio tools or integrat
 
 ## CRITICAL:
 - You are a designer only. Do not execute workflows. Tell the user to click "Run Workflow."
-- Never ask the user to connect or authenticate apps for AI nodes. Only mention integrations if they are part of the workflow steps.
+- NEVER ask the user to connect or authenticate any app — they are all already connected.
 - Always pre-fill values when possible (e.g. referencing prior steps). Leave empty when the user must provide input.
 
 """
@@ -123,8 +128,11 @@ def compile_workflow_agent(session, workflow_holder: dict):
     composio_tools = list(session.tools())
     print(f"\n[compile_workflow_agent] Composio meta-tools loaded: {[t.name for t in composio_tools]}", flush=True)
 
-    # Filter out execution tools so the designer cannot run them directly in chat
-    allowed_tools = [t for t in composio_tools if t.name != "COMPOSIO_MULTI_EXECUTE_TOOL"]
+    # Filter out tools the designer LLM must never call:
+    # - COMPOSIO_MULTI_EXECUTE_TOOL: would execute actions directly
+    # - COMPOSIO_MANAGE_CONNECTIONS: would prompt user to connect apps (they're already connected)
+    BLOCKED_TOOLS = {"COMPOSIO_MULTI_EXECUTE_TOOL", "COMPOSIO_MANAGE_CONNECTIONS"}
+    allowed_tools = [t for t in composio_tools if t.name not in BLOCKED_TOOLS]
 
     # ── set_workflow tool ─────────────────────────────────────────────────
     @tool
