@@ -105,14 +105,15 @@ export default function WorkflowsPage() {
   // Toggle single selection
   const handleToggleSelect = (id: string) => {
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
   };
 
   // Toggle select all on current page
   const handleToggleSelectAll = () => {
     const pageIds = paginatedWorkflows.map((w) => w._id);
-    const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id));
+    const allSelected =
+      pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id));
     if (allSelected) {
       setSelectedIds((prev) => prev.filter((id) => !pageIds.includes(id)));
     } else {
@@ -131,14 +132,14 @@ export default function WorkflowsPage() {
     if (!selectedIds.length) return;
     if (
       !confirm(
-        `Are you sure you want to delete ${selectedIds.length} selected workflow(s)?`
+        `Are you sure you want to delete ${selectedIds.length} selected workflow(s)?`,
       )
     )
       return;
 
     let successCount = 0;
     let failCount = 0;
-    
+
     for (const id of selectedIds) {
       try {
         await deleteWorkflow({ id: id as any });
@@ -453,13 +454,15 @@ export default function WorkflowsPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-sm">
             <thead>
-              <tr className="border-b bg-gray-50/50 dark:bg-gray-900/30 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <tr className="border-b bg-gray-50 text-sm font-medium">
                 <th className="py-4 px-4 w-12 text-center">
                   <Checkbox
                     className="rounded"
                     checked={
                       paginatedWorkflows.length > 0 &&
-                      paginatedWorkflows.every((w) => selectedIds.includes(w._id))
+                      paginatedWorkflows.every((w) =>
+                        selectedIds.includes(w._id),
+                      )
                     }
                     onCheckedChange={handleToggleSelectAll}
                   />
@@ -546,11 +549,11 @@ export default function WorkflowsPage() {
                           <div
                             className={`p-2.5 rounded-lg flex items-center justify-center shrink-0 ${bgClass}`}
                           >
-                            <IconComponent className="h-5 w-5" />
+                            <IconComponent className="h-5 w-5 text-black!" />
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-semibold text-foreground text-sm hover:underline cursor-pointer">
+                              <span className="capitalize text-foreground text-sm hover:underline cursor-pointer">
                                 {w.name}
                               </span>
                               <span
@@ -563,16 +566,11 @@ export default function WorkflowsPage() {
                                 {isWorkflowActive ? "Active" : "Draft"}
                               </span>
                             </div>
-                            {w.description && (
-                              <p className="text-xs text-muted-foreground mt-0.5 max-w-sm truncate">
-                                {w.description}
-                              </p>
-                            )}
                           </div>
                         </div>
                       </td>
                       <td className="py-4 px-4 text-center">
-                        <span className="inline-flex items-center justify-center bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-400 text-xs font-semibold px-2 py-1 rounded-md min-w-[28px]">
+                        <span className="inline-flex items-center justify-center bg-neutral-100 text-black text-xs font-medium px-2 py-1 rounded border min-w-[28px]">
                           {w.structure?.nodes?.length || 0}
                         </span>
                       </td>
@@ -608,7 +606,7 @@ export default function WorkflowsPage() {
                               {isWorkflowActive ? "Active" : "Draft"}
                             </span>
                             <Switch
-                              size="sm"
+                              size="default"
                               checked={isWorkflowActive}
                               onCheckedChange={() =>
                                 handleToggleStatus(w._id, w.status || "draft")

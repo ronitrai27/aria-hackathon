@@ -173,7 +173,7 @@ export default function HomePage() {
       />
 
       {/* ── Browser Activity Recap & Standup ── */}
-      <BrowserRecapSection />
+      {/* <BrowserRecapSection /> */}
     </div>
   );
 }
