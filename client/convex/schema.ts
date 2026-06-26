@@ -111,13 +111,22 @@ export default defineSchema({
     name: v.string(),
     description: v.optional(v.string()),
     isStarred: v.boolean(),
+    status: v.optional(v.union(v.literal("active"), v.literal("draft"))),
     structure: v.object({
       nodes: v.array(v.any()),
       edges: v.array(v.any()),
     }),
+    lastRun: v.optional(v.number()), // timestamp of last execution
+    scheduled: v.optional(
+      v.object({
+        time: v.string(),      // e.g. "09:00"
+        frequency: v.string(), // "once" | "daily" | "weekly" | "monthly"
+      }),
+    ),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_user_starred", ["userId", "isStarred"]),
+    .index("by_user_starred", ["userId", "isStarred"])
+    .index("by_user_status", ["userId", "status"]),
 });

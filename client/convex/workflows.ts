@@ -9,6 +9,7 @@ export const saveWorkflow = mutation({
   args: {
     name: v.string(),
     description: v.optional(v.string()),
+    status: v.optional(v.union(v.literal("active"), v.literal("draft"))),
     structure: v.object({
       nodes: v.array(v.any()),
       edges: v.array(v.any()),
@@ -21,7 +22,6 @@ export const saveWorkflow = mutation({
     }
     const userId = identity.subject;
 
-    // Find if user already has a workflow with this exact name
     const existing = await ctx.db
       .query("workflows")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -33,6 +33,7 @@ export const saveWorkflow = mutation({
       await ctx.db.patch(existing._id, {
         structure: args.structure,
         description: args.description || existing.description,
+        status: args.status ?? existing.status,
         updatedAt: now,
       });
       return existing._id;
@@ -42,6 +43,7 @@ export const saveWorkflow = mutation({
         name: args.name,
         description: args.description || "",
         isStarred: false,
+        status: args.status ?? "draft",
         structure: args.structure,
         createdAt: now,
         updatedAt: now,
@@ -60,13 +62,9 @@ export const toggleStar = mutation({
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Unauthorized");
-    }
+    if (!identity) throw new Error("Unauthorized");
     const workflow = await ctx.db.get(args.id);
-    if (!workflow) {
-      throw new Error("Workflow not found");
-    }
+    if (!workflow) throw new Error("Workflow not found");
     const nextStarred = !workflow.isStarred;
     await ctx.db.patch(args.id, {
       isStarred: nextStarred,
@@ -86,13 +84,9 @@ export const renameWorkflow = mutation({
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Unauthorized");
-    }
+    if (!identity) throw new Error("Unauthorized");
     const workflow = await ctx.db.get(args.id);
-    if (!workflow) {
-      throw new Error("Workflow not found");
-    }
+    if (!workflow) throw new Error("Workflow not found");
     await ctx.db.patch(args.id, {
       name: args.name.trim() || workflow.name,
       updatedAt: Date.now(),
@@ -101,15 +95,58 @@ export const renameWorkflow = mutation({
 });
 
 /**
- * Fetch all workflows for the authenticated user
+ * Record the timestamp of the most recent run for a workflow.
+ * Also marks the workflow as "active".
+ */
+export const updateLastRun = mutation({
+  args: {
+    id: v.id("workflows"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const workflow = await ctx.db.get(args.id);
+    if (!workflow) throw new Error("Workflow not found");
+    await ctx.db.patch(args.id, {
+      lastRun: Date.now(),
+      status: "active",
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * Save the schedule configuration (time + repeat frequency) for a workflow.
+ */
+export const updateSchedule = mutation({
+  args: {
+    id: v.id("workflows"),
+    time: v.string(),      // e.g. "09:00"
+    frequency: v.string(), // "once" | "daily" | "weekly" | "monthly"
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const workflow = await ctx.db.get(args.id);
+    if (!workflow) throw new Error("Workflow not found");
+    await ctx.db.patch(args.id, {
+      scheduled: {
+        time: args.time,
+        frequency: args.frequency,
+      },
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * Fetch all workflows for the authenticated user (newest first)
  */
 export const getWorkflows = query({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return [];
-    }
+    if (!identity) return [];
     return await ctx.db
       .query("workflows")
       .withIndex("by_user", (q) => q.eq("userId", identity.subject))

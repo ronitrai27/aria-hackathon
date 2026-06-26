@@ -1,125 +1,146 @@
 "use client";
 
-import { AlertCircle, Plus, Zap } from "lucide-react";
-import * as React from "react";
+import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  type ComposioAction,
-  StepPopover,
-} from "@/modules/workflows/components/StepPopover";
 
 export default function WorkflowsPage() {
-  const [isPopoverOpen, setIsPopoverOpen] = React.useState(false);
-  const [selectedAction, setSelectedAction] = React.useState<{
-    appName: string;
-    action: ComposioAction;
-  } | null>(null);
-
-  const handleSelectAction = (appName: string, action: ComposioAction) => {
-    setSelectedAction({ appName, action });
-  };
+  const router = useRouter();
 
   return (
-    <div className="relative h-[calc(100vh-8rem)] w-full overflow-hidden rounded-2xl border border-border bg-neutral-50 dark:bg-zinc-950 flex flex-col items-center justify-center p-6">
-      {/* Grid Canvas Background Pattern */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:20px_20px] dark:bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] pointer-events-none" />
+    <div className="space-y-6">
+      {/* ── Page header ─────────────────────────────────────── */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold text-foreground">Workflows</h1>
+        <Button
+          className="gap-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg px-4 h-9 font-semibold shadow-sm"
+          onClick={() => router.push("/home/agent")}
+        >
+          <Plus className="h-4 w-4" />
+          Create Workflow
+        </Button>
+      </div>
 
-      {/* Main Canvas Interface */}
-      <div className="relative z-10 flex flex-col items-center max-w-md w-full">
-        {/* Trigger Box Container */}
-        <div className="w-full bg-white dark:bg-zinc-900 border border-neutral-200 dark:border-zinc-800/80 rounded-2xl shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md">
-          {/* Header */}
-          <div className="px-5 py-3.5 border-b border-neutral-100 dark:border-zinc-800/60 bg-neutral-50/50 dark:bg-zinc-900/30 flex items-center justify-between">
-            <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-              {selectedAction ? "Instant Trigger" : "Trigger"}
-            </span>
-            {selectedAction && (
-              <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            )}
-          </div>
-
-          {/* Body */}
-          <div className="p-8 flex flex-col items-center justify-center min-h-[140px]">
-            {selectedAction ? (
-              <div className="flex flex-col items-center text-center gap-3 w-full">
-                <div className="h-12 w-12 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/40 flex items-center justify-center text-purple-600 dark:text-purple-400 shadow-xs">
-                  <Zap className="h-6 w-6" />
-                </div>
-                <div className="space-y-1">
-                  <h4 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-                    {selectedAction.appName} — {selectedAction.action.name}
-                  </h4>
-                  <p className="text-[11px] text-muted-foreground max-w-xs leading-normal">
-                    {selectedAction.action.description}
-                  </p>
-                </div>
-
-                {/* Trigger selection for editing/changing */}
-                <StepPopover
-                  isOpen={isPopoverOpen}
-                  onClose={() => setIsPopoverOpen(false)}
-                  onSelectAction={handleSelectAction}
-                  trigger={
-                    <Button
-                      onClick={() => setIsPopoverOpen(true)}
-                      variant="ghost"
-                      className="mt-2 text-xs h-8 text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-zinc-800/60 rounded-lg cursor-pointer"
-                    >
-                      Change trigger
-                    </Button>
-                  }
-                />
-              </div>
-            ) : (
-              /* Trigger selection when empty */
-              <StepPopover
-                isOpen={isPopoverOpen}
-                onClose={() => setIsPopoverOpen(false)}
-                onSelectAction={handleSelectAction}
-                trigger={
-                  <Button
-                    onClick={() => setIsPopoverOpen(true)}
-                    className="h-11 px-5 gap-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs shadow-sm hover:shadow transition-all hover:scale-[1.01] cursor-pointer"
-                  >
-                    <Plus className="h-4 w-4 shrink-0" />
-                    Add trigger
-                  </Button>
-                }
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Visual Connector Line + StepPopover triggers */}
-        {selectedAction && (
-          <>
-            <div className="h-10 w-0.5 bg-blue-500 dark:bg-blue-600/80 my-0.5 animate-pulse" />
-            <StepPopover
-              isOpen={isPopoverOpen}
-              onClose={() => setIsPopoverOpen(false)}
-              onSelectAction={handleSelectAction}
-              trigger={
-                <button
-                  onClick={() => setIsPopoverOpen(true)}
-                  type="button"
-                  className="h-9 w-9 rounded-full bg-white dark:bg-zinc-900 border border-neutral-200 dark:border-zinc-800 flex items-center justify-center shadow-sm hover:shadow hover:scale-105 transition-all text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200 group cursor-pointer"
-                  title="Add next step"
-                >
-                  <Plus className="h-4 w-4 group-hover:rotate-90 transition-transform duration-200" />
-                </button>
-              }
-            />
-          </>
-        )}
-
-        {/* Help Banner */}
-        <div className="mt-8 flex items-start gap-2.5 p-3.5 rounded-xl border border-amber-200/50 bg-amber-50/20 dark:border-amber-950/20 dark:bg-amber-950/5 text-left max-w-xs">
-          <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-          <p className="text-[10px] text-amber-800 dark:text-amber-300 leading-normal">
-            Click <strong>Add trigger</strong> to view the categories list,
-            search apps, choose integrations, and browse supported actions.
+      {/* ── Hero banner ─────────────────────────────────────── */}
+      <div className="relative overflow-hidden rounded-2xl bg-[#f0eeff] border border-violet-100 px-8 py-7 flex items-center justify-between min-h-[160px]">
+        {/* Left — text + CTAs */}
+        <div className="relative z-10 max-w-sm space-y-3">
+          <h2 className="text-2xl font-bold text-gray-900 leading-snug">
+            Automate. Orchestrate. Elevate.
+          </h2>
+          <p className="text-sm text-gray-500 leading-relaxed">
+            Build powerful workflows that connect your apps,
+            <br />
+            agents, and data — all in one place.
           </p>
+          <div className="flex items-center gap-3 pt-1">
+            <Button
+              className="bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold px-4 h-9 rounded-lg shadow-sm"
+              onClick={() => router.push("/home/agent")}
+            >
+              Create your first workflow
+            </Button>
+            <Button
+              variant="outline"
+              className="bg-white border-gray-200 text-gray-700 text-sm font-semibold px-4 h-9 rounded-lg hover:bg-gray-50"
+            >
+              Explore templates
+            </Button>
+          </div>
         </div>
+
+        {/* Right — decorative flow diagram */}
+        <div className="relative flex items-center gap-0 mr-4 select-none">
+          {/* SVG dashed connector lines */}
+          <svg
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            viewBox="0 0 380 120"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            {/* line: bolt → robot */}
+            <path
+              d="M 72 60 C 100 60, 110 60, 160 60"
+              stroke="#c4b5fd"
+              strokeWidth="2"
+              strokeDasharray="5 4"
+              strokeLinecap="round"
+            />
+            {/* line: robot → database */}
+            <path
+              d="M 218 60 C 248 60, 258 60, 298 60"
+              stroke="#c4b5fd"
+              strokeWidth="2"
+              strokeDasharray="5 4"
+              strokeLinecap="round"
+            />
+            {/* line: database → check */}
+            <path
+              d="M 346 60 C 356 85, 360 95, 370 95"
+              stroke="#c4b5fd"
+              strokeWidth="2"
+              strokeDasharray="5 4"
+              strokeLinecap="round"
+            />
+            {/* small sparkle dots */}
+            <circle cx="125" cy="90" r="3" fill="#a78bfa" opacity="0.5" />
+            <circle cx="270" cy="90" r="3" fill="#a78bfa" opacity="0.5" />
+          </svg>
+
+          {/* Node: Lightning bolt */}
+          <div className="relative z-10 h-14 w-14 rounded-2xl bg-white shadow-md flex items-center justify-center">
+            <svg viewBox="0 0 24 24" className="h-7 w-7 text-violet-500 fill-violet-500">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9z" />
+            </svg>
+          </div>
+
+          <div className="w-20" />
+
+          {/* Node: Robot / AI agent */}
+          <div className="relative z-10 h-14 w-14 rounded-2xl bg-white shadow-md flex items-center justify-center">
+            <svg viewBox="0 0 24 24" className="h-7 w-7 text-gray-700 fill-gray-700">
+              <rect x="5" y="8" width="14" height="9" rx="2" />
+              <circle cx="9" cy="12" r="1.5" fill="white" />
+              <circle cx="15" cy="12" r="1.5" fill="white" />
+              <rect x="8" y="15" width="8" height="1.5" rx="0.75" fill="white" />
+              <rect x="10.5" y="5" width="3" height="3" rx="0.5" />
+              <line x1="12" y1="5" x2="12" y2="8" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+          </div>
+
+          <div className="w-20" />
+
+          {/* Node: Database */}
+          <div className="relative z-10 h-14 w-14 rounded-2xl bg-white shadow-md flex items-center justify-center">
+            <svg viewBox="0 0 24 24" className="h-7 w-7 text-blue-400 fill-blue-400">
+              <ellipse cx="12" cy="5" rx="8" ry="3" />
+              <path d="M4 5v4c0 1.66 3.58 3 8 3s8-1.34 8-3V5" />
+              <path d="M4 9v4c0 1.66 3.58 3 8 3s8-1.34 8-3V9" />
+              <path d="M4 13v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4" />
+            </svg>
+          </div>
+
+          <div className="w-8" />
+
+          {/* Node: Check (success) — offset lower-right */}
+          <div className="relative z-10 h-9 w-9 rounded-full bg-green-500 shadow-md flex items-center justify-center self-end mb-1">
+            <svg viewBox="0 0 24 24" className="h-5 w-5 text-white stroke-white fill-none" strokeWidth="3">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Subtle dot-grid background pattern */}
+        <div
+          className="absolute inset-0 opacity-30 pointer-events-none"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle, #a78bfa 1px, transparent 1px)",
+            backgroundSize: "22px 22px",
+            maskImage:
+              "radial-gradient(ellipse 60% 80% at 70% 50%, black 0%, transparent 100%)",
+          }}
+        />
       </div>
     </div>
   );
