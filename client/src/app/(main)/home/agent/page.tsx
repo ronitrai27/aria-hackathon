@@ -133,7 +133,11 @@ export default function AgentPage() {
         for (const app of knownApps) {
           // Normalize: "Google Meet" → "googlemeet", "Gmail" → "gmail"
           const normalized = app.toLowerCase().replace(/\s+/g, "");
-          if (normalized === prefix || normalized.startsWith(prefix) || prefix.startsWith(normalized)) {
+          if (
+            normalized === prefix ||
+            normalized.startsWith(prefix) ||
+            prefix.startsWith(normalized)
+          ) {
             found.add(app);
           }
         }
@@ -148,7 +152,11 @@ export default function AgentPage() {
     const summary = (workflowData.nodes || [])
       .filter((n: any) => n.type !== "task_trigger")
       .map((n: any) => {
-        const config = n.data?.ai_config || n.data?.composio_config || n.data?.parameters || {};
+        const config =
+          n.data?.ai_config ||
+          n.data?.composio_config ||
+          n.data?.parameters ||
+          {};
         return `  - ${n.type || "node"}: ${JSON.stringify(config)}`;
       })
       .join("\n");
@@ -165,6 +173,30 @@ export default function AgentPage() {
       ``,
       `User request: ${userRequest}`,
     ].join("\n");
+  }
+
+  function resolvePromptTemplate(prompt: string, allNodes: any[]): string {
+    return prompt.replace(/\{\{step[_\s](\d+)\}\}/g, (match, stepNumStr) => {
+      const stepIdx = parseInt(stepNumStr, 10) - 1;
+      if (stepIdx >= 0 && stepIdx < allNodes.length) {
+        const targetNode = allNodes[stepIdx];
+        const trace = targetNode.data?.traceResult;
+        if (trace) {
+          if (typeof trace === "string") return trace;
+          if (trace.result)
+            return typeof trace.result === "string"
+              ? trace.result
+              : JSON.stringify(trace.result);
+          if (trace.data)
+            return typeof trace.data === "string"
+              ? trace.data
+              : JSON.stringify(trace.data);
+          return JSON.stringify(trace);
+        }
+        return `[Step ${stepNumStr} output not available]`;
+      }
+      return match;
+    });
   }
 
   // Auto-save debounced effect
@@ -306,13 +338,24 @@ export default function AgentPage() {
           `[${new Date().toLocaleTimeString()}] ðŸ”Œ [Composio] Executing ${actionSlug} for user ${user?._id}...`,
         ]);
         try {
+          // Resolve prompt templates inside params
+          const resolvedParams: Record<string, any> = {};
+          for (const key in params) {
+            const value = params[key];
+            if (typeof value === "string") {
+              resolvedParams[key] = resolvePromptTemplate(value, nodes);
+            } else {
+              resolvedParams[key] = value;
+            }
+          }
+
           const res = await fetch("/api/composio/execute", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               userId: user?._id || "user_test",
               actionSlug,
-              arguments: params,
+              arguments: resolvedParams,
             }),
           });
           const result = await res.json();
@@ -406,7 +449,119 @@ export default function AgentPage() {
       return;
     }
 
-    // Default simulation for non-composio nodes
+    if (currentNode.type?.startsWith("ai_")) {
+      const runAINode = async () => {
+        setExecutionLogs((prev) => [
+          ...prev,
+          `[${new Date().toLocaleTimeString()}] 🤖 [AI Node] Executing ${currentNode.type} (${currentNode.data?.label || currentNode.id})...`,
+        ]);
+        try {
+          const resolvedPrompt = resolvePromptTemplate(
+            currentNode.data?.ai_config?.prompt || "",
+            nodes,
+          );
+
+          const res = await fetch("/api/ai-vercel/workflow-trigger", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              role: currentNode.type.replace("ai_", ""),
+              prompt: resolvedPrompt,
+              extraInstructions:
+                currentNode.data?.ai_config?.extra_instructions || "",
+              format: currentNode.data?.ai_config?.format || "rich",
+              provider: currentNode.data?.ai_config?.provider || "openai",
+              citations: currentNode.data?.ai_config?.citations || false,
+            }),
+          });
+          const result = await res.json();
+
+          if (!res.ok || result.error) {
+            throw new Error(result.error || "AI Node Execution failed");
+          }
+
+          // Save traceResult on the node
+          setWorkflowData((prev) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              nodes: prev.nodes.map((n) =>
+                n.id === currentNode.id
+                  ? { ...n, data: { ...n.data, traceResult: result } }
+                  : n,
+              ),
+            };
+          });
+
+          setNodeExecutionStatuses((prev) => ({
+            ...prev,
+            [currentNode.id]: "success",
+          }));
+
+          setExecutionLogs((prev) => [
+            ...prev,
+            `[${new Date().toLocaleTimeString()}] ✅ Step ${currentStepIndex + 1}: ${currentNode.data?.label || currentNode.id} executed successfully.`,
+          ]);
+
+          const nextIndex = currentStepIndex + 1;
+          if (nextIndex < nodes.length) {
+            const nextNode = nodes[nextIndex];
+            setNodeExecutionStatuses((prev) => ({
+              ...prev,
+              [nextNode.id]: "running",
+            }));
+            const appName = nextNode.type === "composio_app" ? "App" : "AI";
+            setExecutionLogs((prev) => [
+              ...prev,
+              `[${new Date().toLocaleTimeString()}] ⚡ Invoking Step ${nextIndex + 1} (${appName}): ${nextNode.data?.label || nextNode.id}...`,
+            ]);
+          }
+          setCurrentStepIndex(nextIndex);
+        } catch (err: any) {
+          console.error("AI Node Execution error:", err);
+
+          // Save traceResult as error
+          setWorkflowData((prev) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              nodes: prev.nodes.map((n) =>
+                n.id === currentNode.id
+                  ? {
+                      ...n,
+                      data: {
+                        ...n.data,
+                        traceResult: {
+                          error: err.message || "Execution failed",
+                        },
+                      },
+                    }
+                  : n,
+              ),
+            };
+          });
+
+          setNodeExecutionStatuses((prev) => ({
+            ...prev,
+            [currentNode.id]: "failed",
+          }));
+
+          setExecutionLogs((prev) => [
+            ...prev,
+            `[${new Date().toLocaleTimeString()}] ❌ Step ${currentStepIndex + 1}: ${currentNode.data?.label || currentNode.id} failed: ${err.message}`,
+          ]);
+
+          // Stop execution on failure
+          setIsWorkflowRunning(false);
+          setCurrentStepIndex(null);
+        }
+      };
+
+      runAINode();
+      return;
+    }
+
+    // Default simulation for non-composio and non-AI nodes
     const timer = setTimeout(() => {
       setNodeExecutionStatuses((prev) => ({
         ...prev,
@@ -576,13 +731,16 @@ export default function AgentPage() {
         onEditCurrent={() => {
           const apps = extractAppsFromWorkflow(workflowData?.nodes ?? []);
           if (apps.length > 0) setSelectedSuggestionApps(apps);
-          
+
           let finalPrompt = "edit this workflow as -> ";
           if (pendingPrompt) {
-            const cleanPrompt = pendingPrompt.replace(/^(edit this workflow as ->|edit this workflow as|edit this worklow as ->|edit this worklow as)\s*/i, "");
+            const cleanPrompt = pendingPrompt.replace(
+              /^(edit this workflow as ->|edit this workflow as|edit this worklow as ->|edit this worklow as)\s*/i,
+              "",
+            );
             finalPrompt += cleanPrompt;
           }
-          
+
           setInputVal(finalPrompt);
           setIsEditingWorkflow(true);
           setShowWorkflowChoice(false);
@@ -600,7 +758,10 @@ export default function AgentPage() {
           setInputVal("");
           sendMessage(pendingPrompt);
         }}
-        onClose={() => { setShowWorkflowChoice(false); setPendingPrompt(""); }}
+        onClose={() => {
+          setShowWorkflowChoice(false);
+          setPendingPrompt("");
+        }}
       />
       {/* Global CSS overrides for Allotment dividers and custom morph animations */}
       <style>{`
@@ -783,7 +944,6 @@ export default function AgentPage() {
                   Agent
                 </button>
               </div>
-
 
               <div
                 className={`relative w-full bg-muted/30 border border-border rounded-2xl focus-within:border-ring/50 focus-within:ring-2 focus-within:ring-ring/15 transition-all shadow-sm ${
@@ -1269,13 +1429,16 @@ export default function AgentPage() {
               if (activeMode === "brain") setActiveMode("agent");
               const apps = extractAppsFromWorkflow(workflowData?.nodes ?? []);
               if (apps.length > 0) setSelectedSuggestionApps(apps);
-              
+
               let finalPrompt = "edit this workflow as -> ";
               if (text) {
-                const cleanPrompt = text.replace(/^(edit this workflow as ->|edit this workflow as|edit this worklow as ->|edit this worklow as)\s*/i, "");
+                const cleanPrompt = text.replace(
+                  /^(edit this workflow as ->|edit this workflow as|edit this worklow as ->|edit this worklow as)\s*/i,
+                  "",
+                );
                 finalPrompt += cleanPrompt;
               }
-              
+
               setInputVal(finalPrompt);
               setIsEditingWorkflow(true);
               setTimeout(() => {

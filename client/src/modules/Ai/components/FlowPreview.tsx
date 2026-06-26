@@ -53,6 +53,7 @@ interface FlowPreviewProps {
   activeTab?: "editor" | "runs";
   isRunning?: boolean;
   nodeStatuses?: Record<string, "pending" | "running" | "success" | "failed">;
+  nodeExecutionDurations?: Record<string, number>;
 }
 
 const AI_MODELS = [
@@ -855,22 +856,25 @@ function AINode({ data }: { data: any }) {
             </span>
           </div>
           {data.isRunsTab ? (
-            data.isSimulationActive ? (
-              <div className="h-6 w-6 flex items-center justify-center shrink-0">
-                {data.status === "running" && (
-                  <Loader2 className="h-3.5 w-3.5 text-blue-600 animate-spin" />
-                )}
-                {data.status === "success" && (
-                  <Check className="h-3.5 w-3.5 text-emerald-600 font-bold" />
-                )}
-                {data.status === "failed" && (
-                  <X className="h-3.5 w-3.5 text-red-600 font-bold" />
-                )}
-                {data.status === "pending" && (
-                  <div className="h-1.5 w-1.5 rounded-full bg-white/40" />
-                )}
-              </div>
-            ) : null
+            <div className="h-6 flex items-center gap-1.5 justify-end shrink-0">
+              {data.duration !== undefined && data.status !== "pending" && (
+                <span className={`text-[10px] font-mono text-neutral-700 ${data.status === "running" ? "animate-pulse" : ""}`}>
+                  {data.duration}s
+                </span>
+              )}
+              {data.status === "running" && (
+                <Loader2 className="h-3.5 w-3.5 text-blue-600 animate-spin" />
+              )}
+              {data.status === "success" && (
+                <Check className="h-3.5 w-3.5 text-emerald-600 font-bold" />
+              )}
+              {data.status === "failed" && (
+                <X className="h-3.5 w-3.5 text-red-600 font-bold" />
+              )}
+              {data.status === "pending" && (
+                <div className="h-1.5 w-1.5 rounded-full bg-white/40" />
+              )}
+            </div>
           ) : (
             <Button
               type="button"
@@ -894,23 +898,42 @@ function AINode({ data }: { data: any }) {
           <span className="text-[10px] text-blue-700 bg-blue-200/50 border border-blue-300 px-2 py-0.5 rounded-md font-medium truncate max-w-[130px]">
             {typeTag}
           </span>
-          <div className="flex items-center gap-1 text-[10px] text-blue-700 font-medium">
-            Model: {data.ai_config?.model || "gpt-4.1-nano"}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 text-[10px] text-blue-700 font-medium">
+              Model: {data.ai_config?.model || "gpt-4.1-nano"}
+            </div>
+            {data.isRunsTab && data.traceResult && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant={"outline"}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-[10px] h-6 px-2 bg-white/85 text-blue-700 border-blue-300/40 hover:bg-white flex items-center gap-1 cursor-pointer"
+                  >
+                    Trace Result <Eye className="size-3" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-96 p-4 rounded-xl border border-neutral-200 bg-white shadow-xl z-[9999]"
+                  align="end"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <span className="font-semibold text-xs text-neutral-900">
+                        Execution Trace Result
+                      </span>
+                    </div>
+                    <pre className="text-[10px] bg-neutral-50 p-2.5 rounded-lg border border-neutral-200 overflow-x-auto overflow-y-auto max-h-60 font-mono text-neutral-800 leading-relaxed max-w-full whitespace-pre-wrap">
+                      {JSON.stringify(data.traceResult, null, 2)}
+                    </pre>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
         </div>
-        {data.isRunsTab &&
-          data.errors &&
-          data.errors.length > 0 &&
-          !data.isSimulationActive && (
-            <div className="mt-2.5 pt-2 border-t border-white/20 text-[10px] text-red-700 flex flex-col gap-1">
-              {data.errors.map((err: string, i: number) => (
-                <span key={i} className="flex items-center gap-1 font-medium">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-600" />
-                  {err}
-                </span>
-              ))}
-            </div>
-          )}
         <Handle
           type="source"
           position={Position.Bottom}
@@ -938,22 +961,25 @@ function AINode({ data }: { data: any }) {
           </span>
         </div>
         {data.isRunsTab ? (
-          data.isSimulationActive ? (
-            <div className="h-6 w-6 flex items-center justify-center shrink-0">
-              {data.status === "running" && (
-                <Loader2 className="h-3.5 w-3.5 text-blue-600 animate-spin" />
-              )}
-              {data.status === "success" && (
-                <Check className="h-3.5 w-3.5 text-emerald-600 font-bold" />
-              )}
-              {data.status === "failed" && (
-                <X className="h-3.5 w-3.5 text-red-600 font-bold" />
-              )}
-              {data.status === "pending" && (
-                <div className="h-1.5 w-1.5 rounded-full bg-neutral-300" />
-              )}
-            </div>
-          ) : null
+          <div className="h-6 flex items-center gap-1.5 justify-end shrink-0">
+            {data.duration !== undefined && data.status !== "pending" && (
+              <span className={`text-[10px] font-mono text-neutral-700 ${data.status === "running" ? "animate-pulse" : ""}`}>
+                {data.duration}s
+              </span>
+            )}
+            {data.status === "running" && (
+              <Loader2 className="h-3.5 w-3.5 text-blue-600 animate-spin" />
+            )}
+            {data.status === "success" && (
+              <Check className="h-3.5 w-3.5 text-emerald-600 font-bold" />
+            )}
+            {data.status === "failed" && (
+              <X className="h-3.5 w-3.5 text-red-600 font-bold" />
+            )}
+            {data.status === "pending" && (
+              <div className="h-1.5 w-1.5 rounded-full bg-neutral-300" />
+            )}
+          </div>
         ) : (
           <Button
             type="button"
@@ -977,23 +1003,42 @@ function AINode({ data }: { data: any }) {
         <span className="text-[10px] text-neutral-700 bg-neutral-200/60 border border-neutral-300 px-2 py-0.5 rounded-md font-medium truncate max-w-[130px]">
           {typeTag}
         </span>
-        <div className="flex items-center gap-1 text-[10px] text-neutral-500">
-          Model: {data.ai_config?.model || "gpt-4.1-nano"}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 text-[10px] text-neutral-500">
+            Model: {data.ai_config?.model || "gpt-4.1-nano"}
+          </div>
+          {data.isRunsTab && data.traceResult && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant={"outline"}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-[10px] h-6 px-2 cursor-pointer flex items-center gap-1"
+                >
+                  Trace Result <Eye className="size-3" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-96 p-4 rounded-xl border border-neutral-200 bg-white shadow-xl z-[9999]"
+                align="end"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <span className="font-semibold text-xs text-neutral-900">
+                      Execution Trace Result
+                    </span>
+                  </div>
+                  <pre className="text-[10px] bg-neutral-50 p-2.5 rounded-lg border border-neutral-200 overflow-x-auto overflow-y-auto max-h-60 font-mono text-neutral-800 leading-relaxed max-w-full whitespace-pre-wrap">
+                    {JSON.stringify(data.traceResult, null, 2)}
+                  </pre>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
       </div>
-      {data.isRunsTab &&
-        data.errors &&
-        data.errors.length > 0 &&
-        !data.isSimulationActive && (
-          <div className="mt-2.5 pt-2 border-t border-neutral-200 text-[10px] text-red-600 flex flex-col gap-1.5">
-            {data.errors.map((err: string, i: number) => (
-              <span key={i} className="flex items-center gap-1 font-medium">
-                <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-500" />
-                {err}
-              </span>
-            ))}
-          </div>
-        )}
       <Handle
         type="target"
         position={Position.Top}
@@ -1043,22 +1088,25 @@ function AppNode({ data }: { data: any }) {
             <span className="text-sm font-semibold uppercase">{appName}</span>
           </div>
           {data.isRunsTab ? (
-            data.isSimulationActive ? (
-              <div className="h-6 w-6 flex items-center justify-center shrink-0">
-                {data.status === "running" && (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                )}
-                {data.status === "success" && (
-                  <Check className="h-3.5 w-3.5 font-bold" />
-                )}
-                {data.status === "failed" && (
-                  <X className="h-3.5 w-3.5 font-bold" />
-                )}
-                {data.status === "pending" && (
-                  <div className="h-1.5 w-1.5 rounded-full bg-white/40" />
-                )}
-              </div>
-            ) : null
+            <div className="h-6 flex items-center gap-1.5 justify-end shrink-0">
+              {data.duration !== undefined && data.status !== "pending" && (
+                <span className={`text-[10px] font-mono text-neutral-700 ${data.status === "running" ? "animate-pulse" : ""}`}>
+                  {data.duration}s
+                </span>
+              )}
+              {data.status === "running" && (
+                <Loader2 className="h-3.5 w-3.5 text-blue-600 animate-spin" />
+              )}
+              {data.status === "success" && (
+                <Check className="h-3.5 w-3.5 text-emerald-600 font-bold" />
+              )}
+              {data.status === "failed" && (
+                <X className="h-3.5 w-3.5 text-red-600 font-bold" />
+              )}
+              {data.status === "pending" && (
+                <div className="h-1.5 w-1.5 rounded-full bg-white/40" />
+              )}
+            </div>
           ) : (
             <Button
               type="button"
@@ -1176,22 +1224,25 @@ function AppNode({ data }: { data: any }) {
           <span className="text-sm font-semibold uppercase">{appName}</span>
         </div>
         {data.isRunsTab ? (
-          data.isSimulationActive ? (
-            <div className="h-6 w-6 flex items-center justify-center shrink-0">
-              {data.status === "running" && (
-                <Loader2 className="h-3.5 w-3.5 text-blue-600 animate-spin" />
-              )}
-              {data.status === "success" && (
-                <Check className="h-3.5 w-3.5 text-emerald-600 font-bold" />
-              )}
-              {data.status === "failed" && (
-                <X className="h-3.5 w-3.5 text-red-600 font-bold" />
-              )}
-              {data.status === "pending" && (
-                <div className="h-1.5 w-1.5 rounded-full bg-neutral-300" />
-              )}
-            </div>
-          ) : null
+          <div className="h-6 flex items-center gap-1.5 justify-end shrink-0">
+            {data.duration !== undefined && data.status !== "pending" && (
+              <span className={`text-[10px] font-mono text-neutral-700 ${data.status === "running" ? "animate-pulse" : ""}`}>
+                {data.duration}s
+              </span>
+            )}
+            {data.status === "running" && (
+              <Loader2 className="h-3.5 w-3.5 text-blue-600 animate-spin" />
+            )}
+            {data.status === "success" && (
+              <Check className="h-3.5 w-3.5 text-emerald-600 font-bold" />
+            )}
+            {data.status === "failed" && (
+              <X className="h-3.5 w-3.5 text-red-600 font-bold" />
+            )}
+            {data.status === "pending" && (
+              <div className="h-1.5 w-1.5 rounded-full bg-neutral-300" />
+            )}
+          </div>
         ) : (
           <Button
             type="button"
@@ -1350,6 +1401,7 @@ export default function FlowPreview({
   activeTab = "editor",
   isRunning = false,
   nodeStatuses = {},
+  nodeExecutionDurations = {},
 }: FlowPreviewProps) {
   const [currentRecipes, setCurrentRecipes] = useState<typeof recipes>([]);
   const [localNodes, setLocalNodes] = useState<any[]>([]);
@@ -1372,6 +1424,87 @@ export default function FlowPreview({
       setLocalNodes([]);
     }
   }, [nodes]);
+
+  const [nodeDurations, setNodeDurations] = useState<Record<string, number>>({});
+  const runningNodeIdRef = useRef<string | null>(null);
+  const runningStartTimeRef = useRef<number | null>(null);
+  const prevIsRunningRef = useRef(isRunning);
+
+  // Reset durations when isRunning transitions from false to true (a new run starts)
+  useEffect(() => {
+    if (isRunning && !prevIsRunningRef.current) {
+      setNodeDurations({});
+      runningNodeIdRef.current = null;
+      runningStartTimeRef.current = null;
+    }
+    prevIsRunningRef.current = isRunning;
+  }, [isRunning]);
+
+  // Monitor nodeStatuses changes to start/stop step timers
+  useEffect(() => {
+    if (!isRunning) {
+      // If workflow stopped, compute final duration of the last running node
+      if (runningNodeIdRef.current && runningStartTimeRef.current) {
+        const finalElapsed = (Date.now() - runningStartTimeRef.current) / 1000;
+        const prevId = runningNodeIdRef.current;
+        setNodeDurations((prev) => ({
+          ...prev,
+          [prevId]: Number(finalElapsed.toFixed(1)),
+        }));
+      }
+      runningNodeIdRef.current = null;
+      runningStartTimeRef.current = null;
+      return;
+    }
+
+    // Find the currently running node ID
+    const runningNodeId =
+      Object.keys(nodeStatuses).find((id) => nodeStatuses[id] === "running") ||
+      null;
+
+    if (runningNodeId !== runningNodeIdRef.current) {
+      // Record final elapsed time for previous node
+      if (runningNodeIdRef.current && runningStartTimeRef.current) {
+        const finalElapsed = (Date.now() - runningStartTimeRef.current) / 1000;
+        const prevId = runningNodeIdRef.current;
+        setNodeDurations((prev) => ({
+          ...prev,
+          [prevId]: Number(finalElapsed.toFixed(1)),
+        }));
+      }
+
+      // Start new timer
+      if (runningNodeId) {
+        runningStartTimeRef.current = Date.now();
+        setNodeDurations((prev) => ({
+          ...prev,
+          [runningNodeId]: 0,
+        }));
+      } else {
+        runningStartTimeRef.current = null;
+      }
+      runningNodeIdRef.current = runningNodeId;
+    }
+  }, [nodeStatuses, isRunning]);
+
+  // Interval hook to update active step duration every 100ms
+  useEffect(() => {
+    let interval: any;
+    if (isRunning) {
+      interval = setInterval(() => {
+        const activeId = runningNodeIdRef.current;
+        const startTime = runningStartTimeRef.current;
+        if (activeId && startTime) {
+          const elapsed = (Date.now() - startTime) / 1000;
+          setNodeDurations((prev) => ({
+            ...prev,
+            [activeId]: Number(elapsed.toFixed(1)),
+          }));
+        }
+      }, 100);
+    }
+    return () => clearInterval(interval);
+  }, [isRunning]);
 
   const customNodeTypes = useMemo(
     () => ({
@@ -1423,13 +1556,14 @@ export default function FlowPreview({
           isRunsTab: activeTab === "runs",
           isSimulationActive: isRunning,
           status: nodeStatuses?.[node.id] || "pending",
+          duration: nodeDurations?.[node.id],
           traceResult: node.data?.traceResult,
           errors,
         },
         position: { x: 0, y: index * 160 },
       };
     });
-  }, [localNodes, activeTab, isRunning, nodeStatuses]);
+  }, [localNodes, activeTab, isRunning, nodeStatuses, nodeDurations]);
 
   // Force all edges to use straight type and filter out ones connected to task_trigger
   const renderedEdges = useMemo(() => {
