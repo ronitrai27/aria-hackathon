@@ -3,7 +3,7 @@
 import { Allotment } from "allotment";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "allotment/dist/style.css";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import {
   AlertCircle,
   Bell,
@@ -13,17 +13,13 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
-  FileText,
   Lock,
   MoreHorizontal,
-  PanelRightClose,
-  PanelRightOpen,
   Paperclip,
   Search,
   SendHorizontal,
   Share2,
   Sparkles,
-  Star,
   UserPlus,
   Workflow,
   X,
@@ -42,12 +38,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAgentStore } from "@/hooks/useAgentStore";
 import { connectorIcons, models } from "@/lib/static";
 import { api } from "../../../../../convex/_generated/api";
-import FlowPreview from "../../../../modules/Ai/components/FlowPreview";
+
 import ChatMessageItem, {
   StatusStepper,
 } from "../../../../modules/Ai/components/ChatMessage";
 import { useAgentChat } from "@/hooks/useAgentChat";
 import AgentChatMessages from "./AgentChatMessages";
+import WorkflowPanel from "../../../../modules/workflows/components/WorkflowPanel";
 
 const suggestions = [
   {
@@ -101,6 +98,43 @@ export default function AgentPage() {
     setIsRightOpen,
     sendMessage,
   } = useAgentChat();
+
+  const [isSaving, setIsSaving] = useState(false);
+  const saveWorkflow = useMutation(api.workflows.saveWorkflow);
+
+  // Workflow metadata state (passed down to WorkflowPanel)
+  const [savedWorkflowId, setSavedWorkflowId] = useState<string | null>(null);
+  const [isStarred, setIsStarred] = useState(false);
+  const [workflowTitle, setWorkflowTitle] = useState("Untitled");
+
+  // Auto-save debounced effect
+  useEffect(() => {
+    if (!workflowData || !workflowData.nodes || workflowData.nodes.length === 0)
+      return;
+
+    setIsSaving(true);
+    const delayDebounce = setTimeout(async () => {
+      try {
+        const id = await saveWorkflow({
+          name: workflowTitle,
+          description: "Designed workflow graph",
+          structure: {
+            nodes: workflowData.nodes,
+            edges: workflowData.edges || [],
+          },
+        });
+        if (id && !savedWorkflowId) {
+          setSavedWorkflowId(id as string);
+        }
+      } catch (err) {
+        console.error("Failed to auto-save workflow:", err);
+      } finally {
+        setIsSaving(false);
+      }
+    }, 1000);
+
+    return () => clearTimeout(delayDebounce);
+  }, [workflowData, saveWorkflow]);
 
   const [isWorkflowRunning, setIsWorkflowRunning] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState<number | null>(null);
@@ -166,10 +200,10 @@ export default function AgentPage() {
     setIsWorkflowRunning(true);
     setCurrentStepIndex(0);
     setExecutionLogs([
-      `[${new Date().toLocaleTimeString()}] 🚀 Initiating execution for workflow: Designed Automation Graph`,
-      `[${new Date().toLocaleTimeString()}] 🛡️ Validating security tokens and node credentials...`,
-      `[${new Date().toLocaleTimeString()}] ✅ Security validation complete. All connections authorized.`,
-      `[${new Date().toLocaleTimeString()}] 📍 Starting execution sequence...`,
+      `[${new Date().toLocaleTimeString()}] ðŸš€ Initiating execution for workflow: Designed Automation Graph`,
+      `[${new Date().toLocaleTimeString()}] ðŸ›¡ï¸ Validating security tokens and node credentials...`,
+      `[${new Date().toLocaleTimeString()}] âœ… Security validation complete. All connections authorized.`,
+      `[${new Date().toLocaleTimeString()}] ðŸ“ Starting execution sequence...`,
     ]);
 
     const initialStatuses: Record<
@@ -193,8 +227,8 @@ export default function AgentPage() {
       setCurrentStepIndex(null);
       setExecutionLogs((prev) => [
         ...prev,
-        `[${new Date().toLocaleTimeString()}] 🎉 WORKFLOW COMPLETED SUCCESSFULLY!`,
-        `[${new Date().toLocaleTimeString()}] 💾 State variables persisted. Graph completed in ${(nodes.length * 1.5).toFixed(1)}s.`,
+        `[${new Date().toLocaleTimeString()}] ðŸŽ‰ WORKFLOW COMPLETED SUCCESSFULLY!`,
+        `[${new Date().toLocaleTimeString()}] ðŸ’¾ State variables persisted. Graph completed in ${(nodes.length * 1.5).toFixed(1)}s.`,
       ]);
       return;
     }
@@ -209,7 +243,7 @@ export default function AgentPage() {
       const runComposio = async () => {
         setExecutionLogs((prev) => [
           ...prev,
-          `[${new Date().toLocaleTimeString()}] 🔌 [Composio] Executing ${actionSlug} for user ${user?._id}...`,
+          `[${new Date().toLocaleTimeString()}] ðŸ”Œ [Composio] Executing ${actionSlug} for user ${user?._id}...`,
         ]);
         try {
           const res = await fetch("/api/composio/execute", {
@@ -251,7 +285,7 @@ export default function AgentPage() {
 
           setExecutionLogs((prev) => [
             ...prev,
-            `[${new Date().toLocaleTimeString()}] ✅ Step ${currentStepIndex + 1}: ${currentNode.data?.label || currentNode.id} executed successfully.`,
+            `[${new Date().toLocaleTimeString()}] âœ… Step ${currentStepIndex + 1}: ${currentNode.data?.label || currentNode.id} executed successfully.`,
           ]);
 
           const nextIndex = currentStepIndex + 1;
@@ -264,7 +298,7 @@ export default function AgentPage() {
             const appName = nextNode.type === "composio_app" ? "App" : "AI";
             setExecutionLogs((prev) => [
               ...prev,
-              `[${new Date().toLocaleTimeString()}] ⚡ Invoking Step ${nextIndex + 1} (${appName}): ${nextNode.data?.label || nextNode.id}...`,
+              `[${new Date().toLocaleTimeString()}] âš¡ Invoking Step ${nextIndex + 1} (${appName}): ${nextNode.data?.label || nextNode.id}...`,
             ]);
           }
           setCurrentStepIndex(nextIndex);
@@ -299,7 +333,7 @@ export default function AgentPage() {
 
           setExecutionLogs((prev) => [
             ...prev,
-            `[${new Date().toLocaleTimeString()}] ❌ Step ${currentStepIndex + 1}: ${currentNode.data?.label || currentNode.id} failed: ${err.message}`,
+            `[${new Date().toLocaleTimeString()}] âŒ Step ${currentStepIndex + 1}: ${currentNode.data?.label || currentNode.id} failed: ${err.message}`,
           ]);
 
           // Stop execution on failure
@@ -337,17 +371,17 @@ export default function AgentPage() {
               : "AI";
           return [
             ...prev,
-            `[${new Date().toLocaleTimeString()}] ✅ Step ${currentStepIndex + 1}: ${currentNode.data?.label || currentNode.id} executed successfully.`,
-            `[${new Date().toLocaleTimeString()}] ⚡ Invoking Step ${nextIndex + 1} (${appName}): ${nextNode.data?.label || nextNode.id}...`,
+            `[${new Date().toLocaleTimeString()}] âœ… Step ${currentStepIndex + 1}: ${currentNode.data?.label || currentNode.id} executed successfully.`,
+            `[${new Date().toLocaleTimeString()}] âš¡ Invoking Step ${nextIndex + 1} (${appName}): ${nextNode.data?.label || nextNode.id}...`,
             nextNode.type?.startsWith("ai_")
-              ? `[${new Date().toLocaleTimeString()}] 🤖 model: ${nextNode.data?.ai_config?.model || "gemini-2.0-flash"} | prompt: "${nextNode.data?.ai_config?.prompt?.substring(0, 45)}..."`
-              : `[${new Date().toLocaleTimeString()}] 🔌 action: ${nextNode.data?.composio_config?.action_slug || "integration"}`,
+              ? `[${new Date().toLocaleTimeString()}] ðŸ¤– model: ${nextNode.data?.ai_config?.model || "gemini-2.0-flash"} | prompt: "${nextNode.data?.ai_config?.prompt?.substring(0, 45)}..."`
+              : `[${new Date().toLocaleTimeString()}] ðŸ”Œ action: ${nextNode.data?.composio_config?.action_slug || "integration"}`,
           ];
         });
       } else {
         setExecutionLogs((prev) => [
           ...prev,
-          `[${new Date().toLocaleTimeString()}] ✅ Step ${currentStepIndex + 1}: ${currentNode.data?.label || currentNode.id} executed successfully.`,
+          `[${new Date().toLocaleTimeString()}] âœ… Step ${currentStepIndex + 1}: ${currentNode.data?.label || currentNode.id} executed successfully.`,
         ]);
       }
 
@@ -890,7 +924,7 @@ export default function AgentPage() {
 
                             {selectedSuggestionApps.length >= 3 && (
                               <div className="mt-1 pt-1.5 border-t border-border/40 text-[9px] text-amber-500 dark:text-amber-400 font-medium leading-snug">
-                                ⚠️ Max 3 apps selected. For higher limits
+                                âš ï¸ Max 3 apps selected. For higher limits
                                 upgrade!
                               </div>
                             )}
@@ -1081,175 +1115,46 @@ export default function AgentPage() {
           </div>
         </Allotment.Pane>
 
-        {/* Right Pane: React Flow Preview Page */}
+        {/* Right Pane: Workflow Panel */}
         <Allotment.Pane
           minSize={isRightOpen ? 600 : 60}
           maxSize={isRightOpen ? undefined : 60}
           preferredSize={isRightOpen ? "50%" : 60}
         >
-          {isRightOpen ? (
-            /* Open Preview Panel */
-            <div className="h-full w-full flex flex-col bg-background border-l border-border relative select-none">
-              {/* Header */}
-              <div className="h-16 flex items-center justify-between px-4 border-b border-border shrink-0 bg-background/95 backdrop-blur-sm z-10">
-                {/* Left: Document info */}
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg">
-                    <FileText className="h-4 w-4" />
-                  </div>
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-semibold text-sm text-foreground">
-                        {workflowData
-                          ? "Designed Automation Graph"
-                          : "Untitled"}
-                      </span>
-                      <Star className="h-3 w-3 text-muted-foreground cursor-pointer hover:text-yellow-500 transition-colors" />
-                    </div>
-                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Live Canvas
-                    </span>
-                  </div>
-                </div>
-
-                {/* Center: Tabs Switcher */}
-                <div className="flex items-center bg-muted/60 p-0.5 rounded-xl border border-border">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("editor")}
-                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                      activeTab === "editor"
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Editor
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("runs")}
-                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                      activeTab === "runs"
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Runs
-                  </button>
-                </div>
-                {/* Right: Actions and Collapse trigger */}
-                <div className="flex items-center gap-3">
-                  {activeTab === "runs" &&
-                    workflowData &&
-                    workflowData.nodes &&
-                    workflowData.nodes.length > 0 &&
-                    (isWorkflowRunning ? (
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => {
-                          setIsWorkflowRunning(false);
-                          setCurrentStepIndex(null);
-                        }}
-                        className="flex items-center gap-1.5 font-semibold text-xs h-8 px-3 rounded-lg cursor-pointer"
-                      >
-                        <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping" />
-                        Stop
-                      </Button>
-                    ) : (
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => startSimulation(workflowData.nodes)}
-                        disabled={!isWorkflowReadyToRun(workflowData.nodes)}
-                        className="flex items-center gap-1.5 font-semibold bg-blue-600 hover:bg-blue-700 text-white text-xs h-8 px-3 rounded-lg disabled:opacity-50 cursor-pointer"
-                      >
-                        <svg
-                          fill="currentColor"
-                          viewBox="0 0 24 24"
-                          className="h-3 w-3"
-                        >
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
-                        Run
-                      </Button>
-                    ))}
-
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setIsRightOpen(false)}
-                    className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg bg-muted/30 cursor-pointer"
-                    title="Collapse Preview"
-                  >
-                    <PanelRightClose className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Dotted Canvas Space with React Flow */}
-              <div className="flex-1 relative flex flex-col bg-muted/5 min-h-0">
-                <div className="w-full h-full flex-1 min-h-0">
-                  <FlowPreview
-                    onSelectSuggestion={(prompt, apps) => {
-                      if (activeMode === "brain") {
-                        setActiveMode("agent");
-                      }
-                      setSelectedSuggestionApps(apps || []);
-                      setInputVal(prompt);
-                    }}
-                    onEditWorkflow={(text) => {
-                      if (activeMode === "brain") {
-                        setActiveMode("agent");
-                      }
-                      setInputVal(text);
-                      setTimeout(() => {
-                        if (textareaRef.current) {
-                          textareaRef.current.focus();
-                        }
-                      }, 50);
-                    }}
-                    nodes={workflowData?.nodes}
-                    edges={workflowData?.edges}
-                    onChangeNodes={handleNodesChange}
-                    activeTab={activeTab}
-                    isRunning={activeTab === "runs" && isWorkflowRunning}
-                    nodeStatuses={
-                      activeTab === "runs" ? nodeExecutionStatuses : {}
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Closed Strip */
-            <div className="h-full w-full bg-muted/10 flex flex-col items-center py-4 border-l border-border select-none">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsRightOpen(true)}
-                className="h-10! w-10 text-black rounded-sm mb-6 cursor-pointer"
-                title="Open Preview"
-              >
-                <PanelRightOpen className="h-5 w-5!" />
-              </Button>
-
-              <div className="flex-1 flex items-center justify-center">
-                <button
-                  type="button"
-                  className="text-xs font-bold tracking-wide text-muted-foreground uppercase writing-vertical rotate-180 select-none cursor-pointer hover:text-muted-foreground transition-colors outline-none"
-                  onClick={() => setIsRightOpen(true)}
-                  style={{ writingMode: "vertical-lr" }}
-                >
-                  Workflow Preview Panel
-                </button>
-              </div>
-            </div>
-          )}
+          <WorkflowPanel
+            isRightOpen={isRightOpen}
+            setIsRightOpen={setIsRightOpen}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            workflowData={workflowData}
+            setWorkflowData={setWorkflowData}
+            isSaving={isSaving}
+            isWorkflowRunning={isWorkflowRunning}
+            setIsWorkflowRunning={setIsWorkflowRunning}
+            setCurrentStepIndex={setCurrentStepIndex}
+            nodeExecutionStatuses={nodeExecutionStatuses}
+            isWorkflowReadyToRun={isWorkflowReadyToRun}
+            startSimulation={startSimulation}
+            handleNodesChange={handleNodesChange}
+            onSelectSuggestion={(prompt, apps) => {
+              if (activeMode === "brain") setActiveMode("agent");
+              setSelectedSuggestionApps(apps || []);
+              setInputVal(prompt);
+            }}
+            onEditWorkflow={(text) => {
+              if (activeMode === "brain") setActiveMode("agent");
+              setInputVal(text);
+              setTimeout(() => {
+                if (textareaRef.current) textareaRef.current.focus();
+              }, 50);
+            }}
+            savedWorkflowId={savedWorkflowId}
+            setSavedWorkflowId={setSavedWorkflowId}
+            isStarred={isStarred}
+            setIsStarred={setIsStarred}
+            workflowTitle={workflowTitle}
+            setWorkflowTitle={setWorkflowTitle}
+          />
         </Allotment.Pane>
       </Allotment>
     </div>

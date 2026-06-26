@@ -25,6 +25,7 @@ from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 
@@ -37,64 +38,74 @@ _ROOT = Path(__file__).resolve().parent.parent.parent.parent  # agents/
 load_dotenv(_ROOT / ".env", override=True)
 
 
-# ─── System Prompt ────────────────────────────────────────────────────────────
-
-SYSTEM_PROMPT = """You are a Workflow Designer Agent.
+SYSTEM_PROMPT = """
+You are a Workflow Designer Agent.
 
 Your job is to:
 1. Help the user understand what workflow they want to build.
-2. Use COMPOSIO_SEARCH_TOOLS to find the right tool actions for each step.
-3. Use COMPOSIO_GET_TOOL_SCHEMAS to get the parameter names and types for each action.
+2. Use COMPOSIO_SEARCH_TOOLS to find the right tool actions for each **integration step** (apps like Gmail, Slack, Drive, etc.).
+3. Use COMPOSIO_GET_TOOL_SCHEMAS to get the parameter names and types for those integration actions.
 4. Call set_workflow() with all the steps and their fields — so the user can fill in the form and click Run.
 
-## STEP-BY-STEP PROCESS (follow this every time):
-
-STEP 1: Use COMPOSIO_SEARCH_TOOLS to find the right tool action for each step.
-  - Example: search "send email via gmail" to find GMAIL_SEND_EMAIL
-  - Example: search "post message to slack channel" to find SLACK_SEND_MESSAGE
-  
-STEP 2: Use COMPOSIO_GET_TOOL_SCHEMAS to get the parameter list of each found action.
-  - Pass the exact tool_slug you found in Step 1.
-
-STEP 3: Call set_workflow() with the workflow name, description, and all steps.
-  - Each step MUST include: tool_name, step_description, and fields.
-  - fields MUST list ONLY the important/essential parameters required to run the action (e.g. 'recipient_email', 'subject', and 'body' for Gmail; 'channel' and 'markdown_text' for Slack).
-  - EXCLUDE all highly technical, secondary optional fields (such as 'cc', 'bcc', 'attachment', 'unfurl_links', 'unfurl_media', 'reply_broadcast', 'thread_ts', 'extra_recipients', etc.) unless the user explicitly requested them in their message. This keeps the user form clean and simple.
-
 ## AI PROCESSING NODES:
-You also have access to 4 AI processing node types. Use these ONLY when the user
-explicitly asks for research, summarization, extraction, or classification in their
-prompt. Do NOT add AI nodes unless the user's request specifically requires them.
+You have 4 AI node types. Use these only when the user asks for research, summarization, extraction, or classification.
+AI nodes are **direct prompt nodes**. They do NOT use Composio tools or integrations.
 
-  - AI_SUMMARIZE  → Condenses text into a concise summary.
-    Fields: input_text (string), max_length (integer, optional)
-  - AI_EXTRACT    → Pulls structured data / key entities from text.
-    Fields: input_text (string), extract_format (string, e.g. "json", "list")
-  - AI_CLASSIFY   → Categorizes / labels input into predefined categories.
-    Fields: input_text (string), categories (string, comma-separated list)
-  - AI_RESEARCH   → Deep-dive research on a topic, returns comprehensive findings.
-    Fields: topic (string), depth (string, "brief" or "detailed")
+- AI_SUMMARIZE → Summarizes text or prior step output
+- AI_EXTRACT   → Extracts structured data or entities
+- AI_CLASSIFY  → Classifies input into categories
+- AI_RESEARCH  → Researches a topic and returns findings
 
-When using AI nodes:
-  - Set tool_name to one of: AI_SUMMARIZE, AI_EXTRACT, AI_CLASSIFY, AI_RESEARCH
-  - Use {{step_N}} placeholders to chain AI output into subsequent steps.
-  - AI nodes follow the same schema rules as Composio tool steps.
+## STEP 1: Use COMPOSIO_SEARCH_TOOLS only for integration actions
+  - Example: search "send email via gmail" → GMAIL_SEND_EMAIL
+  - Example: search "post message to slack channel" → SLACK_SEND_MESSAGE
+  - CRITICAL: Do NOT use COMPOSIO_SEARCH_TOOLS for research, summarization, extraction, or classification. Those are AI nodes.
 
-## CRITICAL RULES:
-- You are a DESIGNER only. You do NOT have tools to execute actions. If the user asks you to run, execute, or test the workflow in the chat, explain that you are a designer and instruct them to click the "Run Workflow" button in the right-side panel.
-- To pass the output of a previous step to a subsequent step, use the placeholder `{{step_N}}` where N is the 1-based index of the step (e.g., `{{step_1}}` for the output of Step 1, or `{{step_1.some_key}}` for a nested key if known).
-- For example, if Step 1 is `LINKEDIN_GET_MY_INFO` and Step 2 is `GMAIL_SEND_EMAIL`, you must pre-fill the `body` field of the Gmail step with a value like: "Here is my LinkedIn profile info: {{step_1}}"
-- Always populate "value" in fields when you can infer it from the user's message (or when it references a previous step using `{{step_N}}`).
-- Leave "value" as "" for fields the user must fill in (e.g. recipient email, API keys).
-- After calling set_workflow, tell the user to review the fields on the right panel and click "Run Workflow".
+## STEP 2: Use COMPOSIO_GET_TOOL_SCHEMAS only for integration actions
+  - Pass the exact tool_slug you found in Step 1.
+  - This gives you the parameter list for Gmail, Slack, etc.
+
+## STEP 3: Call set_workflow()
+  - Each step MUST include: tool_name, step_description, and fields.
+  - fields MUST list ONLY the essential parameters (e.g. recipient_email, subject, body for Gmail).
+  - Exclude optional/technical fields unless explicitly requested.
+
+
+### CRITICAL RULES FOR AI NODES:
+1. AI nodes are **direct prompt nodes**. They do NOT use Composio tools or integrations.
+2. Never search for Apollo, Google Search, or other external tools for research/summarization/extraction/classification.
+3. Each AI node has exactly one field:
+   - name: "prompt"
+   - type: "string"
+   - description: "Instructions for the AI"
+   - value: A clear instruction string, referencing prior steps with {{step_N}} if needed.
+4. Example:
+   - "Research the latest news about Claude AI and return key findings."
+   - "Summarize the following Slack messages: {{step_2}}"
+
+## Workflow Chaining:
+- Use {{step_N}} placeholders to pass outputs between steps.
+- Example: Gmail body = "Here is my LinkedIn info: {{step_1}}"
+
+## CRITICAL:
+- You are a designer only. Do not execute workflows. Tell the user to click "Run Workflow."
+- Never ask the user to connect or authenticate apps for AI nodes. Only mention integrations if they are part of the workflow steps.
+- Always pre-fill values when possible (e.g. referencing prior steps). Leave empty when the user must provide input.
+
 """
+
 
 
 # ─── LLM config ──────────────────────────────────────────────────────────────
 
-def get_llm() -> ChatOpenAI:
-    api_key = os.getenv("OPENAI_API_KEY")
-    return ChatOpenAI(model="gpt-4.1-mini", temperature=0.1, api_key=api_key)
+# def get_llm() -> ChatOpenAI:
+#     api_key = os.getenv("OPENAI_API_KEY")
+#     return ChatOpenAI(model="gpt-4.1-mini", temperature=0.1, api_key=api_key)
+
+def get_llm() -> ChatAnthropic:
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    return ChatAnthropic(model="claude-sonnet-4-5", temperature=0.1, api_key=api_key)
+
 
 
 # ─── Custom Agent compilation with custom StateGraph ────────────────────────
@@ -176,7 +187,7 @@ def compile_workflow_agent(session, workflow_holder: dict):
         if err:
             print(f"[agent_node] validation_error found in state: '{err}'", flush=True)
             prompt_msgs.append(
-                SystemMessage(
+                HumanMessage(
                     content=(
                         f"CRITICAL VERIFICATION ERROR: {err}\n"
                         "The workflow you submitted is invalid. You MUST fix the issues "
@@ -208,7 +219,7 @@ def compile_workflow_agent(session, workflow_holder: dict):
             error_msg = f"Structure validation failed: {str(e)}"
             print(f"[verifier_node] Pydantic check FAILED: {error_msg}", flush=True)
             workflow_holder.pop("proposed", None)
-            feedback_msg = SystemMessage(
+            feedback_msg = HumanMessage(
                 content=f"[Verifier Warning] Workflow structure validation failed: {error_msg}. Please fix schemas and try again."
             )
             return {
@@ -233,7 +244,7 @@ def compile_workflow_agent(session, workflow_holder: dict):
                             return {
                                 "is_valid": False,
                                 "validation_error": error_msg,
-                                "messages": [SystemMessage(content=f"[Verifier Warning] {error_msg}")]
+                                "messages": [HumanMessage(content=f"[Verifier Warning] {error_msg}")]
                             }
                         if ref_idx >= idx + 1:
                             error_msg = (
@@ -245,7 +256,7 @@ def compile_workflow_agent(session, workflow_holder: dict):
                             return {
                                 "is_valid": False,
                                 "validation_error": error_msg,
-                                "messages": [SystemMessage(content=f"[Verifier Warning] {error_msg}")]
+                                "messages": [HumanMessage(content=f"[Verifier Warning] {error_msg}")]
                             }
 
         # Phase 3: Success — commit workflow and convert to React Flow format
@@ -259,7 +270,7 @@ def compile_workflow_agent(session, workflow_holder: dict):
         reactflow_data = workflow_to_reactflow(proposed)
         workflow_holder["reactflow"] = reactflow_data
 
-        feedback_msg = SystemMessage(
+        feedback_msg = HumanMessage(
             content=f"[Verifier Success] Workflow '{proposed['name']}' verified and registered successfully."
         )
         return {

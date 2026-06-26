@@ -36,6 +36,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface FlowPreviewProps {
   onSelectSuggestion?: (prompt: string, apps: string[]) => void;
@@ -217,8 +224,14 @@ function AINodePopover({
 }) {
   const aiConfig = data.ai_config || {};
   const [prompt, setPrompt] = useState<string>(aiConfig.prompt || "");
-  const [model, setModel] = useState<string>(
-    aiConfig.model || "gemini-2.0-flash",
+  const [provider, setProvider] = useState<"claude" | "openai">(
+    aiConfig.provider || (aiConfig.model?.includes("gpt") ? "openai" : "claude")
+  );
+  const [citations, setCitations] = useState<boolean>(
+    aiConfig.citations !== undefined ? aiConfig.citations : false
+  );
+  const [format, setFormat] = useState<"plain" | "rich">(
+    aiConfig.format || "rich"
   );
   const [extra, setExtra] = useState<string>(aiConfig.extra_instructions || "");
   const [role, setRole] = useState<string>(nodeType.replace("ai_", ""));
@@ -230,7 +243,10 @@ function AINodePopover({
         ai_config: {
           ...aiConfig,
           prompt,
-          model,
+          provider,
+          model: provider === "claude" ? "claude-sonnet-4-5" : "gpt-4o",
+          citations,
+          format,
           extra_instructions: extra,
         },
       },
@@ -239,124 +255,298 @@ function AINodePopover({
   };
 
   return (
-    <PopoverWrapper onClose={onClose}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center">
-            <Image
-              src="/logo.svg"
-              alt="AI"
-              width={16}
-              height={16}
-              className="object-contain"
-            />
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/45 backdrop-blur-[4px]">
+      <div className="bg-white border border-neutral-200 rounded-3xl shadow-2xl w-[920px] max-w-[95vw] h-[640px] max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center">
+              <Image
+                src="/logo.svg"
+                alt="AI"
+                width={16}
+                height={16}
+                className="object-contain"
+              />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm text-neutral-900">
+                Write with AI
+              </h3>
+              <p className="text-[11px] text-neutral-400 mt-0.5">
+                AI Node Configuration
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-semibold text-sm text-neutral-900">
-              {data.label || "AI Agent Node"}
-            </h3>
-            <p className="text-[11px] text-neutral-400 mt-0.5">
-              AI Node Configuration
-            </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-7 w-7 rounded-lg flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Content Split Panel */}
+        <div className="flex-1 flex overflow-hidden">
+          
+          {/* Left Column (58% width) - Prompt, insertion buttons, Provider selector, Citations toggle */}
+          <div className="w-[58%] border-r border-neutral-100 p-6 flex flex-col justify-between overflow-y-auto">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-neutral-800 mb-1">
+                  Prompt
+                </label>
+                <p className="text-[11px] text-neutral-500 mb-2 leading-normal font-medium">
+                  Give the model detailed instructions. Insert relevant data for context.{" "}
+                  <span className="text-blue-600 hover:underline cursor-pointer">See examples</span>
+                </p>
+                <div className="border border-neutral-200 rounded-xl bg-neutral-50/50 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-400 transition-all">
+                  <textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    rows={8}
+                    placeholder="Write about that mail..."
+                    className="w-full bg-transparent px-4 py-3 text-sm text-neutral-800 placeholder:text-neutral-400 resize-none outline-none leading-relaxed"
+                  />
+                  {/* Pills under textarea */}
+                  <div className="px-3 pb-2.5 flex items-center gap-1.5 border-t border-neutral-100 pt-2 bg-neutral-50/80 rounded-b-xl">
+                    <button
+                      type="button"
+                      className="px-2 py-1 text-[10px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 rounded-md flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      + Data from previous steps
+                    </button>
+                    <button
+                      type="button"
+                      className="px-2 py-1 text-[10px] font-semibold text-neutral-600 bg-neutral-100 hover:bg-neutral-200/80 border border-neutral-200 rounded-md flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      + Tool
+                    </button>
+                    <button
+                      type="button"
+                      className="px-2 py-1 text-[10px] font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 border border-purple-200/80 rounded-md flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      + Knowledge
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Provider Selection */}
+              <div>
+                <label className="block text-xs font-bold text-neutral-800 mb-2">
+                  Choose Provider
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div
+                    onClick={() => setProvider("claude")}
+                    className={`border rounded-xl p-3 flex items-center justify-between cursor-pointer transition-all ${
+                      provider === "claude"
+                        ? "border-blue-500 bg-blue-50/30 ring-2 ring-blue-500/10"
+                        : "border-neutral-200 hover:bg-neutral-50 bg-white"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Image
+                        src="/claude.png"
+                        alt="Claude"
+                        width={20}
+                        height={20}
+                        className="object-contain rounded"
+                      />
+                      <div>
+                        <span className="text-xs font-bold text-neutral-800">Claude</span>
+                        <p className="text-[9px] text-neutral-400">Sonnet 4.5</p>
+                      </div>
+                    </div>
+                    <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${
+                      provider === "claude" ? "border-blue-500 bg-blue-500" : "border-neutral-300"
+                    }`}>
+                      {provider === "claude" && <Check className="h-2.5 w-2.5 text-white stroke-[3px]" />}
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => setProvider("openai")}
+                    className={`border rounded-xl p-3 flex items-center justify-between cursor-pointer transition-all ${
+                      provider === "openai"
+                        ? "border-blue-500 bg-blue-50/30 ring-2 ring-blue-500/10"
+                        : "border-neutral-200 hover:bg-neutral-50 bg-white"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Image
+                        src="/chatgpt.png"
+                        alt="ChatGPT"
+                        width={20}
+                        height={20}
+                        className="object-contain rounded"
+                      />
+                      <div>
+                        <span className="text-xs font-bold text-neutral-800">OpenAI</span>
+                        <p className="text-[9px] text-neutral-400">GPT-4o</p>
+                      </div>
+                    </div>
+                    <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${
+                      provider === "openai" ? "border-blue-500 bg-blue-500" : "border-neutral-300"
+                    }`}>
+                      {provider === "openai" && <Check className="h-2.5 w-2.5 text-white stroke-[3px]" />}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Citations Toggle */}
+            <div className="flex items-center justify-between pt-4 border-t border-neutral-100 mt-4">
+              <div>
+                <span className="text-xs font-bold text-neutral-800 block">
+                  Include citations in response?
+                </span>
+                <p className="text-[10px] text-neutral-400 mt-0.5">
+                  Provides reference links to source documents if available
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCitations(!citations)}
+                className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer outline-none ${
+                  citations ? "bg-blue-600" : "bg-neutral-200"
+                }`}
+              >
+                <span
+                  className={`block w-4 h-4 bg-white rounded-full shadow transition-transform absolute top-0.5 left-0.5 ${
+                    citations ? "translate-x-4" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+
           </div>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="h-7 w-7 rounded-lg flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
 
-      {/* Body */}
-      <div className="px-6 py-5 space-y-5">
-        {/* Role/Type selection */}
-        <div>
-          <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-            AI Node Role
-          </label>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all cursor-pointer"
+          {/* Right Column (42% width) - Mode, Format selection, Additional instructions, Human-in-the-loop */}
+          <div className="w-[42%] bg-neutral-50/50 p-6 flex flex-col justify-between overflow-y-auto font-medium">
+            <div className="space-y-4">
+              {/* Role Select */}
+              <div>
+                <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+                  AI Node Role
+                </label>
+                <Select value={role} onValueChange={setRole}>
+                  <SelectTrigger className="w-full rounded-xl border border-neutral-200 bg-white text-xs text-neutral-800 font-bold h-9 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="research">Research</SelectItem>
+                    <SelectItem value="summarize">Summarize</SelectItem>
+                    <SelectItem value="classify">Classify</SelectItem>
+                    <SelectItem value="extract">Extract</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Format Card Radios */}
+              <div>
+                <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+                  Output Format
+                </label>
+                <div className="space-y-2">
+                  <div
+                    onClick={() => setFormat("plain")}
+                    className={`border rounded-xl p-3 flex items-start gap-3 cursor-pointer transition-all ${
+                      format === "plain"
+                        ? "border-blue-500 bg-blue-50/20"
+                        : "border-neutral-200 bg-white hover:bg-neutral-50"
+                    }`}
+                  >
+                    <div className={`mt-0.5 h-4 w-4 rounded-full border flex items-center justify-center ${
+                      format === "plain" ? "border-blue-500" : "border-neutral-300"
+                    }`}>
+                      {format === "plain" && <div className="h-2 w-2 rounded-full bg-blue-500" />}
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-neutral-800 block">Plain text</span>
+                      <span className="text-[10px] text-neutral-400 leading-normal block mt-0.5">
+                        Simple, unformatted text
+                      </span>
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => setFormat("rich")}
+                    className={`border rounded-xl p-3 flex items-start gap-3 cursor-pointer transition-all ${
+                      format === "rich"
+                        ? "border-blue-500 bg-blue-50/20"
+                        : "border-neutral-200 bg-white hover:bg-neutral-50"
+                    }`}
+                  >
+                    <div className={`mt-0.5 h-4 w-4 rounded-full border flex items-center justify-center ${
+                      format === "rich" ? "border-blue-500" : "border-neutral-300"
+                    }`}>
+                      {format === "rich" && <div className="h-2 w-2 rounded-full bg-blue-500" />}
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-neutral-800 block">Rich text</span>
+                      <span className="text-[10px] text-neutral-400 leading-normal block mt-0.5 font-medium">
+                        Text with formatting (bold/italic, bullets, links, headings etc). Great for documents, emails and Slack messages
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Extra instructions textarea */}
+              <div>
+                <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+                  Additional Instructions
+                </label>
+                <textarea
+                  value={extra}
+                  onChange={(e) => setExtra(e.target.value)}
+                  rows={3}
+                  placeholder="Anything else you want to specify for this AI step…"
+                  className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-xs text-neutral-800 placeholder:text-neutral-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all leading-normal"
+                />
+              </div>
+
+            </div>
+
+            {/* Test Prompt Button */}
+            <div className="pt-4 border-t border-neutral-100 flex justify-end">
+              <button
+                type="button"
+                className="px-3.5 py-1.5 text-xs font-bold bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100 cursor-pointer transition-colors"
+              >
+                Test prompt
+              </button>
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-neutral-100 bg-neutral-50/50">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg text-xs text-neutral-600 font-semibold hover:bg-neutral-100 transition-colors cursor-pointer"
           >
-            <option value="research">Research</option>
-            <option value="summarize">Summarize</option>
-            <option value="classify">Classify</option>
-            <option value="extract">Extract</option>
-          </select>
-        </div>
-
-        {/* Prompt */}
-        <div>
-          <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-            Prompt
-          </label>
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            rows={5}
-            placeholder="Give the model detailed instructions. Insert relevant data for context."
-            className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-800 placeholder:text-neutral-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all leading-relaxed"
-          />
-        </div>
-
-        {/* Model */}
-        <div>
-          <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-            Model
-          </label>
-          <select
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all cursor-pointer"
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            className="px-5 py-2 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors cursor-pointer"
           >
-            {AI_MODELS.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
+            Done
+          </button>
         </div>
 
-        {/* Extra instructions */}
-        <div>
-          <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-            Additional Instructions
-            <span className="ml-1.5 text-neutral-400 normal-case font-normal">
-              (optional)
-            </span>
-          </label>
-          <textarea
-            value={extra}
-            onChange={(e) => setExtra(e.target.value)}
-            rows={2.5}
-            placeholder="Anything else you want to specify for this AI step…"
-            className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-800 placeholder:text-neutral-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all leading-relaxed"
-          />
-        </div>
       </div>
-
-      {/* Footer */}
-      <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-neutral-100 bg-neutral-50">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-4 py-2 rounded-lg text-sm text-neutral-600 font-medium hover:bg-neutral-100 transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          className="px-5 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-        >
-          Save
-        </button>
-      </div>
-    </PopoverWrapper>
+    </div>
   );
 }
 
@@ -594,33 +784,33 @@ function AINode({ data }: { data: any }) {
 
   if (isFirst) {
     return (
-      <div className="w-[450px] rounded-xl border-2 border-blue-500 bg-blue-600 shadow-lg shadow-blue-500/25 px-4 py-3.5 select-none cursor-default">
-        <div className="flex items-center justify-between mb-1">
+      <div className="w-[500px] rounded-md border bg-blue-100 shadow-sm shadow-blue-500/25 px-4 py-3 select-none cursor-default">
+        <div className="flex items-center justify-between mb-1.5">
           <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded-md bg-white/20 flex items-center justify-center">
+            <div className="h-6 w-6 rounded bg-white flex items-center justify-center border shrink-0">
               <Image
                 src="/logo.svg"
                 alt="AI"
                 width={14}
                 height={14}
-                className="object-contain"
+                className="object-contain invert"
               />
             </div>
-            <span className="text-[9px] font-bold tracking-widest text-blue-100 uppercase">
-              AI · {typeTag}
+            <span className="text-sm font-semibold uppercase text-neutral-800">
+              AI Agent
             </span>
           </div>
           {data.isRunsTab ? (
             data.isSimulationActive ? (
               <div className="h-6 w-6 flex items-center justify-center shrink-0">
                 {data.status === "running" && (
-                  <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 text-blue-600 animate-spin" />
                 )}
                 {data.status === "success" && (
-                  <Check className="h-3.5 w-3.5 text-white font-bold" />
+                  <Check className="h-3.5 w-3.5 text-emerald-600 font-bold" />
                 )}
                 {data.status === "failed" && (
-                  <X className="h-3.5 w-3.5 text-red-205 font-bold" />
+                  <X className="h-3.5 w-3.5 text-red-600 font-bold" />
                 )}
                 {data.status === "pending" && (
                   <div className="h-1.5 w-1.5 rounded-full bg-white/40" />
@@ -634,24 +824,32 @@ function AINode({ data }: { data: any }) {
                 e.stopPropagation();
                 data.onOpenSettings?.();
               }}
-              className="h-6 w-6 rounded-lg flex items-center justify-center text-blue-200 hover:text-white hover:bg-white/20 transition-colors"
+              className="h-6 w-6 rounded-lg flex items-center justify-center text-neutral-500 hover:text-neutral-800 hover:bg-black/5 transition-colors"
               title="Configure AI node"
             >
               <Settings className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
-        <h4 className="font-semibold text-sm text-white leading-snug truncate">
+        <h4 className="font-semibold text-xs text-neutral-800 leading-snug truncate">
           {data.label}
         </h4>
+        <div className="mt-2 flex items-center justify-between">
+          <span className="text-[10px] text-blue-700 bg-blue-200/50 border border-blue-300 px-2 py-0.5 rounded-md font-medium truncate max-w-[130px]">
+            {typeTag}
+          </span>
+          <div className="flex items-center gap-1 text-[10px] text-blue-700 font-medium">
+            Model: {data.ai_config?.model || "gemini-2.0-flash"}
+          </div>
+        </div>
         {data.isRunsTab &&
           data.errors &&
           data.errors.length > 0 &&
           !data.isSimulationActive && (
-            <div className="mt-2.5 pt-2 border-t border-white/20 text-[10px] text-red-100 flex flex-col gap-1">
+            <div className="mt-2.5 pt-2 border-t border-white/20 text-[10px] text-red-700 flex flex-col gap-1">
               {data.errors.map((err: string, i: number) => (
                 <span key={i} className="flex items-center gap-1 font-medium">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-200" />
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-600" />
                   {err}
                 </span>
               ))}
@@ -660,27 +858,27 @@ function AINode({ data }: { data: any }) {
         <Handle
           type="source"
           position={Position.Bottom}
-          className="!w-2 !h-2 !bg-blue-200 !border-2 !border-blue-600"
+          className="!w-2 !h-2"
         />
       </div>
     );
   }
 
   return (
-    <div className="w-[450px] rounded-md border border-neutral-200 bg-neutral-50 shadow-sm px-4 py-3.5 select-none cursor-default hover:shadow-md hover:border-neutral-300 transition-all">
+    <div className="w-[500px] rounded-md border border-neutral-200 bg-neutral-50 shadow-sm px-4 py-3 select-none cursor-default hover:shadow-md hover:border-neutral-300 transition-all">
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
-          <div className="h-6 w-6 rounded-md bg-neutral-900 flex items-center justify-center">
+          <div className="h-6 w-6 rounded-md bg-neutral-900 flex items-center justify-center shrink-0">
             <Image
               src="/logo.svg"
               alt="AI"
               width={13}
               height={13}
-              className="object-contain"
+              className="object-contain invert"
             />
           </div>
-          <span className="text-[9px] font-bold tracking-widest text-neutral-400 uppercase">
-            AI · {typeTag}
+          <span className="text-sm font-semibold uppercase text-neutral-800">
+            AI Agent
           </span>
         </div>
         {data.isRunsTab ? (
@@ -714,9 +912,17 @@ function AINode({ data }: { data: any }) {
           </button>
         )}
       </div>
-      <h4 className="font-semibold text-sm text-neutral-800 leading-snug truncate">
+      <h4 className="font-semibold text-xs text-neutral-800 leading-snug truncate">
         {data.label}
       </h4>
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-[10px] text-neutral-700 bg-neutral-200/60 border border-neutral-300 px-2 py-0.5 rounded-md font-medium truncate max-w-[130px]">
+          {typeTag}
+        </span>
+        <div className="flex items-center gap-1 text-[10px] text-neutral-500">
+          Model: {data.ai_config?.model || "gemini-2.0-flash"}
+        </div>
+      </div>
       {data.isRunsTab &&
         data.errors &&
         data.errors.length > 0 &&

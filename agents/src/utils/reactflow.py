@@ -27,8 +27,9 @@ Layout: simple vertical — one node below another, centered at x=250.
 
 Two node categories:
   1. Tool nodes  — Composio action steps (GMAIL_SEND_EMAIL, SLACK_SEND_MESSAGE, etc.)
-  2. AI nodes    — built-in AI processing steps with operation ∈ {summarize, extract, classify, research}
-     These are identified by a tool_name prefix "AI_" (e.g. "AI_SUMMARIZE", "AI_RESEARCH").
+  2. AI nodes    — prompt nodes for the frontend LLM (AI_SUMMARIZE, AI_EXTRACT,
+     AI_CLASSIFY, AI_RESEARCH). These carry a single 'prompt' field that the
+     frontend passes to its own LLM at run-time. Identified by the "AI_" prefix.
 """
 
 from __future__ import annotations
@@ -121,18 +122,14 @@ def workflow_to_reactflow(workflow: dict) -> dict:
             operation = tool_name.replace("AI_", "").lower()
             node_type = f"ai_{operation}"
             
-            # Extract main prompt text
-            prompt_val = params_mapping.get("topic") if operation == "research" else params_mapping.get("input_text")
-            if prompt_val is None:
-                prompt_val = ""
-                
             extra_data = {
                 "description": step.get("step_description", ""),
                 "fields": fields,
                 "tool_name": tool_name,
                 "ai_config": {
-                    "prompt": prompt_val,
-                    "model": "gpt-4.1-mini",
+                    # The agent always sets a single 'prompt' field for AI nodes.
+                    "prompt": params_mapping.get("prompt", ""),
+                    "model": "gemini-2.0-flash",
                     "extra_instructions": ""
                 }
             }

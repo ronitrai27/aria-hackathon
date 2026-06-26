@@ -105,4 +105,19 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_fetchedAt", ["userId", "fetchedAt"]),
+
+  workflows: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    description: v.optional(v.string()),
+    isStarred: v.boolean(),
+    structure: v.object({
+      nodes: v.array(v.any()),
+      edges: v.array(v.any()),
+    }),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_starred", ["userId", "isStarred"]),
 });
