@@ -13,6 +13,7 @@ import type * as agentTools from "../agentTools.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
 import type * as importantActions from "../importantActions.js";
+import type * as tasks from "../tasks.js";
 import type * as user from "../user.js";
 import type * as workflows from "../workflows.js";
 
@@ -28,6 +29,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   http: typeof http;
   importantActions: typeof importantActions;
+  tasks: typeof tasks;
   user: typeof user;
   workflows: typeof workflows;
 }>;

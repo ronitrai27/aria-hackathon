@@ -1,3 +1,5 @@
-export default function TasksPage() {
-  return <div>tasks</div>;
+import { TasksPage } from "@/modules/tasks/TasksPage";
+
+export default function TasksRoute() {
+  return <TasksPage />;
 }
