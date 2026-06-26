@@ -257,7 +257,7 @@ function AINodePopover({
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/45 backdrop-blur-[4px]">
-      <div className="bg-white border border-neutral-200 rounded-3xl shadow-2xl w-[920px] max-w-[95vw] h-[640px] max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white border border-neutral-200 rounded-3xl shadow-xl w-[920px] max-w-[95vw] h-[600px] max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
           <div className="flex items-center gap-3">
@@ -282,7 +282,7 @@ function AINodePopover({
           <button
             type="button"
             onClick={onClose}
-            className="h-7 w-7 rounded-lg flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+            className="h-7 w-7 rounded-sm flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -313,7 +313,7 @@ function AINodePopover({
                     className="w-full bg-transparent px-4 py-3 text-sm text-neutral-800 placeholder:text-neutral-400 resize-none outline-none leading-relaxed"
                   />
                   {/* Pills under textarea */}
-                  <div className="px-3 pb-2.5 flex items-center gap-1.5 border-t border-neutral-100 pt-2 bg-neutral-50/80 rounded-b-xl">
+                  <div className="px-3 pb-2.5 flex items-center gap-1.5 border-t border-neutral-400 pt-2 bg-neutral-100 rounded-b-xl">
                     <button
                       type="button"
                       className="px-2 py-1 text-[10px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 rounded-md flex items-center gap-1 cursor-pointer transition-colors"
@@ -322,7 +322,7 @@ function AINodePopover({
                     </button>
                     <button
                       type="button"
-                      className="px-2 py-1 text-[10px] font-semibold text-neutral-600 bg-neutral-100 hover:bg-neutral-200/80 border border-neutral-200 rounded-md flex items-center gap-1 cursor-pointer transition-colors"
+                      className="px-2 py-1 text-[10px] font-semibold text-neutral-600 bg-white hover:bg-neutral-200/80 border border-neutral-200 rounded-md flex items-center gap-1 cursor-pointer transition-colors"
                     >
                       + Tool
                     </button>
@@ -445,18 +445,20 @@ function AINodePopover({
             </div>
           </div>
 
-          {/* Right Column (42% width) - Mode, Format selection, Additional instructions, Human-in-the-loop */}
-          <div className="w-[42%] bg-neutral-50/50 p-6 flex flex-col justify-between overflow-y-auto font-medium">
-            <div className="space-y-4">
-              {/* Role Select */}
-              <div>
-                <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-                  AI Node Role
+          {/* Right Column */}
+          <div className="w-[42%] bg-white p-6 flex flex-col overflow-y-auto">
+            <div className="space-y-6">
+              {/* Role */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-neutral-800">
+                  AI Role
                 </label>
+
                 <Select value={role} onValueChange={setRole}>
-                  <SelectTrigger className="w-full rounded-xl border border-neutral-200 bg-white text-xs text-neutral-800 font-bold h-9 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400">
+                  <SelectTrigger className="h-10 rounded-md text-sm">
                     <SelectValue />
                   </SelectTrigger>
+
                   <SelectContent>
                     <SelectItem value="research">Research</SelectItem>
                     <SelectItem value="summarize">Summarize</SelectItem>
@@ -466,18 +468,21 @@ function AINodePopover({
                 </Select>
               </div>
 
-              {/* Format Card Radios */}
-              <div>
-                <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-                  Output Format
+              {/* Output */}
+
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-neutral-800">
+                  Output format
                 </label>
+
                 <div className="space-y-2">
-                  <div
+                  <button
+                    type="button"
                     onClick={() => setFormat("plain")}
-                    className={`border rounded-xl p-3 flex items-start gap-3 cursor-pointer transition-all ${
+                    className={`w-full rounded-md border px-4 py-3 flex items-start gap-3 transition cursor-pointer ${
                       format === "plain"
-                        ? "border-blue-500 bg-blue-50/20"
-                        : "border-neutral-200 bg-white hover:bg-neutral-50"
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-neutral-200 hover:bg-neutral-50"
                     }`}
                   >
                     <div
@@ -491,22 +496,25 @@ function AINodePopover({
                         <div className="h-2 w-2 rounded-full bg-blue-500" />
                       )}
                     </div>
-                    <div>
-                      <span className="text-xs font-bold text-neutral-800 block">
-                        Plain text
-                      </span>
-                      <span className="text-[10px] text-neutral-400 leading-normal block mt-0.5">
-                        Simple, unformatted text
-                      </span>
-                    </div>
-                  </div>
 
-                  <div
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-neutral-900">
+                        Plain text
+                      </p>
+
+                      <p className="text-xs text-neutral-500 mt-1">
+                        Simple, unformatted output.
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => setFormat("rich")}
-                    className={`border rounded-xl p-3 flex items-start gap-3 cursor-pointer transition-all ${
+                    className={`w-full rounded-md border px-4 py-3 flex items-start gap-3 transition cursor-pointer ${
                       format === "rich"
-                        ? "border-blue-500 bg-blue-50/20"
-                        : "border-neutral-200 bg-white hover:bg-neutral-50"
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-neutral-200 hover:bg-neutral-50"
                     }`}
                   >
                     <div
@@ -520,43 +528,56 @@ function AINodePopover({
                         <div className="h-2 w-2 rounded-full bg-blue-500" />
                       )}
                     </div>
-                    <div>
-                      <span className="text-xs font-bold text-neutral-800 block">
+
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-neutral-900">
                         Rich text
-                      </span>
-                      <span className="text-[10px] text-neutral-400 leading-normal block mt-0.5 font-medium">
-                        Text with formatting (bold/italic, bullets, links,
-                        headings etc). Great for documents, emails and Slack
-                        messages
-                      </span>
+                      </p>
+
+                      <p className="text-xs text-neutral-500 mt-1 leading-5">
+                        Supports headings, bullet lists, markdown, links and
+                        formatted documents.
+                      </p>
                     </div>
-                  </div>
+                  </button>
                 </div>
               </div>
 
-              {/* Extra instructions textarea */}
-              <div>
-                <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+              {/* Extra */}
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-neutral-800">
                   Additional Instructions
                 </label>
+
                 <textarea
                   value={extra}
                   onChange={(e) => setExtra(e.target.value)}
-                  rows={3}
-                  placeholder="Anything else you want to specify for this AI step…"
-                  className="w-full rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-xs text-neutral-800 placeholder:text-neutral-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all leading-normal"
+                  rows={5}
+                  placeholder="Optional instructions for this AI step..."
+                  className="
+          w-full
+          rounded-md
+          border
+          border-neutral-200
+          bg-white
+          px-3
+          py-2.5
+          text-sm
+          resize-none
+          placeholder:text-neutral-400
+          focus:outline-none
+          focus:ring-2
+          focus:ring-blue-500/20
+          focus:border-blue-500
+        "
                 />
-              </div>
-            </div>
 
-            {/* Test Prompt Button */}
-            <div className="pt-4 border-t border-neutral-100 flex justify-end">
-              <button
-                type="button"
-                className="px-3.5 py-1.5 text-xs font-bold bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100 cursor-pointer transition-colors"
-              >
-                Test prompt
-              </button>
+                <p className="text-xs text-neutral-400">
+                  Optional. These instructions will be appended after the main
+                  prompt.
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -851,17 +872,19 @@ function AINode({ data }: { data: any }) {
               </div>
             ) : null
           ) : (
-            <button
+            <Button
               type="button"
+              size={"xs"}
+              variant={"default"}
               onClick={(e) => {
                 e.stopPropagation();
                 data.onOpenSettings?.();
               }}
-              className="h-6 w-6 rounded-lg flex items-center justify-center text-neutral-500 hover:text-neutral-800 hover:bg-black/5 transition-colors"
-              title="Configure AI node"
+              className="text-[10px] rounded-sm flex items-center justify-center"
+              title="Configure app node"
             >
-              <Settings className="h-3.5 w-3.5" />
-            </button>
+              Edit <Settings className="h-3.5 w-3.5" />
+            </Button>
           )}
         </div>
         <h4 className="font-semibold text-xs text-neutral-800 leading-snug truncate">
@@ -872,7 +895,7 @@ function AINode({ data }: { data: any }) {
             {typeTag}
           </span>
           <div className="flex items-center gap-1 text-[10px] text-blue-700 font-medium">
-            Model: {data.ai_config?.model || "gemini-2.0-flash"}
+            Model: {data.ai_config?.model || "gpt-4.1-nano"}
           </div>
         </div>
         {data.isRunsTab &&
@@ -932,17 +955,19 @@ function AINode({ data }: { data: any }) {
             </div>
           ) : null
         ) : (
-          <button
+          <Button
             type="button"
+            size={"xs"}
+            variant={"default"}
             onClick={(e) => {
               e.stopPropagation();
               data.onOpenSettings?.();
             }}
-            className="h-6 w-6 rounded-lg flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
-            title="Configure AI node"
+            className="text-[10px] rounded-sm flex items-center justify-center"
+            title="Configure app node"
           >
-            <Settings className="h-3.5 w-3.5" />
-          </button>
+            Edit <Settings className="h-3.5 w-3.5" />
+          </Button>
         )}
       </div>
       <h4 className="font-semibold text-xs text-neutral-800 leading-snug truncate">
@@ -1035,17 +1060,19 @@ function AppNode({ data }: { data: any }) {
               </div>
             ) : null
           ) : (
-            <button
+            <Button
               type="button"
+              size={"xs"}
+              variant={"default"}
               onClick={(e) => {
                 e.stopPropagation();
                 data.onOpenSettings?.();
               }}
-              className="h-6 w-6 rounded-lg flex items-center justify-center  hover:bg-white/20 transition-colors"
+              className="text-[10px] rounded-sm flex items-center justify-center"
               title="Configure app node"
             >
-              <Settings className="h-3.5 w-3.5" />
-            </button>
+              Edit <Settings className="h-3.5 w-3.5" />
+            </Button>
           )}
         </div>
         <h4 className="font-semibold text-xs leading-snug truncate">
@@ -1166,17 +1193,19 @@ function AppNode({ data }: { data: any }) {
             </div>
           ) : null
         ) : (
-          <button
+          <Button
             type="button"
+            size={"xs"}
+            variant={"default"}
             onClick={(e) => {
               e.stopPropagation();
               data.onOpenSettings?.();
             }}
-            className="h-6 w-6 rounded-lg flex items-center justify-center  hover:bg-neutral-100 transition-colors"
+            className="text-[10px] rounded-sm flex items-center justify-center"
             title="Configure app node"
           >
-            <Settings className="h-3.5 w-3.5" />
-          </button>
+            Edit <Settings className="h-3.5 w-3.5" />
+          </Button>
         )}
       </div>
       <h4 className="font-semibold text-xs text-neutral-800 leading-snug truncate">
@@ -1241,7 +1270,7 @@ function AppNode({ data }: { data: any }) {
           )}
         </div>
       )}
-      {data.isRunsTab &&
+      {/* {data.isRunsTab &&
         data.errors &&
         data.errors.length > 0 &&
         !data.isSimulationActive && (
@@ -1253,7 +1282,7 @@ function AppNode({ data }: { data: any }) {
               </span>
             ))}
           </div>
-        )}
+        )} */}
       <Handle
         type="target"
         position={Position.Top}
@@ -1420,6 +1449,10 @@ export default function FlowPreview({
 
   const hasWorkflow = renderedNodes.length > 0;
 
+  const hasMissingParams = renderedNodes.some(
+    (node) => node.data?.errors?.length > 0,
+  );
+
   return (
     <div className="w-full h-full relative flex items-center justify-center">
       {/* Canvas — white background */}
@@ -1499,7 +1532,7 @@ export default function FlowPreview({
 
       {/* Recipe suggestions — shown only if no workflow loaded */}
       {!hasWorkflow && (
-        <div className="relative z-10 max-w-md w-full border border-neutral-200 shadow rounded-md p-5 bg-neutral-50 select-none mx-4">
+        <div className="relative max-w-md w-full border border-neutral-200 shadow rounded-md p-4 bg-neutral-50 select-none mx-4">
           <div className="flex items-start gap-3 mb-4">
             <div className="h-9 w-9 rounded-xl bg-neutral-900 flex items-center justify-center shrink-0">
               <svg viewBox="0 0 36 48" width="16" height="20" fill="white">
@@ -1573,6 +1606,32 @@ export default function FlowPreview({
           </Button>
         </div>
       )}
+
+      {activeTab === "runs" &&
+        hasWorkflow &&
+        hasMissingParams &&
+        !isRunning && (
+          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 rounded-lg border border-red-200 bg-white px-4 py-2 shadow-md animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
+
+            <span className="text-xs text-neutral-600">
+              Some workflow nodes are missing required parameters.
+            </span>
+
+            <div className="h-4 w-px bg-neutral-200" />
+
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 text-xs rounded-sm"
+              onClick={() => {
+                // on click back to editor
+              }}
+            >
+              Go to Editor
+            </Button>
+          </div>
+        )}
     </div>
   );
 }

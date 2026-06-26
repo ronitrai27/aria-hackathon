@@ -5,10 +5,12 @@ import { useQuery, useMutation } from "convex/react";
 import {
   Check,
   ChevronDown,
+  Clock3,
   FileText,
   PanelRightClose,
   PanelRightOpen,
   Pencil,
+  Play,
   Star,
   X,
 } from "lucide-react";
@@ -19,9 +21,27 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+import { Label } from "@/components/ui/label";
+import { CalendarClock } from "lucide-react";
 import { api } from "../../../../convex/_generated/api";
 import FlowPreview from "../../Ai/components/FlowPreview";
 import { Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 interface WorkflowPanelProps {
   isRightOpen: boolean;
@@ -83,6 +103,8 @@ export default function WorkflowPanel({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [isWorkflowDropdownOpen, setIsWorkflowDropdownOpen] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState<Date>();
+  const [frequency, setFrequency] = useState("once");
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -283,7 +305,7 @@ export default function WorkflowPanel({
           {isWorkflowDropdownOpen && (
             <div
               id="workflow-dropdown-panel"
-              className="absolute top-full left-0 mt-2 z-50 w-72 bg-white border border-neutral-200 rounded-md shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150"
+              className="absolute top-full left-0 mt-2 z-50! w-72 bg-white border border-neutral-200 rounded-md shadow-md overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150"
             >
               <div className="px-3 py-2 border-b border-neutral-100 flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-neutral-600 uppercase tracking-wider">
@@ -317,7 +339,7 @@ export default function WorkflowPanel({
                         setSavedWorkflowId(wf._id);
                         setIsWorkflowDropdownOpen(false);
                       }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-neutral-50 transition-colors text-left group"
+                      className="w-full flex items-center gap-3 px-3 py-2 hover:bg-neutral-50 transition-colors text-left group"
                     >
                       <div
                         className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 ${
@@ -356,7 +378,7 @@ export default function WorkflowPanel({
                 )}
               </div>
               {/* Always-visible Create New button */}
-              <div className="px-2 py-2 border-t border-neutral-100">
+              <div className="px-2 py-1 border-t border-neutral-100">
                 <button
                   type="button"
                   onClick={() => {
@@ -368,7 +390,7 @@ export default function WorkflowPanel({
                   }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors group"
                 >
-                  <div className="h-7 w-7 rounded-lg bg-blue-100 group-hover:bg-blue-200 flex items-center justify-center shrink-0 transition-colors">
+                  <div className="h-6 w-6 rounded-lg bg-blue-100 group-hover:bg-blue-200 flex items-center justify-center shrink-0 transition-colors">
                     <Plus className="h-3.5 w-3.5" />
                   </div>
                   <span className="text-xs font-semibold">
@@ -399,7 +421,7 @@ export default function WorkflowPanel({
         </div>
 
         {/* Right: Run / Stop + collapse */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {activeTab === "runs" &&
             workflowData &&
             workflowData.nodes.length > 0 &&
@@ -412,36 +434,91 @@ export default function WorkflowPanel({
                   setIsWorkflowRunning(false);
                   setCurrentStepIndex(null);
                 }}
-                className="flex items-center gap-1.5 font-semibold text-xs h-8 px-3 rounded-lg cursor-pointer"
+                className="h-9 rounded-lg px-4 font-semibold"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping" />
+                <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping mr-2" />
                 Stop
               </Button>
             ) : (
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => startSimulation(workflowData.nodes)}
-                disabled={!isWorkflowReadyToRun(workflowData.nodes)}
-                className="flex items-center gap-1.5 font-semibold bg-blue-600 hover:bg-blue-700 text-white text-xs h-8 px-3 rounded-lg disabled:opacity-50 cursor-pointer"
-              >
-                <svg
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                  className="h-3 w-3"
+              <div className="flex items-center gap-2">
+                {/* Schedule */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 rounded"
+                    >
+                      <CalendarClock className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+
+                  <PopoverContent className="w-72 p-4 rounded-sm!" align="end">
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="font-semibold text-sm">
+                          Schedule Workflow
+                        </h4>
+                        <p className="text-xs text-muted-foreground">
+                          Run automatically.
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Time</Label>
+
+                        <Input type="time" defaultValue="09:00" />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Repeat</Label>
+
+                        <Select defaultValue="once">
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+
+                          <SelectContent>
+                            <SelectItem value="once">Once</SelectItem>
+                            <SelectItem value="daily">Every Day</SelectItem>
+                            <SelectItem value="weekly">Every Week</SelectItem>
+                            <SelectItem value="monthly">Every Month</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm">
+                          Cancel
+                        </Button>
+
+                        <Button size="sm">Save</Button>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Run */}
+
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => startSimulation(workflowData.nodes)}
+                  disabled={!isWorkflowReadyToRun(workflowData.nodes)}
+                  className="h-8 rounded-sm px-2 text-xs bg-blue-600 hover:bg-blue-700 gap-2 cursor-pointer"
                 >
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                Run
-              </Button>
+                  <Play className="h-4 w-4 fill-white" />
+                  Run now
+                </Button>
+              </div>
             ))}
+
           <Button
             type="button"
             variant="ghost"
             size="icon"
             onClick={() => setIsRightOpen(false)}
-            className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg bg-muted/30 cursor-pointer"
-            title="Collapse Preview"
+            className="h-9 w-9 rounded-lg bg-muted/30"
           >
             <PanelRightClose className="h-4 w-4" />
           </Button>
