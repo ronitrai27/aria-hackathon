@@ -2,7 +2,13 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import { useEffect, useState, useCallback, useMemo, MutableRefObject } from "react";
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  MutableRefObject,
+} from "react";
 import { useAgentStore } from "@/hooks/useAgentStore";
 import { useStoreUser } from "@/hooks/useStoreUser";
 import Image from "next/image";
