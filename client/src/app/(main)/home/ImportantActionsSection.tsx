@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import { useEffect, useState, useCallback, MutableRefObject } from "react";
+import { useEffect, useState, useCallback, useMemo, MutableRefObject } from "react";
 import { useAgentStore } from "@/hooks/useAgentStore";
 import { useStoreUser } from "@/hooks/useStoreUser";
 import Image from "next/image";
@@ -353,10 +353,25 @@ export function ImportantActionsSection({
   const calConnected = stillLoading ? null : isConnected("calendar");
   const slackConnected = stillLoading ? null : isConnected("slack");
 
+  const tasks = useQuery(api.tasks.getTasks);
+  const dueTodayTasksCount = useMemo(() => {
+    if (!tasks) return 0;
+    const now = new Date();
+    return tasks.filter((task) => {
+      if (task.status === "completed") return false;
+      const start = new Date(task.estimation.startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(task.estimation.endDate);
+      end.setHours(23, 59, 59, 999);
+      return now >= start && now <= end;
+    }).length;
+  }, [tasks]);
+
   const totalCount =
     (gmailConnected ? (storedData?.gmailUnreadCount ?? 0) : 0) +
     (calConnected ? (storedData?.calendarEvents.length ?? 0) : 0) +
-    (slackConnected ? (storedData?.slackMessageCount ?? 0) : 0);
+    (slackConnected ? (storedData?.slackMessageCount ?? 0) : 0) +
+    dueTodayTasksCount;
 
   const openConnectionDialog = useAgentStore((s) => s.openConnectionDialog);
 
@@ -529,13 +544,13 @@ export function ImportantActionsSection({
           ctaHref="https://outlook.com"
         />
 
-        {/* Tasks — demo, no connection state */}
+        {/* Tasks — active, no connection state */}
         <ActionCard
           icon={<TasksIcon />}
           toolName="Tasks"
           connected={null}
           loadingConn={false}
-          label="3 tasks due today"
+          label={`${dueTodayTasksCount} task${dueTodayTasksCount !== 1 ? "s" : ""} due today`}
           sublabel="in Tasks"
           ctaLabel="View Tasks"
           ctaHref="/home/tasks"

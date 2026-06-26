@@ -18,7 +18,9 @@ export const saveWorkflow = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("Unauthorized: Cannot save workflow without a Clerk session.");
+      throw new Error(
+        "Unauthorized: Cannot save workflow without a Clerk session.",
+      );
     }
     const userId = identity.subject;
 
@@ -43,7 +45,7 @@ export const saveWorkflow = mutation({
         name: args.name,
         description: args.description || "",
         isStarred: false,
-        status: args.status ?? "draft",
+        status: args.status ?? "active",
         structure: args.structure,
         createdAt: now,
         updatedAt: now,
@@ -116,12 +118,32 @@ export const updateLastRun = mutation({
 });
 
 /**
+ * Update the status of a workflow (active or draft)
+ */
+export const updateStatus = mutation({
+  args: {
+    id: v.id("workflows"),
+    status: v.union(v.literal("active"), v.literal("draft")),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const workflow = await ctx.db.get(args.id);
+    if (!workflow) throw new Error("Workflow not found");
+    await ctx.db.patch(args.id, {
+      status: args.status,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
  * Save the schedule configuration (time + repeat frequency) for a workflow.
  */
 export const updateSchedule = mutation({
   args: {
     id: v.id("workflows"),
-    time: v.string(),      // e.g. "09:00"
+    time: v.string(), // e.g. "09:00"
     frequency: v.string(), // "once" | "daily" | "weekly" | "monthly"
   },
   handler: async (ctx, args) => {
@@ -152,5 +174,24 @@ export const getWorkflows = query({
       .withIndex("by_user", (q) => q.eq("userId", identity.subject))
       .order("desc")
       .collect();
+  },
+});
+
+/**
+ * Delete a workflow by ID
+ */
+export const deleteWorkflow = mutation({
+  args: {
+    id: v.id("workflows"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const workflow = await ctx.db.get(args.id);
+    if (!workflow) throw new Error("Workflow not found");
+    if (workflow.userId !== identity.subject) {
+      throw new Error("Unauthorized: You do not own this workflow");
+    }
+    await ctx.db.delete(args.id);
   },
 });

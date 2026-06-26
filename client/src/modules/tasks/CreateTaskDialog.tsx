@@ -187,14 +187,14 @@ export function CreateTaskDialog({ trigger }: CreateTaskDialogProps) {
       }}
     >
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="w-full min-w-[600px] bg-card border border-border shadow-2xl p-0 overflow-hidden text-foreground rounded-xl">
+      <DialogContent className="w-full min-w-[600px] bg-card border border-border shadow-xl p-0 overflow-hidden text-foreground rounded-xl">
         {/* Header Breadcrumb */}
-        <DialogHeader className="px-6 py-4 flex flex-row items-center justify-between border-b border-border bg-neutral-100 dark:bg-neutral-950">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium select-none">
+        <DialogHeader className="px-6 py-4 flex flex-row items-center justify-between border-b border-border bg-neutral-100">
+          <div className="flex items-center gap-1.5 text-xs text font-medium select-none">
             <span className="hover:text-foreground transition-colors cursor-pointer">
               My Tasks
             </span>
-            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60" />
+            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="text-foreground font-semibold">New Task</span>
           </div>
         </DialogHeader>
@@ -203,9 +203,7 @@ export function CreateTaskDialog({ trigger }: CreateTaskDialogProps) {
         <div className="p-6 space-y-5">
           {/* Task Title Input Box */}
           <div className="space-y-1.5">
-            <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-              Task Title
-            </Label>
+            <Label className="text-sm">Task Title</Label>
             <Input
               autoFocus
               placeholder="What needs to be done?"
@@ -218,7 +216,7 @@ export function CreateTaskDialog({ trigger }: CreateTaskDialogProps) {
                 if (e.key === "Enter") handleCreate();
               }}
               className={cn(
-                "h-10 text-sm bg-neutral-50 dark:bg-neutral-900 border border-border/80 rounded-lg focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary",
+                "h-10 text-sm bg-neutral-100 border border-border/80 rounded-lg focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary",
                 duplicateError &&
                   "border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500",
               )}
@@ -233,20 +231,18 @@ export function CreateTaskDialog({ trigger }: CreateTaskDialogProps) {
 
           {/* Properties row */}
           <div className="space-y-1.5">
-            <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-              Task Settings
-            </Label>
+            <Label className="text-sm">Task Settings</Label>
             <div className="flex items-center gap-2.5 overflow-x-auto whitespace-nowrap py-1">
               {/* Status Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
-                    className="h-10 gap-2 rounded-lg text-xs bg-neutral-50 dark:bg-neutral-900 border-border/80 hover:bg-muted/20 text-muted-foreground hover:text-foreground font-semibold transition-all shrink-0 px-4"
+                    className="h-10 gap-2 rounded-lg text-xs bg-neutral-100 border border-border/80 hover:bg-muted/20 transition-all shrink-0 px-4"
                   >
                     <StatusDot status={status} />
                     <span>{STATUS_CONFIG[status].label}</span>
-                    <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5 shrink-0" />
+                    <ChevronDown className="w-3.5 h-3.5 ml-0.5 shrink-0" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
@@ -282,11 +278,11 @@ export function CreateTaskDialog({ trigger }: CreateTaskDialogProps) {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
-                    className="h-10 gap-2 rounded-lg text-xs bg-neutral-50 dark:bg-neutral-900 border-border/80 hover:bg-muted/20 text-muted-foreground hover:text-foreground font-semibold transition-all shrink-0 px-4"
+                    className="h-10 gap-2 rounded-lg text-xs bg-neutral-100 border border-border/80 hover:bg-muted/20 transition-all shrink-0 px-4"
                   >
                     {priorityBars[priority]}
                     <span className="capitalize">{priority} Priority</span>
-                    <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5 shrink-0" />
+                    <ChevronDown className="w-3.5 h-3.5 ml-0.5 shrink-0" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
@@ -317,7 +313,7 @@ export function CreateTaskDialog({ trigger }: CreateTaskDialogProps) {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="h-10 gap-2 rounded-lg text-xs bg-neutral-50 dark:bg-neutral-900 border-border/80 hover:bg-muted/20 text-muted-foreground hover:text-foreground font-semibold transition-all shrink-0 px-4"
+                    className="h-10 gap-2 rounded-lg text-xs bg-neutral-100 border border-border/80 hover:bg-muted/20 transition-all shrink-0 px-4"
                   >
                     <CalendarRange className="w-3.5 h-3.5 text-muted-foreground/80" />
                     <span>
