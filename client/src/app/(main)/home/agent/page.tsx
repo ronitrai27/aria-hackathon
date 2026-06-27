@@ -46,35 +46,80 @@ import AgentChatMessages from "./AgentChatMessages";
 import WorkflowPanel from "../../../../modules/workflows/components/WorkflowPanel";
 import WorkflowChoiceDialog from "../../../../modules/WorkflowChoiceDialog";
 
-const suggestions = [
+const brainSuggestions = [
   {
-    title: "Context",
-    description:
-      "Suggest me some tasks and automations from yesterday research.",
-    shortDescription: "Suggest tasks from yesterday's research.",
-    prompt: "Suggest tasks and automations from yesterday research.",
+    title: "Browser Activities",
+    description: "Create tasks from my previous important browser activities.",
+    shortDescription: "Tasks from browser activities.",
+    prompt: "Create tasks from my previous important browser activities.",
     icon: Brain,
     iconColor: "text-purple-500",
     iconBg: "bg-purple-500/10 group-hover:bg-purple-500/20",
   },
   {
-    title: "Workload & Deadline",
-    description: "Explain my recent workload and tasks pending",
-    shortDescription: "Explain my pending workload.",
-    prompt: "Explain my recent workload and tasks pending",
+    title: "Internet Usage",
+    description:
+      "Reflect my past activities and tell what I spent most hours on internet?",
+    shortDescription: "Internet usage recap.",
+    prompt:
+      "Reflect my past activities and tell what I spent most hours on internet?",
     icon: Clock,
-    iconColor: "text-purple-500",
-    iconBg: "bg-purple-500/10 group-hover:bg-purple-500/20",
+    iconColor: "text-amber-500",
+    iconBg: "bg-amber-500/10 group-hover:bg-amber-500/20",
   },
   {
-    title: "Research Workflow",
+    title: "Important Tasks",
     description:
-      "Create a workflow to research about x topic and create report.",
-    shortDescription: "Research a topic and create report.",
-    prompt: "Create a workflow to research about x topic and create report.",
+      "Check my important emails, calendar and slack messages and make some tasks that are important.",
+    shortDescription: "Sync emails, calendar & slack.",
+    prompt:
+      "Check my important emails, calendar and slack messages and make some tasks that are important.",
     icon: Workflow,
-    iconColor: "text-purple-500",
-    iconBg: "bg-purple-500/10 group-hover:bg-purple-500/20",
+    iconColor: "text-blue-500",
+    iconBg: "bg-blue-500/10 group-hover:bg-blue-500/20",
+    images: ["/gmail.png", "/calendar.png", "/slack.png"],
+  },
+];
+
+const agentSuggestions = [
+  {
+    title: "AI Trends Doc",
+    description:
+      "Research about latest AI trends and create a doc and send to email.",
+    shortDescription: "Research AI trends & send doc.",
+    prompt:
+      "Research about latest AI trends, create a Google Doc, and send to my email.",
+    icon: Sparkles,
+    iconColor: "text-blue-500",
+    iconBg: "bg-blue-500/10 group-hover:bg-blue-500/20",
+    images: ["/logo.svg", "/docs.png", "/gmail.png"],
+    apps: ["Google Docs", "Gmail"],
+  },
+  {
+    title: "AI Jobs in India",
+    description:
+      "Research about latest AI jobs in India, send to slack and post in reddit.",
+    shortDescription: "AI jobs: Slack & Reddit.",
+    prompt:
+      "Research about latest AI jobs in India, send details to Slack, and post on Reddit.",
+    icon: Search,
+    iconColor: "text-orange-500",
+    iconBg: "bg-orange-500/10 group-hover:bg-orange-500/20",
+    images: ["/logo.svg", "/slack.png", "/reddit.png"],
+    apps: ["Slack", "Reddit"],
+  },
+  {
+    title: "Linear & Todoist",
+    description:
+      "Fetch tasks from linear, send to slack and make those tasks in todoist.",
+    shortDescription: "Linear tasks to Slack & Todoist.",
+    prompt:
+      "Fetch tasks from Linear, send a summary to Slack, and create those tasks in Todoist.",
+    icon: Bot,
+    iconColor: "text-emerald-500",
+    iconBg: "bg-emerald-500/10 group-hover:bg-emerald-500/20",
+    images: ["/linear.jpeg", "/slack.png", "/todoist.jpg"],
+    apps: ["Linear", "Slack", "Todoist"],
   },
 ];
 
@@ -418,39 +463,42 @@ export default function AgentPage() {
     return errors;
   }, []);
 
-  const startSimulation = useCallback((nodes: any[]) => {
-    if (!nodes || nodes.length === 0) return;
-    setIsWorkflowRunning(true);
-    setCurrentStepIndex(0);
-    setExecutionLogs([
-      `[${new Date().toLocaleTimeString()}] 🚀 Initiating execution for workflow: Designed Automation Graph`,
-      `[${new Date().toLocaleTimeString()}] 🛡️ Validating security tokens and node credentials...`,
-      `[${new Date().toLocaleTimeString()}] ✅ Security validation complete. All connections authorized.`,
-      `[${new Date().toLocaleTimeString()}] 📝 Starting execution sequence...`,
-    ]);
+  const startSimulation = useCallback(
+    (nodes: any[]) => {
+      if (!nodes || nodes.length === 0) return;
+      setIsWorkflowRunning(true);
+      setCurrentStepIndex(0);
+      setExecutionLogs([
+        `[${new Date().toLocaleTimeString()}] 🚀 Initiating execution for workflow: Designed Automation Graph`,
+        `[${new Date().toLocaleTimeString()}] 🛡️ Validating security tokens and node credentials...`,
+        `[${new Date().toLocaleTimeString()}] ✅ Security validation complete. All connections authorized.`,
+        `[${new Date().toLocaleTimeString()}] 📝 Starting execution sequence...`,
+      ]);
 
-    const initialStatuses: Record<
-      string,
-      "pending" | "running" | "success" | "failed"
-    > = {};
-    nodes.forEach((n, idx) => {
-      initialStatuses[n.id] = idx === 0 ? "running" : "pending";
-    });
-    setNodeExecutionStatuses(initialStatuses);
-
-    // Record the last run execution
-    if (savedWorkflowId) {
-      updateLastRun({ id: savedWorkflowId as any }).catch((err) => {
-        console.error("Failed to update last run:", err);
+      const initialStatuses: Record<
+        string,
+        "pending" | "running" | "success" | "failed"
+      > = {};
+      nodes.forEach((n, idx) => {
+        initialStatuses[n.id] = idx === 0 ? "running" : "pending";
       });
-    }
+      setNodeExecutionStatuses(initialStatuses);
 
-    // Show a loading toast at top-center
-    const toastId = toast.loading("Running workflow...", {
-      position: "top-center",
-    });
-    runToastIdRef.current = toastId;
-  }, [savedWorkflowId, updateLastRun]);
+      // Record the last run execution
+      if (savedWorkflowId) {
+        updateLastRun({ id: savedWorkflowId as any }).catch((err) => {
+          console.error("Failed to update last run:", err);
+        });
+      }
+
+      // Show a loading toast at top-center
+      const toastId = toast.loading("Running workflow...", {
+        position: "top-center",
+      });
+      runToastIdRef.current = toastId;
+    },
+    [savedWorkflowId, updateLastRun],
+  );
 
   // Simulation execution loop
   useEffect(() => {
@@ -1054,19 +1102,29 @@ export default function AgentPage() {
 
                   {/* ── Cards — suggestions ── */}
                   <div
-                    className={`grid w-full max-w-2xl gap-3.5 mb-6 ${
+                    className={`grid w-full max-w-[680px] gap-3.5 mb-6 ${
                       isNarrow ? "grid-cols-1" : "grid-cols-3"
                     }`}
                   >
-                    {suggestions.map((s, idx) => (
+                    {(activeMode === "agent"
+                      ? agentSuggestions
+                      : brainSuggestions
+                    ).map((s, idx) => (
                       <button
                         key={s.title}
                         type="button"
-                        onClick={() => setInputVal(s.prompt)}
+                        onClick={() => {
+                          setInputVal(s.prompt);
+                          if (s.apps) {
+                            setSelectedSuggestionApps(s.apps);
+                          } else {
+                            setSelectedSuggestionApps([]);
+                          }
+                        }}
                         className={`flex text-left bg-card hover:border-primary/20 hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-xs w-full ${
                           isNarrow
                             ? "flex-row items-center p-2 rounded-lg border border-border h-11"
-                            : "flex-col items-start p-4 rounded-xl border border-border h-36"
+                            : "flex-col items-start p-4 rounded-xl border border-border h-40"
                         }`}
                         style={{
                           transitionDelay: `${idx * 80}ms`,
@@ -1086,15 +1144,61 @@ export default function AgentPage() {
                             <span className="text-[11px] text-muted-foreground font-medium truncate ml-2.5 flex-1 pr-1 group-hover:text-primary transition-colors duration-300">
                               {s.shortDescription}
                             </span>
+                            {s.images && (
+                              <div className="flex -space-x-1 ml-auto mr-2 shrink-0">
+                                {s.images.map((img, i) => (
+                                  <div
+                                    key={i}
+                                    className={`w-5 h-5 border border-card bg-white flex items-center justify-center shadow-xs overflow-hidden shrink-0 ${
+                                      img.includes("logo.svg") ? "rounded-sm" : "rounded"
+                                    }`}
+                                  >
+                                    <Image
+                                      src={img}
+                                      alt=""
+                                      width={12}
+                                      height={12}
+                                      className={`object-contain ${
+                                        img.includes("logo.svg") ? "invert" : ""
+                                      }`}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </>
                         ) : (
                           <>
-                            <div
-                              className={`p-2 rounded-lg ${s.iconBg} mb-3 transition-colors duration-300`}
-                            >
-                              <s.icon
-                                className={`h-4.5 w-4.5 ${s.iconColor}`}
-                              />
+                            <div className="flex justify-between items-start w-full">
+                              <div
+                                className={`p-2 rounded-lg ${s.iconBg} mb-3 transition-colors duration-300`}
+                              >
+                                <s.icon
+                                  className={`h-4.5 w-4.5 ${s.iconColor}`}
+                                />
+                              </div>
+                              {s.images && (
+                                <div className="flex -space-x-1.5 mt-1">
+                                  {s.images.map((img, i) => (
+                                    <div
+                                      key={i}
+                                      className={`w-5.5 h-5.5 border border-card bg-white flex items-center justify-center shadow-xs overflow-hidden ${
+                                        img.includes("logo.svg") ? "rounded-sm" : "rounded-full"
+                                      }`}
+                                    >
+                                      <Image
+                                        src={img}
+                                        alt=""
+                                        width={15}
+                                        height={15}
+                                        className={`object-contain ${
+                                          img.includes("logo.svg") ? "invert" : ""
+                                        }`}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                             <h4 className="font-semibold text-xs text-foreground mb-1 group-hover:text-primary transition-colors duration-300">
                               {s.title}

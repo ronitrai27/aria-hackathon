@@ -3,11 +3,14 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../../../convex/_generated/api";
+import { redis } from "@/lib/redis";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 const customOpenai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  // apiKey:
+  //   "sk-proj-ZfcteT-6xfwz9q",
 });
 
 const model = customOpenai("gpt-4.1-nano");
@@ -34,8 +37,13 @@ interface AggregatedActivity {
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = await req.json();
-    console.log("[Recap API] Request received for userId:", userId);
+    const { userId, forceRefresh } = await req.json();
+    console.log(
+      "[Recap API] Request received for userId:",
+      userId,
+      "forceRefresh:",
+      forceRefresh,
+    );
 
     if (!userId) {
       console.error("[Recap API] Missing required parameter: userId");
@@ -43,6 +51,27 @@ export async function POST(req: NextRequest) {
         { error: "Missing required parameter: userId" },
         { status: 400 },
       );
+    }
+
+    const cacheKey = `browser_recap:${userId}`;
+
+    if (!forceRefresh) {
+      try {
+        const cachedData = await redis.get(cacheKey);
+        if (cachedData) {
+          console.log("[Recap API] Cache hit from Redis for user:", userId);
+          const data =
+            typeof cachedData === "string"
+              ? JSON.parse(cachedData)
+              : cachedData;
+          return NextResponse.json({ ...data, cached: true });
+        }
+      } catch (redisError) {
+        console.error(
+          "[Recap API] Redis read error (falling back to fetch):",
+          redisError,
+        );
+      }
     }
 
     // 1. Fetch raw browser data from Convex
@@ -244,11 +273,20 @@ Rules:
     const result = JSON.parse(cleanText);
     console.log("[Recap API] Parsed JSON response successfully:", result);
 
-    return NextResponse.json({
+    const finalResult = {
       summary: result.summary,
       items: result.items || [],
       topSites,
-    });
+    };
+
+    try {
+      await redis.set(cacheKey, JSON.stringify(finalResult), { ex: 3600 });
+      console.log("[Recap API] Cached new result in Redis for user:", userId);
+    } catch (redisError) {
+      console.error("[Recap API] Redis write error:", redisError);
+    }
+
+    return NextResponse.json(finalResult);
   } catch (error: any) {
     console.error("[API /api/ai-vercel/browser] Error:", error);
     return NextResponse.json(

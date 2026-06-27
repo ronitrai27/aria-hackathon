@@ -151,7 +151,7 @@ export default function HomePage() {
             alt="logo"
             width={30}
             height={30}
-            className=" shrink-0"
+            className=" shrink-0 invert"
           />
         </div>
         <div className="w-full">
@@ -173,7 +173,7 @@ export default function HomePage() {
       />
 
       {/* ── Browser Activity Recap & Standup ── */}
-      {/* <BrowserRecapSection /> */}
+      <BrowserRecapSection />
     </div>
   );
 }
