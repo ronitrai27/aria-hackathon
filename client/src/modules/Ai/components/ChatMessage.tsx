@@ -1,5 +1,14 @@
 import { useState, useEffect, useRef } from "react";
-import { CheckCircle, RefreshCw, ChevronDown } from "lucide-react";
+import {
+  CheckCircle,
+  RefreshCw,
+  ChevronDown,
+  Clock,
+  Copy,
+  Check,
+  ThumbsUp,
+  ThumbsDown,
+} from "lucide-react";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -45,27 +54,31 @@ export function TraceLogsViewer({
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
-  const currentDuration = isGenerating ? elapsed : (message?.executionTime || 0);
+  const currentDuration = isGenerating ? elapsed : message?.executionTime || 0;
 
   return (
     <div className="mt-3 p-4 bg-muted/40 backdrop-blur-md rounded-xl border border-border space-y-3 max-w-xl shadow-sm select-none dark:bg-zinc-900/40 dark:border-white/5">
-      <div 
+      <div
         className="flex items-center justify-between border-b border-border dark:border-white/5 pb-2 cursor-pointer"
         onClick={() => setIsOpen(!isOpen)}
       >
         <span className="text-[10px] font-bold text-muted-foreground dark:text-zinc-400 tracking-wider uppercase flex items-center gap-1.5">
-          <span className={`h-1.5 w-1.5 rounded-full ${isGenerating ? "bg-indigo-500 animate-pulse" : "bg-emerald-500"}`} />
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${isGenerating ? "bg-indigo-500 animate-pulse" : "bg-emerald-500"}`}
+          />
           {isGenerating ? "Executing..." : `Executed in ${currentDuration}s`}
         </span>
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-mono text-muted-foreground dark:text-zinc-500 font-semibold bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">
             {formatTime(currentDuration)}
           </span>
-          <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform duration-200 ${isOpen ? "transform rotate-180" : ""}`} />
+          <ChevronDown
+            className={`h-3 w-3 text-muted-foreground transition-transform duration-200 ${isOpen ? "transform rotate-180" : ""}`}
+          />
         </div>
       </div>
       {isOpen && (
-        <div 
+        <div
           ref={containerRef}
           className="space-y-1.5 max-h-48 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-800"
         >
@@ -190,35 +203,52 @@ export function CustomMarkdown({ content }: { content: string }) {
         // 1. Check if heading
         if (trimmed.startsWith("### ")) {
           return (
-            <h4 key={blockIdx} className="text-xs font-bold text-zinc-800 dark:text-zinc-100 mt-4 mb-1.5 tracking-wide uppercase">
+            <h4
+              key={blockIdx}
+              className="text-xs font-bold text-zinc-800 dark:text-zinc-100 mt-4 mb-1.5 tracking-wide uppercase"
+            >
               {parseInline(trimmed.substring(4))}
             </h4>
           );
         }
         if (trimmed.startsWith("## ")) {
           return (
-            <h3 key={blockIdx} className="text-sm font-bold text-zinc-800 dark:text-zinc-100 mt-5 mb-2 border-b border-zinc-200 dark:border-zinc-800 pb-1">
+            <h3
+              key={blockIdx}
+              className="text-sm font-bold text-zinc-800 dark:text-zinc-100 mt-5 mb-2 border-b border-zinc-200 dark:border-zinc-800 pb-1"
+            >
               {parseInline(trimmed.substring(3))}
             </h3>
           );
         }
         if (trimmed.startsWith("# ")) {
           return (
-            <h2 key={blockIdx} className="text-base font-extrabold text-zinc-900 dark:text-zinc-100 mt-5 mb-2.5">
+            <h2
+              key={blockIdx}
+              className="text-base font-extrabold text-zinc-900 dark:text-zinc-100 mt-5 mb-2.5"
+            >
               {parseInline(trimmed.substring(2))}
             </h2>
           );
         }
 
         // 2. Check if bullet list block
-        if (trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.startsWith("\n- ") || trimmed.startsWith("\n* ")) {
+        if (
+          trimmed.startsWith("- ") ||
+          trimmed.startsWith("* ") ||
+          trimmed.startsWith("\n- ") ||
+          trimmed.startsWith("\n* ")
+        ) {
           const items = trimmed
             .split(/\n[-*]\s+/)
             .map((item) => item.replace(/^[-*]\s+/, "").trim())
             .filter(Boolean);
 
           return (
-            <ul key={blockIdx} className="list-disc pl-4 space-y-1.5 text-zinc-700 dark:text-zinc-300">
+            <ul
+              key={blockIdx}
+              className="list-disc pl-4 space-y-1.5 text-zinc-700 dark:text-zinc-300"
+            >
               {items.map((item, itemIdx) => (
                 <li key={itemIdx} className="text-[12.5px] leading-relaxed">
                   {parseInline(item)}
@@ -231,7 +261,10 @@ export function CustomMarkdown({ content }: { content: string }) {
         // 3. Regular paragraph
         const lines = trimmed.split("\n");
         return (
-          <p key={blockIdx} className="text-[12.5px] leading-relaxed text-zinc-800 dark:text-zinc-200">
+          <p
+            key={blockIdx}
+            className="text-[12.5px] leading-relaxed text-zinc-800 dark:text-zinc-200"
+          >
             {lines.map((line, lineIdx) => (
               <React.Fragment key={lineIdx}>
                 {lineIdx > 0 && <br />}
@@ -254,14 +287,20 @@ function parseInline(text: string): React.ReactNode[] {
   return matches.map((part, idx) => {
     if (part.startsWith("**") && part.endsWith("**")) {
       return (
-        <strong key={idx} className="font-semibold text-zinc-900 dark:text-zinc-50">
+        <strong
+          key={idx}
+          className="font-semibold text-zinc-900 dark:text-zinc-50"
+        >
           {part.slice(2, -2)}
         </strong>
       );
     }
     if (part.startsWith("`") && part.endsWith("`")) {
       return (
-        <code key={idx} className="px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded font-mono text-[10.5px] text-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700/50">
+        <code
+          key={idx}
+          className="px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded font-mono text-[10.5px] text-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700/50"
+        >
           {part.slice(1, -1)}
         </code>
       );
@@ -270,12 +309,20 @@ function parseInline(text: string): React.ReactNode[] {
   });
 }
 
-interface ChatMessageItemProps {
+export interface ChatMessageItemProps {
   message: ChatMessage;
 }
 
 export default function ChatMessageItem({ message }: ChatMessageItemProps) {
   const isUser = message.role === "user";
+  const [copied, setCopied] = useState(false);
+  const [liked, setLiked] = useState<"up" | "down" | null>(null);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(message.content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <div
@@ -296,12 +343,12 @@ export default function ChatMessageItem({ message }: ChatMessageItemProps) {
           </svg>
         </div>
       )}
-      <div className="flex flex-col gap-1 w-full max-w-[82%]">
+      <div className="flex flex-col gap-1 w-full max-w-none">
         <div
           className={`rounded-2xl text-sm leading-relaxed ${
             isUser
-              ? "p-4 bg-zinc-100 border border-zinc-200 text-zinc-900 dark:bg-zinc-800/90 dark:border-zinc-700/40 dark:text-neutral-100 rounded-tr-sm ml-auto shadow-xs"
-              : "py-2 px-1 text-foreground dark:text-neutral-200 rounded-tl-sm"
+              ? "p-4 bg-zinc-100 border border-zinc-200 text-zinc-900 dark:bg-zinc-800/90 dark:border-zinc-700/40 dark:text-neutral-100 rounded-tr-sm ml-auto shadow-xs max-w-[85%]"
+              : "py-2 px-1 text-foreground dark:text-neutral-200 rounded-tl-sm w-full"
           }`}
         >
           {isUser ? (
@@ -309,13 +356,61 @@ export default function ChatMessageItem({ message }: ChatMessageItemProps) {
           ) : (
             <CustomMarkdown content={formatMessageContent(message.content)} />
           )}
-          
+
           {!isUser && message.traceLogs && message.traceLogs.length > 0 ? (
-            <TraceLogsViewer traceLogs={message.traceLogs} isGenerating={false} message={message} />
+            <TraceLogsViewer
+              traceLogs={message.traceLogs}
+              isGenerating={false}
+              message={message}
+            />
           ) : (
-            !isUser && message.steps && message.steps.length > 0 && (
-              <StatusStepper steps={message.steps} />
-            )
+            !isUser &&
+            message.steps &&
+            message.steps.length > 0 && <StatusStepper steps={message.steps} />
+          )}
+
+          {!isUser && message.executionTime !== undefined && (
+            <div className="flex items-center gap-3.5 mt-3 pt-2 border-t border-zinc-200  text-[10.5px]  select-none">
+              <span className="flex items-center gap-1 shrink-0 font-medium">
+                <Clock className="h-3.5 w-3.5 text-zinc-400" />
+                Executed in {message.executionTime}s
+              </span>
+              <div className="flex items-center gap-1.5 ml-auto">
+                <button
+                  onClick={handleCopy}
+                  className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800/80 transition-colors text-neutral-700 cursor-pointer"
+                  title="Copy response"
+                >
+                  {copied ? (
+                    <Check className="h-3 w-3 text-emerald-500" />
+                  ) : (
+                    <Copy className="h-3 w-3" />
+                  )}
+                </button>
+                <button
+                  onClick={() => setLiked(liked === "up" ? null : "up")}
+                  className={`p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800/80 transition-colors cursor-pointer ${
+                    liked === "up"
+                      ? "text-emerald-500 hover:text-emerald-400"
+                      : "text-neutral-700"
+                  }`}
+                  title="Like response"
+                >
+                  <ThumbsUp className="h-3 w-3" />
+                </button>
+                <button
+                  onClick={() => setLiked(liked === "down" ? null : "down")}
+                  className={`p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800/80 transition-colors cursor-pointer ${
+                    liked === "down"
+                      ? "text-rose-500 hover:text-rose-400"
+                      : "text-neutral-700"
+                  }`}
+                  title="Dislike response"
+                >
+                  <ThumbsDown className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>

@@ -1,5 +1,8 @@
 import { useState, useCallback } from "react";
-import { ChatMessage, formatMessageContent } from "@/modules/Ai/components/ChatMessage";
+import {
+  ChatMessage,
+  formatMessageContent,
+} from "@/modules/Ai/components/ChatMessage";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
@@ -12,16 +15,22 @@ export function useBrainChat() {
   >([]);
   const [pendingTasks, setPendingTasks] = useState<any[] | null>(null);
   const [threadId] = useState(
-    () => `brain_thread_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+    () =>
+      `brain_thread_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
   );
 
   const user = useQuery(api.user.getCurrentUser);
 
   // Core SSE stream consumer
-  const consumeStream = async (reader: ReadableStreamDefaultReader<Uint8Array>) => {
+  const consumeStream = async (
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    startTime: number,
+    initialSteps: Array<{ worker: string; status: string; message: string }>,
+  ) => {
     const decoder = new TextDecoder();
     let buffer = "";
     const accumulatedTraceLogs: string[] = [];
+    const accumulatedSteps = [...initialSteps];
 
     // Ensure we start with an assistant message block staged if we receive thoughts
     let hasStagedAssistant = false;
@@ -61,7 +70,7 @@ export function useBrainChat() {
                 setActiveTraceLogs([...accumulatedTraceLogs]);
               } else if (eventName === "brain_thought") {
                 const thought = payload.message || "";
-                
+
                 // Append the streamed thoughts to the assistant message in real-time without mutation
                 setMessages((prev) => {
                   const list = [...prev];
@@ -69,7 +78,7 @@ export function useBrainChat() {
                   if (last && last.role === "assistant" && hasStagedAssistant) {
                     list[list.length - 1] = {
                       ...last,
-                      content: last.content + thought
+                      content: last.content + thought,
                     };
                     return list;
                   } else {
@@ -85,20 +94,30 @@ export function useBrainChat() {
                 setActiveTraceLogs([...accumulatedTraceLogs]);
 
                 // Update active steps
-                setActiveSteps((prev) => {
-                  const list = [...prev];
-                  const existingIdx = list.findIndex((s) => s.worker === toolName);
-                  const detailsMsg = `Executing tool: ${toolName}...`;
-                  if (existingIdx !== -1) {
-                    list[existingIdx] = { worker: toolName, status: "running", message: detailsMsg };
-                  } else {
-                    list.push({ worker: toolName, status: "running", message: detailsMsg });
-                  }
-                  return list;
-                });
+                const existingIdx = accumulatedSteps.findIndex(
+                  (s) => s.worker === toolName,
+                );
+                const detailsMsg = `Executing tool: ${toolName}...`;
+                if (existingIdx !== -1) {
+                  accumulatedSteps[existingIdx] = {
+                    worker: toolName,
+                    status: "running",
+                    message: detailsMsg,
+                  };
+                } else {
+                  accumulatedSteps.push({
+                    worker: toolName,
+                    status: "running",
+                    message: detailsMsg,
+                  });
+                }
+                setActiveSteps([...accumulatedSteps]);
               } else if (eventName === "brain_tool_result") {
                 const toolName = payload.tool_name || "";
-                let contentStr = typeof payload.content === "string" ? payload.content : JSON.stringify(payload.content || "");
+                let contentStr =
+                  typeof payload.content === "string"
+                    ? payload.content
+                    : JSON.stringify(payload.content || "");
                 if (contentStr.length > 200) {
                   contentStr = contentStr.substring(0, 200) + "...";
                 }
@@ -107,17 +126,19 @@ export function useBrainChat() {
                 setActiveTraceLogs([...accumulatedTraceLogs]);
 
                 // Update active steps as completed
-                setActiveSteps((prev) => {
-                  return prev.map((s) => {
-                    if (s.worker === toolName) {
-                      return { ...s, status: "completed", message: `Tool ${toolName} completed.` };
-                    }
-                    return s;
-                  });
-                });
+                for (let i = 0; i < accumulatedSteps.length; i++) {
+                  if (accumulatedSteps[i].worker === toolName) {
+                    accumulatedSteps[i].status = "completed";
+                    accumulatedSteps[i].message = `Tool ${toolName} completed.`;
+                  }
+                }
+                setActiveSteps([...accumulatedSteps]);
               } else if (eventName === "hitl_request") {
                 const tasks = payload.tasks || [];
-                console.log(`[useBrainChat] HITL Task Creation Interrupted. Tasks awaiting approval:`, tasks);
+                console.log(
+                  `[useBrainChat] HITL Task Creation Interrupted. Tasks awaiting approval:`,
+                  tasks,
+                );
                 setPendingTasks(tasks);
                 // Turn off generation loader during HITL wait
                 setIsGenerating(false);
@@ -132,34 +153,67 @@ export function useBrainChat() {
                       last.content = formatMessageContent(finalTxt);
                       return list;
                     }
-                    return [...list, { role: "assistant", content: formatMessageContent(finalTxt) }];
+                    return [
+                      ...list,
+                      {
+                        role: "assistant",
+                        content: formatMessageContent(finalTxt),
+                      },
+                    ];
                   });
                 }
-                
+
                 // Mark supervisor node as completed
-                setActiveSteps((prev) => {
-                  return prev.map((s) => {
-                    if (s.worker === "brain_supervisor") {
-                      return { ...s, status: "completed", message: "Aria finished reasoning." };
-                    }
-                    return s;
-                  });
-                });
+                for (let i = 0; i < accumulatedSteps.length; i++) {
+                  if (accumulatedSteps[i].worker === "brain_supervisor") {
+                    accumulatedSteps[i].status = "completed";
+                    accumulatedSteps[i].message = "Aria finished reasoning.";
+                  }
+                }
+                setActiveSteps([...accumulatedSteps]);
               } else if (eventName === "error") {
                 console.error("Brain SSE error payload:", payload.error);
                 accumulatedTraceLogs.push(`❌ Error: ${payload.error}`);
                 setActiveTraceLogs([...accumulatedTraceLogs]);
               }
             } catch (err) {
-              console.error("Error parsing brain stream event JSON:", err, dataStr);
+              console.error(
+                "Error parsing brain stream event JSON:",
+                err,
+                dataStr,
+              );
             }
           }
         }
       }
     } catch (err: any) {
       console.error("Error consuming stream:", err);
-      accumulatedTraceLogs.push(`❌ Network stream error: ${err.message || err}`);
+      accumulatedTraceLogs.push(
+        `❌ Network stream error: ${err.message || err}`,
+      );
       setActiveTraceLogs([...accumulatedTraceLogs]);
+    } finally {
+      // Finalize the last assistant message with execution time
+      const finalTime = Math.round((Date.now() - startTime) / 1000);
+
+      setMessages((prev) => {
+        const list = [...prev];
+        const last = list[list.length - 1];
+        if (last && last.role === "assistant") {
+          list[list.length - 1] = {
+            ...last,
+            executionTime: finalTime,
+          };
+        } else {
+          // Fallback if no assistant message was staged yet
+          list.push({
+            role: "assistant",
+            content: "Execution completed.",
+            executionTime: finalTime,
+          });
+        }
+        return list;
+      });
     }
   };
 
@@ -168,23 +222,28 @@ export function useBrainChat() {
     async (textToSend: string) => {
       if (!textToSend.trim()) return;
 
-      // Add user message to state
-      setMessages((prev) => [...prev, { role: "user", content: textToSend }]);
-      setIsGenerating(true);
-      setActiveTraceLogs([]);
-      setActiveSteps([
+      const startTime = Date.now();
+      const initialSteps = [
         {
           worker: "brain_supervisor",
           status: "running",
           message: "Aria is reasoning...",
         },
-      ]);
+      ];
+
+      // Add user message to state
+      setMessages((prev) => [...prev, { role: "user", content: textToSend }]);
+      setIsGenerating(true);
+      setActiveTraceLogs([]);
+      setActiveSteps(initialSteps);
       setPendingTasks(null);
 
       const clerkUserId = user?.id || "";
       const clerkUserName = user?.name || "User";
 
-      console.log(`[useBrainChat] Send message: "${textToSend}", Clerk ID: "${clerkUserId}", Username: "${clerkUserName}"`);
+      console.log(
+        `[useBrainChat] Send message: "${textToSend}", Clerk ID: "${clerkUserId}", Username: "${clerkUserName}"`,
+      );
 
       try {
         const response = await fetch("/api/chat", {
@@ -196,9 +255,9 @@ export function useBrainChat() {
             message: textToSend,
             thread_id: threadId,
             mode: "brain",
-            userId: clerkUserId,      // Clerk unique identifier
+            userId: clerkUserId, // Clerk unique identifier
             user_id: clerkUserId,
-            userName: clerkUserName,  // Display name
+            userName: clerkUserName, // Display name
             user_name: clerkUserName,
           }),
         });
@@ -208,8 +267,7 @@ export function useBrainChat() {
         }
 
         const reader = response.body.getReader();
-        await consumeStream(reader);
-
+        await consumeStream(reader, startTime, initialSteps);
       } catch (error: any) {
         console.error("Brain chat fetch failed:", error);
         setMessages((prev) => [
@@ -225,26 +283,31 @@ export function useBrainChat() {
         setActiveTraceLogs([]);
       }
     },
-    [user?.id, user?.name, threadId]
+    [user?.id, user?.name, threadId],
   );
 
   // ── Approve/Reject Tasks ───────────────────────────────────────────────────
   const handleApprove = useCallback(
     async (approved: boolean) => {
-      setIsGenerating(true);
-      setPendingTasks(null);
-      setActiveSteps([
+      const startTime = Date.now();
+      const initialSteps = [
         {
           worker: "brain_supervisor",
           status: "running",
           message: "Processing tasks confirmation...",
         },
-      ]);
+      ];
+
+      setIsGenerating(true);
+      setPendingTasks(null);
+      setActiveSteps(initialSteps);
 
       const clerkUserId = user?.id || "";
       const clerkUserName = user?.name || "User";
 
-      console.log(`[useBrainChat] Sending approval decision: approved=${approved} for thread_id=${threadId}`);
+      console.log(
+        `[useBrainChat] Sending approval decision: approved=${approved} for thread_id=${threadId}`,
+      );
 
       try {
         const response = await fetch("/api/chat/approve", {
@@ -267,8 +330,7 @@ export function useBrainChat() {
         }
 
         const reader = response.body.getReader();
-        await consumeStream(reader);
-
+        await consumeStream(reader, startTime, initialSteps);
       } catch (error: any) {
         console.error("Failed to send task approval decision:", error);
         setMessages((prev) => [
@@ -284,7 +346,7 @@ export function useBrainChat() {
         setActiveTraceLogs([]);
       }
     },
-    [user?.id, user?.name, threadId]
+    [user?.id, user?.name, threadId],
   );
 
   return {

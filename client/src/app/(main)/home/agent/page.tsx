@@ -47,7 +47,19 @@ import AgentChatMessages from "./AgentChatMessages";
 import WorkflowPanel from "../../../../modules/workflows/components/WorkflowPanel";
 import WorkflowChoiceDialog from "../../../../modules/WorkflowChoiceDialog";
 
-const brainSuggestions = [
+interface SuggestionItem {
+  title: string;
+  description: string;
+  shortDescription: string;
+  prompt: string;
+  icon: React.ComponentType<any>;
+  iconColor: string;
+  iconBg: string;
+  images?: string[];
+  apps?: string[];
+}
+
+const brainSuggestions: SuggestionItem[] = [
   {
     title: "Browser Activities",
     description: "Create tasks from my previous important browser activities.",
@@ -82,7 +94,7 @@ const brainSuggestions = [
   },
 ];
 
-const agentSuggestions = [
+const agentSuggestions: SuggestionItem[] = [
   {
     title: "AI Trends Doc",
     description:
@@ -169,7 +181,6 @@ export default function AgentPage() {
   const isGenerating = isBrainMode ? isBrainGenerating : isAgentGenerating;
   const activeTraceLogs = isBrainMode ? brainTraceLogs : agentTraceLogs;
   const activeSteps = isBrainMode ? brainSteps : agentSteps;
-
 
   const [isSaving, setIsSaving] = useState(false);
   const saveWorkflow = useMutation(api.workflows.saveWorkflow);

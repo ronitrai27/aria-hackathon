@@ -34,7 +34,7 @@ export default function AgentChatMessages({
   if (messages.length === 0) return null;
 
   return (
-    <div className="flex-1 w-full max-w-2xl overflow-y-auto py-4 space-y-6 pr-2 select-text scrollbar-none flex flex-col">
+    <div className="flex-1 w-full max-w-4xl overflow-y-auto py-4 space-y-6 pr-2 select-text scrollbar-none flex flex-col">
       {messages.map((msg, idx) => (
         <ChatMessageItem key={idx} message={msg} />
       ))}
