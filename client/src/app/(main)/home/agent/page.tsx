@@ -958,11 +958,21 @@ export default function AgentPage() {
 
     if (isAgentMode) {
       if (selectedSuggestionApps.length === 0) {
-        toast.error("You need to select connected apps to continue using agent for making workflows.");
+        toast.error(
+          "You need to select connected apps to continue using agent for making workflows.",
+          {
+            position: "top-center",
+          },
+        );
         return;
       }
       if (hasUnconnectedApps) {
-        toast.error("You need to select connected apps to continue using agent for making workflows.");
+        toast.error(
+          "You need to select connected apps to continue using agent for making workflows.",
+          {
+            position: "top-center",
+          },
+        );
         return;
       }
     }
@@ -1200,7 +1210,9 @@ export default function AgentPage() {
                                   <div
                                     key={i}
                                     className={`w-5 h-5 border border-card bg-white flex items-center justify-center shadow-xs overflow-hidden shrink-0 ${
-                                      img.includes("logo.svg") ? "rounded-sm" : "rounded"
+                                      img.includes("logo.svg")
+                                        ? "rounded-sm"
+                                        : "rounded"
                                     }`}
                                   >
                                     <Image
@@ -1233,7 +1245,9 @@ export default function AgentPage() {
                                     <div
                                       key={i}
                                       className={`w-5.5 h-5.5 border border-card bg-white flex items-center justify-center shadow-xs overflow-hidden ${
-                                        img.includes("logo.svg") ? "rounded-sm" : "rounded-full"
+                                        img.includes("logo.svg")
+                                          ? "rounded-sm"
+                                          : "rounded-full"
                                       }`}
                                     >
                                       <Image
@@ -1242,7 +1256,9 @@ export default function AgentPage() {
                                         width={15}
                                         height={15}
                                         className={`object-contain ${
-                                          img.includes("logo.svg") ? "invert" : ""
+                                          img.includes("logo.svg")
+                                            ? "invert"
+                                            : ""
                                         }`}
                                       />
                                     </div>
@@ -1553,7 +1569,10 @@ export default function AgentPage() {
                                               }}
                                               className="px-2 py-0.5 bg-white border border-border text-[10px] font-medium flex items-center justify-center gap-0.5 transition-all shadow-sm cursor-pointer hover:bg-muted rounded-md shrink-0"
                                             >
-                                              Connect <span className="font-semibold text-xs">+</span>
+                                              Connect{" "}
+                                              <span className="font-semibold text-xs">
+                                                +
+                                              </span>
                                             </button>
                                           )}
                                         </div>
@@ -1751,10 +1770,7 @@ export default function AgentPage() {
                         size="icon"
                         onClick={() => handleSend()}
                         className="h-8 w-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/95 transition-all shadow-sm ml-1 cursor-pointer disabled:opacity-50"
-                        disabled={
-                          !inputVal.trim() ||
-                          isGenerating
-                        }
+                        disabled={!inputVal.trim() || isGenerating}
                       >
                         <SendHorizontal className="h-4 w-4" />
                       </Button>

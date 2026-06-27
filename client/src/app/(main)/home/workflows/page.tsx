@@ -406,7 +406,7 @@ export default function WorkflowsPage() {
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0 rounded-md" align="start">
               <Calendar
-                initialFocus
+                // initialFocus
                 mode="range"
                 selected={{
                   from: dateRange.from,
@@ -661,14 +661,6 @@ export default function WorkflowsPage() {
                                 handleToggleStatus(w._id, w.status || "draft")
                               }
                             />
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDelete(w._id, w.name)}
-                              className="h-8 w-8 text-neutral-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
                           </div>
                         </div>
                       </td>
