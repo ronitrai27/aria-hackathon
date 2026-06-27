@@ -5,6 +5,7 @@ Exposes /agent and /brain endpoints, acting as a gateway to our LangGraph instan
 
 import os
 import sys
+import threading
 from pathlib import Path
 
 # Add project root to sys.path to allow absolute imports
@@ -302,25 +303,80 @@ def agent_chat_endpoint(body: ChatRequest, request: Request):
     )
 
 
+# ── Brain session cancel registry ──────────────────────────────────────────────
+# Maps thread_id → threading.Event. The brain event_stream checks this flag
+# on every iteration and stops cleanly when set.
+BRAIN_STOP_FLAGS: Dict[str, threading.Event] = {}
+
+
 @app.post("/brain")
 def brain_chat_endpoint(body: ChatRequest, request: Request):
     """
-    Placeholder endpoint for /brain route, which will be integrated in future tasks.
+    POST /brain — streaming Brain Agent endpoint (SSE).
+    Accepts a message + thread_id + userId, streams events from the brain
+    LangGraph (memory_agent, inbox_agent, doc_node, task tools, etc.).
     """
     message = body.message
+    thread_id = body.thread_id or "brain_default"
     uid = body.userId or body.user_id or "default_user"
-    print(f"\n[POST /brain] Match /brain Route (Placeholder). userId: {uid}, query: '{message}'", flush=True)
+
+    print(
+        f"\n[POST /brain] userId: {uid}, thread_id: {thread_id}, query: '{message}'",
+        flush=True,
+    )
+
+    # Register a fresh stop flag for this thread; clear any stale one
+    stop_event = threading.Event()
+    BRAIN_STOP_FLAGS[thread_id] = stop_event
 
     def brain_event_stream():
-        yield format_sse("worker_status", {
-            "worker": "router",
-            "status": "completed",
-            "details": {"message": "Brain Query intent checked."}
-        })
-        yield format_sse("supervisor_data", {
-            "status": "done",
-            "final_response": f"Brain agent placeholder response. You asked: {message}"
-        })
+        try:
+            # Setup/retrieve chat history for this brain thread
+            history = THREAD_HISTORY.setdefault(thread_id, [])
+            history.append({"role": "user", "content": message})
+
+            # Signal that the brain agent has started
+            yield format_sse("worker_status", {
+                "worker": "brain",
+                "status": "running",
+                "details": {"message": "Brain agent initializing..."},
+            })
+
+            # ── Placeholder: will be replaced with run_brain_agent_stream() ──
+            # The real graph will be wired here once brain/graph.py is built.
+            # For now we emit a structured "not yet implemented" response so
+            # the client can connect and test the SSE channel.
+            if stop_event.is_set():
+                yield format_sse("worker_status", {
+                    "worker": "brain",
+                    "status": "stopped",
+                    "details": {"message": "Brain agent stopped before start."},
+                })
+                return
+
+            final_response = (
+                f"[Brain agent ready] Thread '{thread_id}' received: {message}. "
+                "Full graph will be wired in the next step."
+            )
+            history.append({"role": "assistant", "content": final_response})
+
+            yield format_sse("supervisor_data", {
+                "status": "done",
+                "final_response": final_response,
+            })
+            yield format_sse("worker_status", {
+                "worker": "brain",
+                "status": "completed",
+                "details": {"message": "Brain agent completed."},
+            })
+
+        except Exception as err:
+            import traceback
+            traceback.print_exc()
+            yield format_sse("error", {"error": str(err)})
+        finally:
+            # Clean up stop flag after stream ends
+            BRAIN_STOP_FLAGS.pop(thread_id, None)
 
     return StreamingResponse(
         brain_event_stream(),
@@ -329,8 +385,28 @@ def brain_chat_endpoint(body: ChatRequest, request: Request):
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
-        }
+        },
     )
+
+
+@app.post("/brain/stop")
+def brain_stop_endpoint(body: ChatRequest):
+    """
+    POST /brain/stop — cancel an active brain agent session.
+    Pass the same thread_id used when calling /brain.
+    The running event_stream will detect the stop flag and exit cleanly.
+    Returns { stopped: true } if a session was found, { stopped: false } otherwise.
+    """
+    thread_id = body.thread_id or "brain_default"
+    stop_event = BRAIN_STOP_FLAGS.get(thread_id)
+
+    if stop_event:
+        stop_event.set()
+        print(f"[POST /brain/stop] Stop signal sent for thread_id: {thread_id}", flush=True)
+        return {"stopped": True, "thread_id": thread_id}
+
+    print(f"[POST /brain/stop] No active brain session for thread_id: {thread_id}", flush=True)
+    return {"stopped": False, "thread_id": thread_id, "message": "No active session found."}
 
 
 if __name__ == "__main__":
