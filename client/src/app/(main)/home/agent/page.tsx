@@ -138,6 +138,7 @@ export default function AgentPage() {
     messages,
     isGenerating,
     activeSteps,
+    activeTraceLogs,
     workflowData,
     setWorkflowData,
     isRightOpen,
@@ -404,6 +405,11 @@ export default function AgentPage() {
   }, [workflowData, saveWorkflow]);
 
   const [isWorkflowRunning, setIsWorkflowRunning] = useState(false);
+  const isWorkflowRunningRef = useRef(isWorkflowRunning);
+  useEffect(() => {
+    isWorkflowRunningRef.current = isWorkflowRunning;
+  }, [isWorkflowRunning]);
+
   const runToastIdRef = useRef<string | number | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState<number | null>(null);
   const [nodeExecutionStatuses, setNodeExecutionStatuses] = useState<
@@ -475,6 +481,21 @@ export default function AgentPage() {
         `[${new Date().toLocaleTimeString()}] 📝 Starting execution sequence...`,
       ]);
 
+      // Clear previous trace results from all nodes in the state
+      setWorkflowData((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          nodes: prev.nodes.map((n: any) => ({
+            ...n,
+            data: {
+              ...n.data,
+              traceResult: undefined,
+            },
+          })),
+        };
+      });
+
       const initialStatuses: Record<
         string,
         "pending" | "running" | "success" | "failed"
@@ -497,8 +518,26 @@ export default function AgentPage() {
       });
       runToastIdRef.current = toastId;
     },
-    [savedWorkflowId, updateLastRun],
+    [savedWorkflowId, updateLastRun, setWorkflowData],
   );
+
+  const stopSimulation = useCallback(() => {
+    setIsWorkflowRunning(false);
+    setCurrentStepIndex(null);
+    setNodeExecutionStatuses((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((key) => {
+        if (next[key] === "running") {
+          next[key] = "pending";
+        }
+      });
+      return next;
+    });
+    setExecutionLogs((prev) => [
+      ...prev,
+      `[${new Date().toLocaleTimeString()}] ⏹️ Workflow execution stopped by user.`,
+    ]);
+  }, []);
 
   // Simulation execution loop
   useEffect(() => {
@@ -558,6 +597,8 @@ export default function AgentPage() {
             }),
           });
           const result = await res.json();
+
+          if (!isWorkflowRunningRef.current) return;
 
           if (!res.ok || result.error || result.successful === false) {
             throw new Error(
@@ -682,6 +723,8 @@ export default function AgentPage() {
             }),
           });
           const result = await res.json();
+
+          if (!isWorkflowRunningRef.current) return;
 
           if (!res.ok || result.error) {
             throw new Error(result.error || "AI Node Execution failed");
@@ -910,13 +953,19 @@ export default function AgentPage() {
     overrideText?: string,
     skipWorkflowCheck = false,
   ) => {
-    if (
-      isAgentMode &&
-      (hasUnconnectedApps || selectedSuggestionApps.length === 0)
-    )
-      return;
     const textToSend = overrideText || inputVal;
     if (!textToSend.trim()) return;
+
+    if (isAgentMode) {
+      if (selectedSuggestionApps.length === 0) {
+        toast.error("You need to select connected apps to continue using agent for making workflows.");
+        return;
+      }
+      if (hasUnconnectedApps) {
+        toast.error("You need to select connected apps to continue using agent for making workflows.");
+        return;
+      }
+    }
 
     const isEditIntent =
       isEditingWorkflow ||
@@ -1049,6 +1098,7 @@ export default function AgentPage() {
                   messages={messages}
                   isGenerating={isGenerating}
                   activeSteps={activeSteps}
+                  activeTraceLogs={activeTraceLogs}
                 />
               ) : (
                 /* Welcome / loading area — skeleton fades out, real content fades in */
@@ -1483,16 +1533,29 @@ export default function AgentPage() {
                                               Selected
                                             </span>
                                           )}
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              openConnectionDialog(app);
-                                            }}
-                                            className="px-2 py-0.5 text-[10px] bg-emerald-50 hover:bg-neutral-100 border border-neutral-300 rounded-md text-foreground transition-colors cursor-pointer shrink-0"
-                                          >
-                                            Connect
-                                          </button>
+                                          {user?.connecters?.includes(app) ? (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                openConnectionDialog(app);
+                                              }}
+                                              className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-600 dark:bg-emerald-950/20 dark:border-emerald-900 dark:text-emerald-400 text-[10px] font-medium flex items-center justify-center gap-0.5 transition-all shadow-sm cursor-pointer hover:bg-emerald-100 rounded-md shrink-0"
+                                            >
+                                              Connected
+                                            </button>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                openConnectionDialog(app);
+                                              }}
+                                              className="px-2 py-0.5 bg-white border border-border text-[10px] font-medium flex items-center justify-center gap-0.5 transition-all shadow-sm cursor-pointer hover:bg-muted rounded-md shrink-0"
+                                            >
+                                              Connect <span className="font-semibold text-xs">+</span>
+                                            </button>
+                                          )}
                                         </div>
                                       </div>
                                     );
@@ -1690,10 +1753,7 @@ export default function AgentPage() {
                         className="h-8 w-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/95 transition-all shadow-sm ml-1 cursor-pointer disabled:opacity-50"
                         disabled={
                           !inputVal.trim() ||
-                          isGenerating ||
-                          (isAgentMode &&
-                            (hasUnconnectedApps ||
-                              selectedSuggestionApps.length === 0))
+                          isGenerating
                         }
                       >
                         <SendHorizontal className="h-4 w-4" />
@@ -1745,6 +1805,7 @@ export default function AgentPage() {
                 isWorkflowRunning={isWorkflowRunning}
                 setIsWorkflowRunning={setIsWorkflowRunning}
                 setCurrentStepIndex={setCurrentStepIndex}
+                stopSimulation={stopSimulation}
                 nodeExecutionStatuses={nodeExecutionStatuses}
                 isWorkflowReadyToRun={isWorkflowReadyToRun}
                 startSimulation={startSimulation}

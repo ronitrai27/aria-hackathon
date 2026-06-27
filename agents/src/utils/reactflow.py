@@ -34,6 +34,8 @@ Two node categories:
 
 from __future__ import annotations
 
+import copy
+import re
 from typing import Any
 
 # ─── Constants ────────────────────────────────────────────────────────────────
@@ -49,6 +51,112 @@ AI_OPERATIONS = {"AI_SUMMARIZE", "AI_EXTRACT", "AI_CLASSIFY", "AI_RESEARCH"}
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def consolidate_steps(steps: list[dict]) -> list[dict]:
+    """
+    Consolidate multiple AI nodes of the same operation type (e.g. AI_RESEARCH)
+    into a single step. Merge descriptions and field values, remove duplicates,
+    and adjust step references (e.g. {{step_N}}) in subsequent steps.
+    """
+    first_occurrences = {}  # tool_name -> original_index (0-based)
+    to_delete = set()       # set of original indices to delete
+    merge_map = {}          # original_index -> target_original_index
+    
+    for i, step in enumerate(steps):
+        tool_name = step.get("tool_name", "")
+        if tool_name in AI_OPERATIONS:
+            if tool_name not in first_occurrences:
+                first_occurrences[tool_name] = i
+            else:
+                target = first_occurrences[tool_name]
+                to_delete.add(i)
+                merge_map[i] = target
+                
+    if not to_delete:
+        return steps
+        
+    # Map original_index to new_index (1-based)
+    original_to_new_1based = {}
+    current_new_index = 1
+    for i in range(len(steps)):
+        if i in to_delete:
+            target_orig = merge_map[i]
+            original_to_new_1based[i + 1] = original_to_new_1based[target_orig + 1]
+        else:
+            original_to_new_1based[i + 1] = current_new_index
+            current_new_index += 1
+            
+    # Copy steps to avoid side effects
+    temp_steps = [copy.deepcopy(step) for step in steps]
+    
+    # Merge step information for duplicated nodes
+    for orig_idx, target_orig_idx in merge_map.items():
+        target_step = temp_steps[target_orig_idx]
+        merged_step = temp_steps[orig_idx]
+        
+        # Merge descriptions
+        target_desc = target_step.get("step_description", "")
+        merged_desc = merged_step.get("step_description", "")
+        if merged_desc and merged_desc not in target_desc:
+            target_step["step_description"] = f"{target_desc} / {merged_desc}"
+            
+        # Merge fields
+        target_fields = target_step.setdefault("fields", [])
+        merged_fields = merged_step.get("fields", [])
+        
+        # Build map of target fields by name
+        target_fields_by_name = {
+            f.get("name"): f for f in target_fields if isinstance(f, dict) and f.get("name")
+        }
+        
+        for f in merged_fields:
+            if not isinstance(f, dict):
+                continue
+            fname = f.get("name")
+            if not fname:
+                continue
+            fval = f.get("value")
+            
+            if fname in target_fields_by_name:
+                t_field = target_fields_by_name[fname]
+                t_val = t_field.get("value")
+                
+                # If they are both strings, merge them
+                if isinstance(t_val, str) and isinstance(fval, str):
+                    if fval and fval not in t_val:
+                        if fname in ("prompt", "commentary", "body", "description"):
+                            t_field["value"] = f"{t_val}\n\nAND ALSO:\n\n{fval}"
+                        elif fname in ("topic", "query", "search_query"):
+                            t_field["value"] = f"{t_val}, {fval}"
+                        else:
+                            t_field["value"] = f"{t_val} | {fval}"
+                elif t_val is None or t_val == "":
+                    t_field["value"] = fval
+            else:
+                target_fields.append(copy.deepcopy(f))
+
+    # Build the new steps list, filtering out deleted ones
+    new_steps = []
+    for i, step in enumerate(temp_steps):
+        if i not in to_delete:
+            new_steps.append(step)
+            
+    # Update step placeholders
+    def replace_placeholder(match):
+        orig_step_num = int(match.group(1))
+        new_step_num = original_to_new_1based.get(orig_step_num, orig_step_num)
+        full_match = match.group(0)
+        return full_match.replace(f"step_{orig_step_num}", f"step_{new_step_num}")
+
+    placeholder_pattern = re.compile(r"\{\{\s*step_(\d+)(?:\.[a-zA-Z0-9_\-\.]+)?\s*\}\}")
+
+    for step in new_steps:
+        for field in step.get("fields", []):
+            val = field.get("value")
+            if isinstance(val, str):
+                field["value"] = placeholder_pattern.sub(replace_placeholder, val)
+                
+    return new_steps
 
 def _is_ai_node(tool_name: str) -> bool:
     """Check if this step is an AI processing node rather than a Composio tool."""
@@ -108,7 +216,7 @@ def workflow_to_reactflow(workflow: dict) -> dict:
     edges: list[dict] = []
 
     # ── Step nodes ────────────────────────────────────────────────────────
-    steps = workflow.get("steps", [])
+    steps = consolidate_steps(workflow.get("steps", []))
     for i, step in enumerate(steps):
         node_id = f"step_{i + 1}"
         tool_name = step.get("tool_name", "UNKNOWN")

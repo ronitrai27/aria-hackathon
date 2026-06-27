@@ -1,9 +1,86 @@
-import { CheckCircle, RefreshCw } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { CheckCircle, RefreshCw, ChevronDown } from "lucide-react";
 
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   steps?: Array<{ worker: string; status: string; message: string }>;
+  traceLogs?: string[];
+  executionTime?: number;
+}
+
+export function TraceLogsViewer({
+  traceLogs,
+  isGenerating,
+  message,
+}: {
+  traceLogs: string[];
+  isGenerating: boolean;
+  message?: ChatMessage;
+}) {
+  const [isOpen, setIsOpen] = useState(true);
+  const [elapsed, setElapsed] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isGenerating) return;
+    setElapsed(0);
+    const interval = setInterval(() => {
+      setElapsed((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isGenerating]);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
+  }, [traceLogs.length, isOpen]);
+
+  if (!traceLogs || traceLogs.length === 0) return null;
+
+  const formatTime = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
+
+  const currentDuration = isGenerating ? elapsed : (message?.executionTime || 0);
+
+  return (
+    <div className="mt-3 p-4 bg-muted/40 backdrop-blur-md rounded-xl border border-border space-y-3 max-w-xl shadow-sm select-none dark:bg-zinc-900/40 dark:border-white/5">
+      <div 
+        className="flex items-center justify-between border-b border-border dark:border-white/5 pb-2 cursor-pointer"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="text-[10px] font-bold text-muted-foreground dark:text-zinc-400 tracking-wider uppercase flex items-center gap-1.5">
+          <span className={`h-1.5 w-1.5 rounded-full ${isGenerating ? "bg-indigo-500 animate-pulse" : "bg-emerald-500"}`} />
+          {isGenerating ? "Agent Action Trace Logs" : "Agent Action Trace Logs (Completed)"}
+        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono text-muted-foreground dark:text-zinc-500 font-semibold bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">
+            {formatTime(currentDuration)}
+          </span>
+          <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform duration-200 ${isOpen ? "transform rotate-180" : ""}`} />
+        </div>
+      </div>
+      {isOpen && (
+        <div 
+          ref={containerRef}
+          className="space-y-1.5 max-h-48 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-800"
+        >
+          {traceLogs.map((log, idx) => (
+            <div
+              key={idx}
+              className="font-mono text-[10px] text-zinc-600 dark:text-zinc-400 py-0.5 border-l border-indigo-500/20 pl-2 leading-relaxed whitespace-pre-wrap break-all"
+            >
+              {log}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function StatusStepper({
@@ -130,8 +207,12 @@ export default function ChatMessageItem({ message }: ChatMessageItemProps) {
           }`}
         >
           {formatMessageContent(message.content)}
-          {!isUser && message.steps && message.steps.length > 0 && (
-            <StatusStepper steps={message.steps} />
+          {!isUser && message.traceLogs && message.traceLogs.length > 0 ? (
+            <TraceLogsViewer traceLogs={message.traceLogs} isGenerating={false} message={message} />
+          ) : (
+            !isUser && message.steps && message.steps.length > 0 && (
+              <StatusStepper steps={message.steps} />
+            )
           )}
         </div>
       </div>

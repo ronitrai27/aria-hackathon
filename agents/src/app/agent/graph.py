@@ -30,7 +30,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 
 from src.app.schema.agent_schema import WorkflowState, WorkflowStructure
-from src.utils.reactflow import workflow_to_reactflow
+from src.utils.reactflow import workflow_to_reactflow, consolidate_steps
 
 # Load .env from agents root
 from pathlib import Path
@@ -87,6 +87,7 @@ AI nodes are **direct prompt nodes**. They do NOT use Composio tools or integrat
 4. Example:
    - "Research the latest news about Claude AI and return key findings."
    - "Summarize the following Slack messages: {{step_2}}"
+5. CONSOLIDATE AI NODES: Never generate multiple AI nodes of the same type/role in a single workflow. If you need to perform multiple research tasks (e.g., Hacker News startups and YC videos), specify all of them in a single AI_RESEARCH node's prompt. Do NOT create separate AI_RESEARCH steps; create exactly ONE AI_RESEARCH step that encompasses all research requirements. Similarly, use a single AI_SUMMARIZE node for all summarization needs.
 
 ## Workflow Chaining:
 - Use {{step_N}} placeholders to pass outputs between steps.
@@ -103,13 +104,13 @@ AI nodes are **direct prompt nodes**. They do NOT use Composio tools or integrat
 
 # ─── LLM config ──────────────────────────────────────────────────────────────
 
-# def get_llm() -> ChatOpenAI:
-#     api_key = os.getenv("OPENAI_API_KEY")
-#     return ChatOpenAI(model="gpt-4.1-mini", temperature=0.1, api_key=api_key)
+def get_llm() -> ChatOpenAI:
+    api_key = os.getenv("OPENAI_API_KEY")
+    return ChatOpenAI(model="gpt-5-nano", temperature=0.1, api_key=api_key)
 
-def get_llm() -> ChatAnthropic:
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    return ChatAnthropic(model="claude-sonnet-4-5", temperature=0.1, api_key=api_key)
+# def get_llm() -> ChatAnthropic:
+#     api_key = os.getenv("ANTHROPIC_API_KEY")
+#     return ChatAnthropic(model="claude-sonnet-4-5", temperature=0.1, api_key=api_key)
 
 
 
@@ -154,6 +155,7 @@ def compile_workflow_agent(session, workflow_holder: dict):
                   - description: What this parameter does
                   - value: Pre-filled value if known from user's message, else empty string ""
         """
+        steps = consolidate_steps(steps)
         field_count = sum(len(s.get("fields", [])) for s in steps)
         print(f"\n[set_workflow called] name='{name}' steps={len(steps)} total_fields={field_count}", flush=True)
 
@@ -341,8 +343,14 @@ def run_workflow_agent_stream(
       - tool_output  → tool returned a result
       - workflow     → verifier approved, contains {nodes, edges} for React Flow
       - final_answer → last text response from agent
+      - trace        → live backend execution log message
     """
+    yield {"type": "trace", "content": f"[run_workflow_agent_stream] Starting agent run for thread_id={thread_id}"}
+    yield {"type": "trace", "content": "[compile_workflow_agent] Loading Composio meta-tools..."}
     agent = compile_workflow_agent(session, workflow_holder)
+    tool_names = [t.name for t in session.tools()]
+    yield {"type": "trace", "content": f"[compile_workflow_agent] Composio meta-tools loaded: {tool_names}"}
+
     lc_messages = chat_messages_to_lc(chat_history)
     config = {"configurable": {"thread_id": thread_id}}
 
@@ -350,6 +358,7 @@ def run_workflow_agent_stream(
     final_text = ""
     for chunk in agent.stream({"messages": lc_messages}, config=config, stream_mode="updates"):
         if "agent" in chunk:
+            yield {"type": "trace", "content": "[agent_node] Running agent without validation errors."}
             for msg in chunk["agent"].get("messages", []):
                 content = getattr(msg, "content", None)
                 if isinstance(content, str) and content.strip():
@@ -357,22 +366,43 @@ def run_workflow_agent_stream(
                     yield {"type": "thought", "content": final_text}
 
                 for tc in getattr(msg, "tool_calls", []):
+                    tool_name = tc.get("name", "unknown")
+                    yield {"type": "trace", "content": f"[should_continue] Routing to tools. Calls: ['{tool_name}']"}
                     yield {
                         "type": "tool_call",
-                        "name": tc.get("name", "unknown"),
+                        "name": tool_name,
                         "args": tc.get("args", {}),
                     }
 
         elif "tools" in chunk:
             for msg in chunk["tools"].get("messages", []):
+                tool_name = getattr(msg, "name", "unknown")
+                tool_content = str(getattr(msg, "content", "") or "")
+                
+                if tool_name == "set_workflow":
+                    proposed = workflow_holder.get("proposed", {})
+                    name = proposed.get("name", "unknown")
+                    steps_count = len(proposed.get("steps", []))
+                    field_count = sum(len(s.get("fields", [])) for s in proposed.get("steps", []))
+                    yield {"type": "trace", "content": f"[set_workflow called] name='{name}' steps={steps_count} total_fields={field_count}"}
+                else:
+                    yield {"type": "trace", "content": f"[tools_node] Tool '{tool_name}' executed successfully."}
+
                 yield {
                     "type": "tool_output",
-                    "name": getattr(msg, "name", "unknown"),
-                    "content": str(getattr(msg, "content", "") or ""),
+                    "name": tool_name,
+                    "content": tool_content,
                 }
 
         elif "verifier" in chunk:
             node_data = chunk["verifier"]
+            
+            proposed = workflow_holder.get("proposed")
+            if proposed:
+                yield {"type": "trace", "content": f"[verifier_node] Validating proposed workflow '{proposed.get('name')}'..."}
+            else:
+                yield {"type": "trace", "content": "[verifier_node] No proposed workflow staged. Skipping validation."}
+
             # Yield verifier thoughts/warnings to the chat
             for msg in node_data.get("messages", []):
                 content = getattr(msg, "content", None)
@@ -382,12 +412,15 @@ def run_workflow_agent_stream(
             # If verifier approved, yield the React Flow data for the canvas
             if node_data.get("is_valid") and node_data.get("workflow"):
                 wf = node_data["workflow"]
+                yield {"type": "trace", "content": f"[verifier_node] Validation SUCCESS. Committing workflow '{wf.get('name')}' to active state."}
                 if "nodes" in wf and "edges" in wf:
                     yield {
                         "type": "workflow",
                         "nodes": wf["nodes"],
                         "edges": wf["edges"],
                     }
+            elif not node_data.get("is_valid") and node_data.get("validation_error"):
+                yield {"type": "trace", "content": f"[verifier_node] Validation FAILED: {node_data.get('validation_error')}"}
 
     print("[run_workflow_agent_stream] Stream complete.", flush=True)
     yield {"type": "final_answer", "content": final_text or "Done."}

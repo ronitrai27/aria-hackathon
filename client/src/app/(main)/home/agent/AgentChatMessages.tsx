@@ -3,18 +3,21 @@
 import { useEffect, useRef } from "react";
 import ChatMessageItem, {
   StatusStepper,
+  TraceLogsViewer,
 } from "../../../../modules/Ai/components/ChatMessage";
 
 interface AgentChatMessagesProps {
   messages: any[];
   isGenerating: boolean;
   activeSteps: any[];
+  activeTraceLogs: string[];
 }
 
 export default function AgentChatMessages({
   messages,
   isGenerating,
   activeSteps,
+  activeTraceLogs,
 }: AgentChatMessagesProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -49,7 +52,7 @@ export default function AgentChatMessages({
               <p className="text-[13px] text-muted-foreground dark:text-neutral-200 leading-relaxed font-medium mb-3">
                 I am starting to create the workflow based on your request...
               </p>
-              <StatusStepper steps={activeSteps} />
+              <TraceLogsViewer traceLogs={activeTraceLogs} isGenerating={true} />
             </div>
           </div>
         </div>

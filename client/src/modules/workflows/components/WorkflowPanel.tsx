@@ -57,6 +57,7 @@ interface WorkflowPanelProps {
   isWorkflowRunning: boolean;
   setIsWorkflowRunning: (v: boolean) => void;
   setCurrentStepIndex: (v: number | null) => void;
+  stopSimulation: () => void;
   nodeExecutionStatuses: Record<
     string,
     "pending" | "running" | "success" | "failed"
@@ -89,6 +90,7 @@ export default function WorkflowPanel({
   isWorkflowRunning,
   setIsWorkflowRunning,
   setCurrentStepIndex,
+  stopSimulation,
   nodeExecutionStatuses,
   isWorkflowReadyToRun,
   startSimulation,
@@ -499,8 +501,7 @@ export default function WorkflowPanel({
                   variant="destructive"
                   size="sm"
                   onClick={() => {
-                    setIsWorkflowRunning(false);
-                    setCurrentStepIndex(null);
+                    stopSimulation();
                   }}
                   className="h-9 rounded-lg px-3! font-semibold"
                 >

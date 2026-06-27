@@ -116,11 +116,9 @@ def agent_chat_endpoint(body: ChatRequest, request: Request):
             history = THREAD_HISTORY.setdefault(thread_id, [])
             history.append({"role": "user", "content": message})
 
-            # 3. Yield initial router status events to frontend
-            yield format_sse("worker_status", {
-                "worker": "router",
-                "status": "completed",
-                "details": {"message": "Query intent checked."}
+            # 3. Yield initial trace log and start workflow builder status
+            yield format_sse("trace_log", {
+                "message": f"[event_stream] Initializing Composio session for user: {uid}"
             })
             yield format_sse("worker_status", {
                 "worker": "workflow_builder",
@@ -138,11 +136,18 @@ def agent_chat_endpoint(body: ChatRequest, request: Request):
                 workflow_holder=workflow_holder
             )
 
+            final_text = ""
             final_response = ""
             for event in raw_stream:
                 event_type = event.get("type")
 
-                if event_type == "thought":
+                if event_type == "trace":
+                    content = event.get("content", "")
+                    yield format_sse("trace_log", {
+                        "message": content
+                    })
+
+                elif event_type == "thought":
                     content = event.get("content", "")
                     # Match verifier outputs
                     if "[Verifier Warning]" in content or "validation failed" in content.lower():

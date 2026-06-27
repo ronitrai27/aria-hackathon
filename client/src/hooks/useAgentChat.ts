@@ -13,6 +13,7 @@ export function useAgentChat() {
   const [activeSteps, setActiveSteps] = useState<
     Array<{ worker: string; status: string; message: string }>
   >([]);
+  const [activeTraceLogs, setActiveTraceLogs] = useState<string[]>([]);
   const [workflowData, setWorkflowData] = useState<{
     nodes: any[];
     edges: any[];
@@ -34,12 +35,15 @@ export function useAgentChat() {
       ]);
       setIsGenerating(true);
       setActiveSteps([]);
+      setActiveTraceLogs([]);
 
+      const startTime = Date.now();
       const accumulatedSteps: Array<{
         worker: string;
         status: string;
         message: string;
       }> = [];
+      const accumulatedTraceLogs: string[] = [];
 
       try {
         const response = await fetch("/api/chat", {
@@ -95,7 +99,11 @@ export function useAgentChat() {
                   payload,
                 );
 
-                if (eventName === "worker_status") {
+                if (eventName === "trace_log") {
+                  const message = payload.message || "";
+                  accumulatedTraceLogs.push(message);
+                  setActiveTraceLogs([...accumulatedTraceLogs]);
+                } else if (eventName === "worker_status") {
                   const worker = payload.worker;
                   const status = payload.status;
                   const detailsMsg =
@@ -236,6 +244,8 @@ export function useAgentChat() {
             role: "assistant",
             content: cleanTextResponse,
             steps: finalSteps,
+            traceLogs: [...accumulatedTraceLogs],
+            executionTime: Math.round((Date.now() - startTime) / 1000),
           },
         ]);
       } catch (error: any) {
@@ -252,11 +262,14 @@ export function useAgentChat() {
                 message: "Failed to establish connection.",
               },
             ],
+            traceLogs: [...accumulatedTraceLogs],
+            executionTime: Math.round((Date.now() - startTime) / 1000),
           },
         ]);
       } finally {
         setIsGenerating(false);
         setActiveSteps([]);
+        setActiveTraceLogs([]);
       }
     },
     [activeMode, user?._id, threadId],
@@ -269,6 +282,8 @@ export function useAgentChat() {
     setIsGenerating,
     activeSteps,
     setActiveSteps,
+    activeTraceLogs,
+    setActiveTraceLogs,
     workflowData,
     setWorkflowData,
     isRightOpen,
