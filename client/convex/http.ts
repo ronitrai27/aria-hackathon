@@ -222,5 +222,55 @@ http.route({
   }),
 });
 
+// ─── Brain Tool: GET /api/brain/get-browser-activity ─────────────────────────
+// Called by the Python brain agent to retrieve recent browser activity for a user.
+// Query params:
+//   userId  — Clerk user ID (required)
+// Returns: [ { domain, totalDurationMs, visitCount, lastVisitedAt } ]
+http.route({
+  path: "/api/brain/get-browser-activity",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const url = new URL(request.url);
+      const userId = url.searchParams.get("userId");
+
+      if (!userId) {
+        return new Response(
+          JSON.stringify({ error: "Missing required param: userId" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      const result = await ctx.runQuery(api.agentTools.getBrowserActivity, {
+        userId,
+        now: Date.now(),
+      });
+
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (err: any) {
+      return new Response(JSON.stringify({ error: err.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }),
+});
+
+http.route({
+  path: "/api/brain/get-browser-activity",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }),
+});
+
 export default http;
+
 

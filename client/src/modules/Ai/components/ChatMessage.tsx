@@ -55,7 +55,7 @@ export function TraceLogsViewer({
       >
         <span className="text-[10px] font-bold text-muted-foreground dark:text-zinc-400 tracking-wider uppercase flex items-center gap-1.5">
           <span className={`h-1.5 w-1.5 rounded-full ${isGenerating ? "bg-indigo-500 animate-pulse" : "bg-emerald-500"}`} />
-          {isGenerating ? "Agent Action Trace Logs" : "Agent Action Trace Logs (Completed)"}
+          {isGenerating ? "Executing..." : `Executed in ${currentDuration}s`}
         </span>
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-mono text-muted-foreground dark:text-zinc-500 font-semibold bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">
@@ -172,6 +172,104 @@ export const formatMessageContent = (content: string) => {
   return content;
 };
 
+import React from "react";
+
+// ─── Custom Markdown Parser ──────────────────────────────────────────────────
+export function CustomMarkdown({ content }: { content: string }) {
+  if (!content) return null;
+
+  // Split by double newlines to find paragraphs/blocks
+  const blocks = content.split(/\n\n+/);
+
+  return (
+    <div className="space-y-3.5 select-text">
+      {blocks.map((block, blockIdx) => {
+        const trimmed = block.trim();
+        if (!trimmed) return null;
+
+        // 1. Check if heading
+        if (trimmed.startsWith("### ")) {
+          return (
+            <h4 key={blockIdx} className="text-xs font-bold text-zinc-800 dark:text-zinc-100 mt-4 mb-1.5 tracking-wide uppercase">
+              {parseInline(trimmed.substring(4))}
+            </h4>
+          );
+        }
+        if (trimmed.startsWith("## ")) {
+          return (
+            <h3 key={blockIdx} className="text-sm font-bold text-zinc-800 dark:text-zinc-100 mt-5 mb-2 border-b border-zinc-200 dark:border-zinc-800 pb-1">
+              {parseInline(trimmed.substring(3))}
+            </h3>
+          );
+        }
+        if (trimmed.startsWith("# ")) {
+          return (
+            <h2 key={blockIdx} className="text-base font-extrabold text-zinc-900 dark:text-zinc-100 mt-5 mb-2.5">
+              {parseInline(trimmed.substring(2))}
+            </h2>
+          );
+        }
+
+        // 2. Check if bullet list block
+        if (trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.startsWith("\n- ") || trimmed.startsWith("\n* ")) {
+          const items = trimmed
+            .split(/\n[-*]\s+/)
+            .map((item) => item.replace(/^[-*]\s+/, "").trim())
+            .filter(Boolean);
+
+          return (
+            <ul key={blockIdx} className="list-disc pl-4 space-y-1.5 text-zinc-700 dark:text-zinc-300">
+              {items.map((item, itemIdx) => (
+                <li key={itemIdx} className="text-[12.5px] leading-relaxed">
+                  {parseInline(item)}
+                </li>
+              ))}
+            </ul>
+          );
+        }
+
+        // 3. Regular paragraph
+        const lines = trimmed.split("\n");
+        return (
+          <p key={blockIdx} className="text-[12.5px] leading-relaxed text-zinc-800 dark:text-zinc-200">
+            {lines.map((line, lineIdx) => (
+              <React.Fragment key={lineIdx}>
+                {lineIdx > 0 && <br />}
+                {parseInline(line)}
+              </React.Fragment>
+            ))}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+// Parse bold (**text**) and code backticks (`code`) inline
+function parseInline(text: string): React.ReactNode[] {
+  if (!text) return [];
+  const regex = /(\*\*.*?\*\*|`.*?`)/g;
+  const matches = text.split(regex);
+
+  return matches.map((part, idx) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <strong key={idx} className="font-semibold text-zinc-900 dark:text-zinc-50">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return (
+        <code key={idx} className="px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded font-mono text-[10.5px] text-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700/50">
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+    return part;
+  });
+}
+
 interface ChatMessageItemProps {
   message: ChatMessage;
 }
@@ -206,7 +304,12 @@ export default function ChatMessageItem({ message }: ChatMessageItemProps) {
               : "py-2 px-1 text-foreground dark:text-neutral-200 rounded-tl-sm"
           }`}
         >
-          {formatMessageContent(message.content)}
+          {isUser ? (
+            <p className="text-[12.5px] leading-relaxed">{message.content}</p>
+          ) : (
+            <CustomMarkdown content={formatMessageContent(message.content)} />
+          )}
+          
           {!isUser && message.traceLogs && message.traceLogs.length > 0 ? (
             <TraceLogsViewer traceLogs={message.traceLogs} isGenerating={false} message={message} />
           ) : (

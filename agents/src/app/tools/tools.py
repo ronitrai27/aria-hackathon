@@ -125,8 +125,106 @@ def create_tasks(user_id: str, tasks: list[dict]) -> dict:
         return {"error": f"Failed to create tasks: {str(e)}"}
 
 
+# ─── Tool: get_browser_activity ────────────────────────────────────────────────
+
+@tool
+def get_browser_activity(user_id: str) -> list[dict]:
+    """
+    Fetch user's recent aggregated browser activity (last 48 hours).
+    Returns a list of websites/domains where the user has spent a significant
+    amount of time (>= 10 minutes combined), sorted by total duration descending.
+
+    Args:
+        user_id: The Clerk user ID (e.g. "").
+
+    Returns:
+        A list of dicts, each containing:
+          - domain (str): the domain visited
+          - totalDurationMs (int): total time spent in milliseconds
+          - visitCount (int): number of visits
+          - lastVisitedAt (int): timestamp of the last visit
+    """
+    url = f"{CONVEX_SITE_URL}/api/brain/get-browser-activity"
+    params = {"userId": user_id}
+
+    try:
+        response = httpx.get(url, params=params, timeout=15)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        return [{"error": f"Failed to fetch browser activity: {str(e)}"}]
+
+
+# ─── Tool: fetch_inbox ─────────────────────────────────────────────────────────
+
+@tool
+def fetch_inbox(user_id: str, instruction: str) -> str:
+    """
+    Query Gmail, Slack, and Google Calendar for the user.
+    The agent searches and executes actions across these three services using Composio.
+
+    Args:
+        user_id: The Clerk user ID (e.g. "").
+        instruction: Detailed instruction of what to fetch/do (e.g., "Get my unread emails from Gmail").
+
+    Returns:
+        A formatted text summary of the results returned by the sub-agent.
+    """
+    from src.app.brain.inbox_agent import create_inbox_session, run_inbox_agent
+
+    print(f"\n[fetch_inbox tool] Running inbox sub-agent for user_id={user_id} with instruction: {instruction}", flush=True)
+    try:
+        session = create_inbox_session(user_id)
+        result = run_inbox_agent(session, instruction)
+        return result
+    except Exception as e:
+        print(f"[fetch_inbox tool error] {str(e)}", flush=True)
+        return f"Error executing inbox agent: {str(e)}"
+
+
+# ─── Tool: fetch_memory ────────────────────────────────────────────────────────
+
+@tool
+def fetch_memory(user_id: str, query_text: str, source: str = "all") -> dict:
+    """
+    Retrieve personal knowledge context from the user's vector store,
+    knowledge graph, or browser activity history.
+
+    Args:
+        user_id: The Clerk user ID (e.g. "").
+        query_text: Search query / keywords (e.g., "past work on Next.js").
+        source: Source type to query. Either "all" (queries both Pinecone Vector Index + Neo4j Graph db)
+                or "browser" (queries Convex browser activity database).
+
+    Returns:
+        A dictionary containing the retrieved contextual elements.
+    """
+    print(f"\n[fetch_memory tool] Querying memory source={source} for user_id={user_id} with query_text: {query_text}", flush=True)
+    
+    if source == "browser":
+        # Simply query browser activity
+        activity = get_browser_activity(user_id)
+        return {"browser_activity": activity}
+    
+    # Otherwise query vector store + graph
+    from src.utils.vector_store import query_pinecone
+    from src.utils.graph_db import query_neo4j
+
+    vector_results = query_pinecone(user_id, query_text)
+    graph_results = query_neo4j(user_id, query_text)
+
+    print(f"[fetch_memory tool] Memory query returned {len(vector_results)} vector matches and {len(graph_results)} graph relationships.", flush=True)
+
+    return {
+        "vector_context": vector_results,
+        "graph_context": graph_results
+    }
+
+
 # ─── Exported tool list (register all agent tools here) ──────────────────────
 
 # AGENT_TOOLS = [get_task_by_name]
-BRAIN_TOOLS = [get_tasks, create_tasks]
+BRAIN_TOOLS = [get_tasks, create_tasks, get_browser_activity, fetch_inbox, fetch_memory]
+
+
 

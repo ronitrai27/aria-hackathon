@@ -42,6 +42,7 @@ import ChatMessageItem, {
   StatusStepper,
 } from "../../../../modules/Ai/components/ChatMessage";
 import { useAgentChat } from "@/hooks/useAgentChat";
+import { useBrainChat } from "@/hooks/useBrainChat";
 import AgentChatMessages from "./AgentChatMessages";
 import WorkflowPanel from "../../../../modules/workflows/components/WorkflowPanel";
 import WorkflowChoiceDialog from "../../../../modules/WorkflowChoiceDialog";
@@ -134,17 +135,41 @@ export default function AgentPage() {
     string[]
   >([]);
 
+  const { activeMode, setActiveMode, openConnectionDialog } = useAgentStore();
+
   const {
-    messages,
-    isGenerating,
-    activeSteps,
-    activeTraceLogs,
+    messages: agentMessages,
+    setMessages: setAgentMessages,
+    isGenerating: isAgentGenerating,
+    setIsGenerating: setIsAgentGenerating,
+    activeSteps: agentSteps,
+    setActiveSteps,
+    activeTraceLogs: agentTraceLogs,
+    setActiveTraceLogs: setAgentTraceLogs,
     workflowData,
     setWorkflowData,
     isRightOpen,
     setIsRightOpen,
-    sendMessage,
+    sendMessage: sendAgentMessage,
   } = useAgentChat();
+
+  const {
+    messages: brainMessages,
+    setMessages: setBrainMessages,
+    isGenerating: isBrainGenerating,
+    activeTraceLogs: brainTraceLogs,
+    activeSteps: brainSteps,
+    pendingTasks,
+    sendMessage: sendBrainMessage,
+    handleApprove: handleBrainApprove,
+  } = useBrainChat();
+
+  const isBrainMode = activeMode === "brain";
+  const messages = isBrainMode ? brainMessages : agentMessages;
+  const isGenerating = isBrainMode ? isBrainGenerating : isAgentGenerating;
+  const activeTraceLogs = isBrainMode ? brainTraceLogs : agentTraceLogs;
+  const activeSteps = isBrainMode ? brainSteps : agentSteps;
+
 
   const [isSaving, setIsSaving] = useState(false);
   const saveWorkflow = useMutation(api.workflows.saveWorkflow);
@@ -940,8 +965,6 @@ export default function AgentPage() {
     }
   }, []);
 
-  const { activeMode, setActiveMode, openConnectionDialog } = useAgentStore();
-
   const isAgentMode = activeMode === "agent";
   const unconnectedApps = isAgentMode
     ? selectedSuggestionApps.filter((app) => !user?.connecters?.includes(app))
@@ -1000,12 +1023,16 @@ export default function AgentPage() {
     setInputVal("");
     setShowWorkflowChoice(false);
 
-    if (isEditIntent && workflowData) {
+    if (isEditIntent && workflowData && !isBrainMode) {
       const enriched = buildEditPrompt(textToSend);
       setIsEditingWorkflow(false);
-      sendMessage(enriched, textToSend);
+      sendAgentMessage(enriched, textToSend);
     } else {
-      sendMessage(textToSend);
+      if (isBrainMode) {
+        sendBrainMessage(textToSend);
+      } else {
+        sendAgentMessage(textToSend);
+      }
     }
   };
 
@@ -1048,7 +1075,7 @@ export default function AgentPage() {
             setSavedWorkflowId(null);
             setShowWorkflowChoice(false);
             setInputVal("");
-            sendMessage(pendingPrompt);
+            sendAgentMessage(pendingPrompt);
           }}
           onClose={() => {
             setShowWorkflowChoice(false);
@@ -1109,6 +1136,8 @@ export default function AgentPage() {
                   isGenerating={isGenerating}
                   activeSteps={activeSteps}
                   activeTraceLogs={activeTraceLogs}
+                  pendingTasks={isBrainMode ? pendingTasks : null}
+                  onApprove={isBrainMode ? handleBrainApprove : undefined}
                 />
               ) : (
                 /* Welcome / loading area — skeleton fades out, real content fades in */

@@ -24,6 +24,10 @@ from composio_langchain import LangchainProvider
 
 from src.app.agent.graph import run_workflow_agent_stream
 from src.app.agent.sse_emitter import format_sse
+from src.app.brain.graph import run_brain_agent_stream
+from src.app.brain.brain_sse_emitter import map_brain_stream_to_sse
+from src.utils.checkpointer import get_checkpointer
+from src.config import settings
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -87,6 +91,9 @@ class ChatRequest(BaseModel):
     mode: Optional[str] = "agent"
     userId: Optional[str] = None
     user_id: Optional[str] = None
+    userName: Optional[str] = None
+    user_name: Optional[str] = None
+
 
 
 @app.get("/health")
@@ -309,19 +316,29 @@ def agent_chat_endpoint(body: ChatRequest, request: Request):
 BRAIN_STOP_FLAGS: Dict[str, threading.Event] = {}
 
 
+class BrainApproveRequest(BaseModel):
+    thread_id: str
+    approved: bool
+    userId: Optional[str] = "default_user"
+    user_id: Optional[str] = "default_user"
+    userName: Optional[str] = "User"
+    user_name: Optional[str] = "User"
+
+
 @app.post("/brain")
 def brain_chat_endpoint(body: ChatRequest, request: Request):
     """
     POST /brain — streaming Brain Agent endpoint (SSE).
-    Accepts a message + thread_id + userId, streams events from the brain
-    LangGraph (memory_agent, inbox_agent, doc_node, task tools, etc.).
+    Accepts a message + thread_id + userId + userName, streams events from the brain
+    LangGraph (tasks tools, inbox sub-agent, memory search, etc.).
     """
     message = body.message
     thread_id = body.thread_id or "brain_default"
     uid = body.userId or body.user_id or "default_user"
+    uname = body.userName or body.user_name or "User"
 
     print(
-        f"\n[POST /brain] userId: {uid}, thread_id: {thread_id}, query: '{message}'",
+        f"\n[POST /brain] userId: {uid}, userName: {uname}, thread_id: {thread_id}, query: '{message}'",
         flush=True,
     )
 
@@ -329,46 +346,45 @@ def brain_chat_endpoint(body: ChatRequest, request: Request):
     stop_event = threading.Event()
     BRAIN_STOP_FLAGS[thread_id] = stop_event
 
-    def brain_event_stream():
+    async def brain_event_stream():
         try:
             # Setup/retrieve chat history for this brain thread
             history = THREAD_HISTORY.setdefault(thread_id, [])
-            history.append({"role": "user", "content": message})
+            if message:
+                history.append({"role": "user", "content": message})
 
-            # Signal that the brain agent has started
-            yield format_sse("worker_status", {
-                "worker": "brain",
-                "status": "running",
-                "details": {"message": "Brain agent initializing..."},
-            })
+            # 1. Initialize Redis checkpointer
+            print(f"[brain_chat] Getting checkpointer for redis: {settings.redis_url}", flush=True)
+            checkpointer = await get_checkpointer(settings.redis_url)
 
-            # ── Placeholder: will be replaced with run_brain_agent_stream() ──
-            # The real graph will be wired here once brain/graph.py is built.
-            # For now we emit a structured "not yet implemented" response so
-            # the client can connect and test the SSE channel.
-            if stop_event.is_set():
-                yield format_sse("worker_status", {
-                    "worker": "brain",
-                    "status": "stopped",
-                    "details": {"message": "Brain agent stopped before start."},
-                })
-                return
+            # 2. Run graph stream generator
+            async def run_generator():
+                final_answer = ""
+                async for event in run_brain_agent_stream(
+                    message=message,
+                    user_id=uid,
+                    user_name=uname,
+                    thread_id=thread_id,
+                    checkpointer=checkpointer
+                ):
+                    if stop_event.is_set():
+                        print(f"[brain_chat] Stop flag detected. Halting stream for thread_id={thread_id}", flush=True)
+                        yield {"type": "trace", "content": "[brain_chat] Session stopped cleanly."}
+                        break
+                    
+                    # Capture final answer for history mapping
+                    if event.get("type") == "final_answer":
+                        final_answer = event.get("content", "")
+                        
+                    yield event
+                
+                # Append assistant answer to history
+                if final_answer:
+                    history.append({"role": "assistant", "content": final_answer})
 
-            final_response = (
-                f"[Brain agent ready] Thread '{thread_id}' received: {message}. "
-                "Full graph will be wired in the next step."
-            )
-            history.append({"role": "assistant", "content": final_response})
-
-            yield format_sse("supervisor_data", {
-                "status": "done",
-                "final_response": final_response,
-            })
-            yield format_sse("worker_status", {
-                "worker": "brain",
-                "status": "completed",
-                "details": {"message": "Brain agent completed."},
-            })
+            # 3. Stream mapped SSE events
+            async for sse_str in map_brain_stream_to_sse(run_generator()):
+                yield sse_str
 
         except Exception as err:
             import traceback
@@ -380,6 +396,88 @@ def brain_chat_endpoint(body: ChatRequest, request: Request):
 
     return StreamingResponse(
         brain_event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.post("/brain/approve")
+def brain_approve_endpoint(body: BrainApproveRequest):
+    """
+    POST /brain/approve — Approve or reject pending HITL tasks.
+    Updates the LangGraph checkpointer state for the thread and resumes the graph execution stream.
+    """
+    thread_id = body.thread_id
+    approved = body.approved
+    uid = body.userId or body.user_id or "default_user"
+    uname = body.userName or body.user_name or "User"
+
+    print(
+        f"\n[POST /brain/approve] thread_id: {thread_id}, approved: {approved}, user: {uname} ({uid})",
+        flush=True,
+    )
+
+    # Register a fresh stop flag for this thread
+    stop_event = threading.Event()
+    BRAIN_STOP_FLAGS[thread_id] = stop_event
+
+    async def approve_event_stream():
+        try:
+            # 1. Initialize checkpointer and update the HITL state variables
+            checkpointer = await get_checkpointer(settings.redis_url)
+            config = {"configurable": {"thread_id": thread_id}}
+            
+            print(f"[brain/approve] Setting hitl_approved={approved} for thread={thread_id}", flush=True)
+            from src.app.brain.graph import compile_brain_graph
+            graph = compile_brain_graph(checkpointer)
+            await graph.aupdate_state(config, {
+                "hitl_approved": approved
+            }, as_node="execute_tasks")
+
+            # Setup history for appending final result
+            history = THREAD_HISTORY.setdefault(thread_id, [])
+
+            # 2. Run stream generator (resuming since inputs=None)
+            async def run_generator():
+                final_answer = ""
+                async for event in run_brain_agent_stream(
+                    message="",  # Empty string since it's a resume
+                    user_id=uid,
+                    user_name=uname,
+                    thread_id=thread_id,
+                    checkpointer=checkpointer
+                ):
+                    if stop_event.is_set():
+                        print(f"[brain/approve] Stop flag detected. Halting stream for thread_id={thread_id}", flush=True)
+                        yield {"type": "trace", "content": "[brain/approve] Session stopped cleanly."}
+                        break
+                    
+                    if event.get("type") == "final_answer":
+                        final_answer = event.get("content", "")
+                        
+                    yield event
+                
+                # Append final response to local thread history
+                if final_answer:
+                    history.append({"role": "assistant", "content": final_answer})
+
+            # 3. Stream mapped SSE events
+            async for sse_str in map_brain_stream_to_sse(run_generator()):
+                yield sse_str
+
+        except Exception as err:
+            import traceback
+            traceback.print_exc()
+            yield format_sse("error", {"error": str(err)})
+        finally:
+            BRAIN_STOP_FLAGS.pop(thread_id, None)
+
+    return StreamingResponse(
+        approve_event_stream(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -407,6 +505,7 @@ def brain_stop_endpoint(body: ChatRequest):
 
     print(f"[POST /brain/stop] No active brain session for thread_id: {thread_id}", flush=True)
     return {"stopped": False, "thread_id": thread_id, "message": "No active session found."}
+
 
 
 if __name__ == "__main__":

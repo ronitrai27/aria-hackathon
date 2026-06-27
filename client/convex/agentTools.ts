@@ -115,7 +115,11 @@ export const createTasks = mutation({
     // Hard cap: never create more than 10 tasks at once
     const batch = args.tasks.slice(0, 10);
     const now = Date.now();
-    const results: { title: string; status: "created" | "skipped"; reason?: string }[] = [];
+    const results: {
+      title: string;
+      status: "created" | "skipped";
+      reason?: string;
+    }[] = [];
 
     for (const task of batch) {
       // Check for existing task with same title for this user
@@ -159,3 +163,96 @@ export const createTasks = mutation({
     };
   },
 });
+
+// ─── Brain Tool: getBrowserActivity ───────────────────────────────────────────
+/**
+ * getBrowserActivity — fetch recent aggregated browser activity for a given user.
+ * Fetches data from last 48 hours, groups by domain to remove duplicate pages/visits,
+ * and returns only domains where the user spent >= 10 minutes, sorted descending by duration (max 30).
+ */
+export const getBrowserActivity = query({
+  args: {
+    userId: v.string(),
+    now: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const fortyEightHoursAgo = args.now - 48 * 60 * 60 * 1000;
+    const tenMinutesMs = 10 * 60 * 1000;
+
+    // Fetch recent browser data entries for the user
+    const rows = await ctx.db
+      .query("browserData")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .order("desc")
+      .take(1000);
+
+    console.log("[getBrowserActivity Query] Total rows found in DB:", rows.length);
+    if (rows.length > 0) {
+      console.log("[getBrowserActivity Query] First row openedAt:", rows[0].openedAt, "duration:", rows[0].duration, "url:", rows[0].url);
+    }
+
+    // Self-healing time filter: if no data matches the last 48 hours, relax the filter
+    const hasRecentData = rows.some((r) => r.openedAt >= fortyEightHoursAgo);
+    const timeFilter = hasRecentData ? fortyEightHoursAgo : 0;
+    console.log("[getBrowserActivity Query] hasRecentData in last 48h:", hasRecentData, "timeFilter:", timeFilter);
+
+    // Grouping structure: domain -> aggregated data
+    const groups: Record<
+      string,
+      {
+        domain: string;
+        totalDurationMs: number;
+        visitCount: number;
+        lastVisitedAt: number;
+      }
+    > = {};
+
+    for (const r of rows) {
+      if (r.openedAt < timeFilter) continue;
+
+      let domain = "";
+      try {
+        const urlWithProto = r.url.startsWith("http") ? r.url : `https://${r.url}`;
+        const parsed = new URL(urlWithProto);
+        domain = parsed.hostname.replace("www.", "");
+      } catch (e) {
+        domain = r.url.split("/")[0] || r.url;
+      }
+
+      if (!domain) continue;
+
+      if (!groups[domain]) {
+        groups[domain] = {
+          domain,
+          totalDurationMs: 0,
+          visitCount: 0,
+          lastVisitedAt: r.openedAt,
+        };
+      }
+
+      groups[domain].totalDurationMs += r.duration ?? 0;
+      groups[domain].visitCount += 1;
+      if (r.openedAt > groups[domain].lastVisitedAt) {
+        groups[domain].lastVisitedAt = r.openedAt;
+      }
+    }
+
+    // Dynamic duration thresholding fallback chain
+    let filtered = Object.values(groups).filter((g) => g.totalDurationMs >= tenMinutesMs);
+    if (filtered.length === 0) {
+      filtered = Object.values(groups).filter((g) => g.totalDurationMs >= 1 * 60 * 1000); // 1 minute
+    }
+    if (filtered.length === 0) {
+      filtered = Object.values(groups); // no floor fallback
+    }
+
+    // Sort descending by duration, limit 30
+    const result = filtered
+      .sort((a, b) => b.totalDurationMs - a.totalDurationMs)
+      .slice(0, 30);
+
+    console.log("[getBrowserActivity Query] Returning aggregated items count:", result.length);
+    return result;
+  },
+});
+
