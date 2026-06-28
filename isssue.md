@@ -1,117 +1,31 @@
-
-[POST /agent] Match /agent Route. userId: j575q101a4sycsnngr0kxz8hz5897wwm, query: 'create me a solid flow to reseaech latest startups from hacker news , new videos from yc from youtube and ai to summarize those and send me email and draft a post in linkedin', thread_id: thread_1782562555767_bkpmhy6
-INFO:     127.0.0.1:54365 - "POST /agent HTTP/1.1" 200 OK
-[event_stream] Initializing Composio session for user: j575q101a4sycsnngr0kxz8hz5897wwm
-
-[compile_workflow_agent] Composio meta-tools loaded: ['COMPOSIO_MANAGE_CONNECTIONS', 'COMPOSIO_MULTI_EXECUTE_TOOL', 'COMPOSIO_SEARCH_TOOLS', 'COMPOSIO_GET_TOOL_SCHEMAS']
-
-[run_workflow_agent_stream] Starting agent run for thread_id=thread_1782562555767_bkpmhy6
-[agent_node] Running agent without validation errors.
-[should_continue] Routing to tools. Calls: ['COMPOSIO_SEARCH_TOOLS']
-[verifier_node] No proposed workflow staged. Skipping validation.
-[agent_node] Running agent without validation errors.
-[should_continue] Routing to tools. Calls: ['COMPOSIO_SEARCH_TOOLS']
-[verifier_node] No proposed workflow staged. Skipping validation.
-[agent_node] Running agent without validation errors.
-[should_continue] Routing to tools. Calls: ['COMPOSIO_SEARCH_TOOLS']
-[verifier_node] No proposed workflow staged. Skipping validation.
-[agent_node] Running agent without validation errors.
-[should_continue] Routing to tools. Calls: ['COMPOSIO_SEARCH_TOOLS']
-[verifier_node] No proposed workflow staged. Skipping validation.
-[agent_node] Running agent without validation errors.
-[should_continue] Routing to tools. Calls: ['COMPOSIO_SEARCH_TOOLS']
-[verifier_node] No proposed workflow staged. Skipping validation.
-[agent_node] Running agent without validation errors.
-[should_continue] Routing to tools. Calls: ['COMPOSIO_SEARCH_TOOLS']
-[verifier_node] No proposed workflow staged. Skipping validation.
-[agent_node] Running agent without validation errors.
-[should_continue] Routing to tools. Calls: ['COMPOSIO_GET_TOOL_SCHEMAS']
-[verifier_node] No proposed workflow staged. Skipping validation.
-[agent_node] Running agent without validation errors.
-[should_continue] Routing to tools. Calls: ['COMPOSIO_SEARCH_TOOLS']
-[verifier_node] No proposed workflow staged. Skipping validation.
-[agent_node] Running agent without validation errors.
-[should_continue] Routing to tools. Calls: ['set_workflow']
-
-[set_workflow called] name='HN + YC digest → Email draft + LinkedIn post' steps=7 total_fields=13
+[set_workflow called] name='Research AI trends, save to doc, and email' steps=4 total_fields=8
 
 ============================================================
-  WORKFLOW: HN + YC digest → Email draft + LinkedIn post
-  DESC:     Find latest startup posts on Hacker News and recent YC videos, summarize them with AI, create an email draft and prepare a LinkedIn post draft.
+  WORKFLOW: Research AI trends, save to doc, and email
+  DESC:     Research latest AI trends, generate a write-up, create a Google Doc with the content, and email it to you via Gmail (with optional attachment).
 ============================================================
-  Step 1: AI_RESEARCH — Find latest Hacker News posts (top / new / Show HN) about startups and return a short structured list.
-    • prompt (string) = 'Search Hacker News (news.ycombinator.com) for the most recent and relevant posts about startups. Return up to 10 items as a JSON array with these fields for each item: {"title": string, "url": string, "hn_type": one of ["top","new","show_hn"], "points": string or number if available, "comments": string or number if available, "one_line": one-sentence summary explaining why this is interesting to startup builders}. Prefer posts from the last 7 days, but include any outstanding Show HN threads. Output ONLY the JSON array.'  # Instructions for the AI
-  Step 2: AI_RESEARCH — List recent Y Combinator (YC) YouTube uploads relevant to startups and collect video metadata.
-    • prompt (string) = 'List recent videos published on the official Y Combinator YouTube channel (or Y Combinator-related YC channels). Return up to 10 videos as a JSON array with: {"title": string, "url": string, "video_id": string, "publish_date": ISO-8601 date if available, "one_line": 1-line description of the video}. Focus on new uploads (last 30 days preferred). Output ONLY the JSON array.'  # Instructions for the AI
-  Step 3: AI_RESEARCH — Retrieve or locate transcripts/captions for the YC videos from step 2 (or indicate if unavailable).
-    • prompt (string) = 'For each video from {{step_2}} (the YC videos list), attempt to locate a transcript or captions and return a JSON mapping array: [{"video_id": string, "transcript": string_or_null, "transcript_source_url": string_or_null, "note": short note if transcript not found}]. If a full transcript is available, include the full text. If only captions/auto-captions or an external summary link exist, provide the best available text or a link and mark transcript as null. Output ONLY the JSON array.'  # Instructions for the AI
-  Step 4: AI_SUMMARIZE — Summarize HN posts + YC video transcripts into an email digest and LinkedIn post draft.
-    • prompt (string) = 'Using the Hacker News items in {{step_1}} and the video transcripts from {{step_3}}, produce two outputs in JSON: {"email_digest": string, "linkedin_post": string}. Email digest: a concise HTML-friendly summary (3-7 bullet highlights, each with one-sentence context and link) plus a short conclusion and suggested subject line. LinkedIn_post: a single post up to 700 characters (or up to 3000 if you prefer) suitable for public sharing that highlights the top 2–3 items and links. Also include a 1-line CTA suggestion. Output ONLY valid JSON with those two fields.'  # Instructions for the AI
-  Step 5: GMAIL_CREATE_EMAIL_DRAFT — Create a Gmail draft containing the research digest (so you can review before sending).
-    • recipient_email (string) = ''  # Primary recipient's email address (fill in who should receive the digest).
-    • subject (string) = 'Startup digest — Hacker News + YC videos'  # Email subject line.
-    • body (string) = '{{step_4.email_digest}'  # Email body content (plain text or HTML). Prefill with the email digest from the AI summary step.
-    • is_html (boolean) = 'true'  # Set to True if the body contains HTML.
-    • user_id (string) = 'me'  # Email account to use; 'me' uses the authenticated user.
-  Step 6: LINKEDIN_GET_MY_INFO — Fetch your LinkedIn profile info to determine the author URN for posting (used by the next step).     
-  Step 7: LINKEDIN_CREATE_LINKED_IN_POST — Create (or save as DRAFT) a LinkedIn post using the AI-generated post text.
-    • author (string) = ''  # URN of the LinkedIn member or organization that will be the author (use the URN returned by LINKEDIN_GET_MY_INFO, e.g., 'urn:li:person:<id>').
-    • commentary (string) = '{{step_4.linkedin_post}'  # The main text content of the post. Prefill with the linkedin_post output from the summarization step.
-    • visibility (string) = 'PUBLIC'  # Who can see the post. Use 'PUBLIC' for everyone.
-    • lifecycleState (string) = 'DRAFT'  # Set to 'DRAFT' to save as a draft or 'PUBLISHED' to publish immediately.
+  Step 1: AI_RESEARCH — Research the latest AI trends and produce a structured write-up.
+    • prompt (string) = 'Research the latest AI trends from the past 6–12 months. Focus on: (1) frontier models (e.g., GPT-4-class, Claude, Gemini, open-source LLMs), (2) multimodal AI (text+image+audio+video), (3) AI coding and agentic workflows, (4) AI in productivity tools, (5) regulation and safety, (6) notable startups and open-source projects. Produce a concise, well-structured report with sections, bullet points, and brief examples where useful.'  # Instructions for the AI about what to research.
+  Step 2: AI_SUMMARIZE — Convert the detailed research into a cleaner report for the document.
+    • prompt (string) = "You are preparing content for a Google Doc. Using the research below, produce a polished report titled 'Latest AI Trends'. Use clear headings, short paragraphs, and bullet lists where helpful. Keep it suitable for a non-expert but technically curious reader. Input:\n\n{{step_1}}"  # Instructions for the AI to summarize or reorganize previous output.      
+  Step 3: GOOGLEDRIVE_CREATE_GOOGLE_DOC — Create a new Google Doc and populate it with the AI trends report.
+    • title (string) = 'Latest AI Trends'  # Title of the new Google Doc.
+    • content_markdown (string) = '{{step_2}}'  # Markdown or text content to place into the Google Doc body.
+  Step 4: GMAIL_SEND_EMAIL — Email the AI trends Google Doc (link or attachment) to your email address.
+    • recipient_email (string) = ''  # Your email address to receive the report.
+    • subject (string) = 'Latest AI Trends Report'  # Email subject line.
+    • body (string) = 'Here is your report on the latest AI trends.\n\nGoogle Doc link: {{step_3}}\n\nIf you’d like, you can also download and keep it for your records.'  # Email body text. You can include the Google Doc link from the previous step.
+    • is_html (boolean) = False  # Whether the email body is HTML formatted.
 ============================================================
 
-[verifier_node] Validating proposed workflow 'HN + YC digest → Email draft + LinkedIn post'...
+[verifier_node] Validating proposed workflow 'Research AI trends, save to doc, and email'...
 [verifier_node] Pydantic schema structure check passed.
-[verifier_node] Validation SUCCESS. Committing workflow 'HN + YC digest → Email draft + LinkedIn post' to active state.
+[verifier_node] Validation SUCCESS. Committing workflow 'Research AI trends, save to doc, and email' to active state.
 [agent_node] Running agent without validation errors.
 [should_continue] No tool calls. Routing to END.
 [run_workflow_agent_stream] Stream complete.
+---------------
 
-
-<!-- MISTAKE-1 BRAIN  -->
-<!-- --------------------------------------- -->
-[brain.supervisor_node] Running supervisor for user: 'Ronit Rai' (user_3FYJ8kFMGmpFPmqhxbjPLCGn3bF)
-[brain.supervisor_node] Invoking LLM...
-[brain.supervisor_node] LLM generated tool calls: ['fetch_inbox']
-[brain.should_continue] Routing to standard tool node for: ['fetch_inbox']
-[brain.tool_node] Running tool node for: ['fetch_inbox']
-
-[fetch_inbox tool] Running inbox sub-agent for user_id=user_3FYJ8kFMGmpFPmqhxbjPLCGn3bF with instruction: Get my unread emails (last 7 days) and upcoming Google Calendar events (next 14 days). For each email include sender, subject, snippet, and unread status. For calendar events include title, start and end time with timezone, location, attendees, and description. Also flag any events that have 'meeting', 'call', 'review', 'demo', or 'deadline' in the title or description.
-
-We should also see what fetch inbox agent is doing ????
-after this we get no idea and blank for 2-3 min !!
-
-<!-- ---------------------------------- -->
-
-[brain.supervisor_node] Running supervisor for user: 'Ronit Rai' (j575q101a4sycsnngr0kxz8hz5897wwm)
-[brain.supervisor_node] Invoking LLM...
-[brain.supervisor_node] LLM generated tool calls: ['get_browser_activity', 'fetch_inbox']
-[brain.should_continue] Routing to standard tool node for: ['get_browser_activity', 'fetch_inbox']
-[brain.tool_node] Running tool node for: ['get_browser_activity', 'fetch_inbox']
-
-[fetch_inbox tool] Running inbox sub-agent for user_id=j575q101a4sycsnngr0kxz8hz5897wwm with instruction: Summarize recent unread and flagged emails, and upcoming calendar events in the next 7 days. Highlight any action items, deadlines, meetings requiring prep, and people mentioned.
-
-[brain.supervisor_node] Running supervisor for user: 'Ronit Rai' (j575q101a4sycsnngr0kxz8hz5897wwm)
-[brain.supervisor_node] Invoking LLM...
-[brain.supervisor_node] LLM generated tool calls: ['create_tasks']
-[brain.should_continue] Matches create_tasks. Routing to execute_tasks (HITL gate).
-[run_brain_agent_stream] HITL interrupt hit. Staging 4 pending tasks.
-[run_brain_agent_stream] Completed stream for thread_id=brain_thread_1782652772123_zwvzco5
-
-[POST /brain/approve] thread_id: brain_thread_1782652772123_zwvzco5, approved: True, user: Ronit Rai (j575q101a4sycsnngr0kxz8hz5897wwm)
-R:\hackathon-project\agents\src\app\brain\graph.py:190: UserWarning: The 'config' parameter should be typed as 'RunnableConfig' or 'RunnableConfig | None', not 'Any'.
-  builder.add_node("supervisor", supervisor_node)
-[brain.compile_brain_graph] Compiling brain graph with interrupt_before=['execute_tasks']
-[brain.should_continue] Matches create_tasks. Routing to execute_tasks (HITL gate).
-[brain.compile_brain_graph] Compiling brain graph with interrupt_before=['execute_tasks']
-[brain.execute_tasks_node] Evaluating approval for create_tasks. Approved=True
-[brain.execute_tasks_node] Approval RECEIVED. Creating 4 tasks...
-[brain.execute_tasks_node] Convex insertion response: {'error': "Failed to create tasks: Server error '500 Internal Server Error' for url 'https://wandering-antelope-3.convex.site/api/brain/create-tasks'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500"}
-
-[brain.supervisor_node] Running supervisor for user: 'Ronit Rai' (j575q101a4sycsnngr0kxz8hz5897wwm)
-[brain.supervisor_node] Invoking LLM...
-[brain.supervisor_node] LLM generated tool calls: ['create_tasks']
-[brain.should_continue] Matches create_tasks. Routing to execute_tasks (HITL gate).
-[run_brain_agent_stream] HITL interrupt hit. Staging 4 pending tasks.
-[run_brain_agent_stream] Completed stream for thread_id=brain_thread_1782652772123_zwvzco5
+mistake 
+GOOGLEDOCS_CREATE_DOCUMENT (takes title to initialize a blank document)
+GOOGLEDOCS_CREATE_DOCUMENT_MARKDOWN (takes title and markdown to initialize a document with pre-filled content)

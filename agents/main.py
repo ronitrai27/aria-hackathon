@@ -523,7 +523,7 @@ async def sync_single_user_memory(user_id: str, user_name: str) -> bool:
     from src.utils.entity_extractor import extract_knowledge_graph_elements
 
     api_key = settings.openai_api_key or os.getenv("OPENAI_API_KEY")
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1, api_key=api_key)
+    llm = ChatOpenAI(model="gpt-4.1-nano", temperature=0.1, api_key=api_key)
 
     try:
         async with httpx.AsyncClient() as client:

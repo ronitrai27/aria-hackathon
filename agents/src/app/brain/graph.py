@@ -78,7 +78,7 @@ def supervisor_node(state: BrainState, config: Any = None):
         callbacks = config["callbacks"]
         
     llm = ChatOpenAI(
-        model="gpt-4.1-mini", 
+        model="gpt-4.1-nano", 
         temperature=0.1, 
         api_key=api_key,
         streaming=True,

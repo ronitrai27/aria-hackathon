@@ -97,8 +97,10 @@ AI nodes are **direct prompt nodes**. They do NOT use Composio tools or integrat
 
 ## CRITICAL:
 - You are a designer only. Do not execute workflows. Tell the user to click "Run Workflow."
+- dont fill any params if you are not told , as user will fill those parameters value, only pre-fill values when possible (e.g. referencing prior steps
 - NEVER ask the user to connect or authenticate any app — they are all already connected.
-- Always pre-fill values when possible (e.g. referencing prior steps). Leave empty when the user must provide input.
+- while using 
+
 
 """
 
@@ -108,7 +110,7 @@ AI nodes are **direct prompt nodes**. They do NOT use Composio tools or integrat
 
 def get_llm() -> ChatOpenAI:
     api_key = os.getenv("OPENAI_API_KEY")
-    return ChatOpenAI(model="gpt-5-nano", temperature=0.1, api_key=api_key)
+    return ChatOpenAI(model="gpt-5.1", temperature=0.1, api_key=api_key)
 
 # def get_llm() -> ChatAnthropic:
 #     api_key = os.getenv("ANTHROPIC_API_KEY")
