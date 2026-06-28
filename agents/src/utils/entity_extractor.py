@@ -102,7 +102,7 @@ if "entity_ruler" not in nlp.pipe_names:
     )
 
 # Target entity types and standard spaCy mapping rules
-TARGET_ENTITIES = {"USER", "CONTACT", "TASK", "EVENT", "DOCUMENT", "WORKFLOW", "FACT", "SKILL"}
+TARGET_ENTITIES = {"USER", "CONTACT", "TASK", "EVENT", "DOCUMENT", "WORKFLOW", "FACT", "SKILL", "PREFERENCE"}
 
 PERSON_RE = r"\b[A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+){1,3}\b"
 
@@ -116,11 +116,36 @@ SKILL_HINTS = {
     "api design", "bm25", "cypher", "data modeling", "graphrag", "javascript",
     "langchain", "langgraph", "llamaparse", "neo4j", "next.js", "pinecone",
     "prompt engineering", "python", "rag", "react", "security review", "spacy",
-    "streamlit", "typescript", "ux research", "workflow automation",
+    "streamlit", "typescript", "ux research", "workflow automation", "css", "html",
+    "vanilla css", "tailwind", "tailwindcss", "sass", "less", "graphql", "rest api"
 }
 ROLE_HINTS = {
     "analyst", "architect", "designer", "engineer", "lead", "manager",
     "owner", "researcher", "scientist",
+}
+
+# Generic noise words that should not be standalone entities
+GENERIC_WORDS = {
+    "api", "assistant", "details", "data", "database", "yesterday", "today", "tomorrow",
+    "now", "app", "application", "project", "work", "task", "info", "information",
+    "thing", "things", "stuff", "someone", "user", "something", "anything", "nothing",
+    "here", "there", "sync", "process", "program", "system", "file", "code", "repo", "repository",
+    "issue", "ticket", "bug", "feature", "meeting", "call", "event", "standup", "huddle", "sync",
+    "week", "month", "year", "day", "time", "date", "hourly", "daily", "weekly", "monthly",
+    "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "page", "website",
+    "domain", "url", "link", "summary", "notes", "status", "priority", "description"
+}
+
+# Known technologies, platforms, tools, libraries, databases to distinguish from human contacts
+TECH_KEYWORDS = {
+    "vercel", "openai", "pinecone", "neo4j", "github", "gitlab", "slack", "google", "microsoft", 
+    "aws", "clerk", "posthog", "redis", "supabase", "mongodb", "postgres", "postgresql", "mysql", 
+    "docker", "kubernetes", "figma", "linear", "jira", "notion", "trello", "zoom", "teams", 
+    "copilot", "chatgpt", "claude", "gemini", "llama", "huggingface", "databricks", "snowflake",
+    "composio", "langgraph", "langchain", "llamaparse", "spacy", "react", "next.js", "nextjs", 
+    "vue", "angular", "svelte", "tailwind", "tailwindcss", "python", "javascript", "typescript",
+    "node", "nodejs", "express", "fastapi", "django", "flask", "ruby", "rails", "rust", "go", "golang",
+    "css", "html", "vanilla css", "sass", "less", "graphql", "rest api", "api"
 }
 
 
@@ -133,6 +158,7 @@ def _clean_and_validate_node(name: str) -> str:
     - Skips if the node starts with '#' or digits followed by whitespace.
     - Skips if the node is longer than 60 characters or empty/single-char.
     - Skips if the node is a merged clause with verbs.
+    - Filters out generic developer noise words.
     """
     if not name:
         return ""
@@ -157,6 +183,14 @@ def _clean_and_validate_node(name: str) -> str:
     if not words:
         return ""
         
+    # Discard if all split words are in GENERIC_WORDS (e.g. "api details", "database data")
+    if all(w in GENERIC_WORDS for w in words):
+        return ""
+        
+    # Discard if single word matches generic blacklist
+    if len(words) == 1 and words[0] in GENERIC_WORDS:
+        return ""
+        
     bad_words = {"with", "to", "from", "for", "and", "in", "on", "of", "about", "works", "contributes", "reports", "attends", "collaborates", "depends"}
     if words[0] in bad_words or words[-1] in bad_words:
         return ""
@@ -175,9 +209,10 @@ def _normalize_node_name(name: str, user_name: Optional[str] = None) -> str:
         return ""
     
     temp_cleaned = name.strip("# \t\n\r,.-'\"")
-    if temp_cleaned.lower() in ("i", "me", "my", "myself"):
+    temp_lower = temp_cleaned.lower()
+    if temp_lower in ("i", "me", "my", "myself", "user", "the user", "he", "she", "his", "her", "him"):
         return "USER"
-    if user_name and temp_cleaned.lower() == user_name.lower():
+    if user_name and temp_lower == user_name.lower():
         return "USER"
         
     cleaned = _clean_and_validate_node(name)
@@ -187,7 +222,7 @@ def _normalize_node_name(name: str, user_name: Optional[str] = None) -> str:
 def map_label(label: str, name: str, user_name: Optional[str] = None) -> str:
     """
     Maps spaCy or custom entity labels to our core entities:
-    USER, CONTACT, TASK, EVENT, DOCUMENT, WORKFLOW, FACT, SKILL
+    USER, CONTACT, TASK, EVENT, DOCUMENT, WORKFLOW, FACT, SKILL, PREFERENCE
     """
     label_upper = label.upper()
     name_lower = name.lower()
@@ -196,12 +231,28 @@ def map_label(label: str, name: str, user_name: Optional[str] = None) -> str:
     if name_lower == "user" or (user_name and name_lower == user_name.lower()):
         return "USER"
 
-    if label_upper == "PERSON":
+    # Specific channel formatting hints
+    if name_lower.startswith("#"):
         return "CONTACT"
 
-    if label_upper in ("ORG", "GPE", "NORP", "LOC", "FAC"):
-        # Organizations, locations, and teams represent communication boundaries
+    name_words = name_lower.split()
+    is_tech = (
+        name_lower in TECH_KEYWORDS or
+        any(w in TECH_KEYWORDS for w in name_words) or
+        any(hint in name_lower for hint in ["db", "database", "api", "service", "library", "framework", "platform", "tool", "sdk", "app", "extension", "plugin", "workflow", "model"])
+    )
+
+    if is_tech:
+        if name_lower in SKILL_HINTS or any(w in SKILL_HINTS for w in name_words):
+            return "SKILL"
+        return "DOCUMENT"
+
+    if label_upper in ("PERSON", "ORG"):
         return "CONTACT"
+
+    if label_upper in ("GPE", "LOC", "FAC", "NORP"):
+        # Geo locations, buildings, groups are factual contexts
+        return "FACT"
 
     if label_upper in ("PRODUCT", "WORK_OF_ART", "LAW"):
         # Digital assets, files, schemas, APIs, libraries
@@ -221,6 +272,9 @@ def map_label(label: str, name: str, user_name: Optional[str] = None) -> str:
     if label_upper == "SKILL":
         return "SKILL"
 
+    if label_upper == "PREFERENCE":
+        return "PREFERENCE"
+
     if label_upper in ("FACT", "ROLE", "EXPERIENCE"):
         return "FACT"
 
@@ -233,9 +287,11 @@ def map_label(label: str, name: str, user_name: Optional[str] = None) -> str:
         return "EVENT"
     if any(word in name_lower.split() for word in ["document", "file", "url", "codebase", "repo", "api", "doc", "pdf", "sheet"]):
         return "DOCUMENT"
-    if name_lower in SKILL_HINTS:
+    if name_lower in SKILL_HINTS or any(w in TECH_KEYWORDS for w in name_words):
         return "SKILL"
-    if any(word in name_lower.split() for word in ["skill", "profile", "fact", "preference", "hobby", "habit"]):
+    if any(word in name_lower.split() for word in ["preference", "prefers", "likes", "favors", "choice"]):
+        return "PREFERENCE"
+    if any(word in name_lower.split() for word in ["skill", "profile", "fact", "hobby", "habit"]):
         return "FACT"
 
     return "FACT"
@@ -496,6 +552,10 @@ def _normalise_relation_type(relation: str) -> str:
     if rel_upper in ("BLOCKS", "PREVENTS"):
         return "BLOCKS"
 
+    # Preferences
+    if rel_upper in ("PREFERS", "PREFER", "LIKES", "LIKE", "FAVORS", "FAVOR", "USES", "USE"):
+        return "PREFERS"
+
     return re.sub(r"[^A-Z0-9_]+", "_", rel_upper).strip("_") or "RELATED_TO"
 
 
@@ -598,6 +658,24 @@ def _extract_profile_relations(text: str, user_name: Optional[str] = None) -> Li
             )
             if work_match:
                 _add_relation(relations, seen, work_match.group("person"), relation_type, work_match.group("target"), user_name)
+
+        # Extract preference statement
+        pref_match = re.search(
+            rf"\b(?P<subject>I|the\s+user|user|{PERSON_RE})\b\s+(?:prefers|likes|favors)\s+(?P<items>.+)$",
+            sentence,
+            flags=re.IGNORECASE
+        )
+        if pref_match:
+            items_str = pref_match.group("items")
+            # Check for "X over Y" pattern
+            over_match = re.search(r"(.+)\s+over\s+(.+)", items_str, flags=re.IGNORECASE)
+            if over_match:
+                pref_item = over_match.group(1).strip()
+                other_item = over_match.group(2).strip()
+                _add_relation(relations, seen, pref_match.group("subject"), "PREFERS", pref_item, user_name)
+            else:
+                for item in _split_profile_items(items_str):
+                    _add_relation(relations, seen, pref_match.group("subject"), "PREFERS", item, user_name)
 
     return relations
 
