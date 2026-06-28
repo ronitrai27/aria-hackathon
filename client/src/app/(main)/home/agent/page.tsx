@@ -169,6 +169,7 @@ export default function AgentPage() {
     messages: brainMessages,
     setMessages: setBrainMessages,
     isGenerating: isBrainGenerating,
+    isStreamingResponse: isBrainStreaming,
     activeTraceLogs: brainTraceLogs,
     activeSteps: brainSteps,
     pendingTasks,
@@ -182,6 +183,7 @@ export default function AgentPage() {
   const isGenerating = isBrainMode ? isBrainGenerating : isAgentGenerating;
   const activeTraceLogs = isBrainMode ? brainTraceLogs : agentTraceLogs;
   const activeSteps = isBrainMode ? brainSteps : agentSteps;
+  const isStreamingResponse = isBrainMode ? isBrainStreaming : false;
 
   const [isSaving, setIsSaving] = useState(false);
   const saveWorkflow = useMutation(api.workflows.saveWorkflow);
@@ -1173,6 +1175,7 @@ export default function AgentPage() {
                 <AgentChatMessages
                   messages={messages}
                   isGenerating={isGenerating}
+                  isStreamingResponse={isStreamingResponse}
                   activeSteps={activeSteps}
                   activeTraceLogs={activeTraceLogs}
                   pendingTasks={isBrainMode ? pendingTasks : null}

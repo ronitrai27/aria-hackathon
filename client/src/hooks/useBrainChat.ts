@@ -9,6 +9,7 @@ import { api } from "../../convex/_generated/api";
 export function useBrainChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isStreamingResponse, setIsStreamingResponse] = useState(false);
   const [activeTraceLogs, setActiveTraceLogs] = useState<string[]>([]);
   const [activeSteps, setActiveSteps] = useState<
     Array<{ worker: string; status: string; message: string }>
@@ -71,6 +72,7 @@ export function useBrainChat() {
                 setActiveTraceLogs([...accumulatedTraceLogs]);
               } else if (eventName === "brain_thought") {
                 const thought = payload.message || "";
+                setIsStreamingResponse(true);
 
                 // Append the streamed thoughts to the assistant message in real-time without mutation
                 setMessages((prev) => {
@@ -183,6 +185,7 @@ export function useBrainChat() {
                 // Turn off generation loader during HITL wait
                 setIsGenerating(false);
               } else if (eventName === "supervisor_data") {
+                setIsStreamingResponse(true);
                 // Done event. Can verify final text output.
                 if (payload.status === "done" && payload.final_response) {
                   const finalTxt = payload.final_response;
@@ -327,6 +330,7 @@ export function useBrainChat() {
         ]);
       } finally {
         setIsGenerating(false);
+        setIsStreamingResponse(false);
         setActiveSteps([]);
         setActiveTraceLogs([]);
       }
@@ -390,6 +394,7 @@ export function useBrainChat() {
         ]);
       } finally {
         setIsGenerating(false);
+        setIsStreamingResponse(false);
         setActiveSteps([]);
         setActiveTraceLogs([]);
         setPendingTasks(null);
@@ -403,6 +408,7 @@ export function useBrainChat() {
     messages,
     setMessages,
     isGenerating,
+    isStreamingResponse,
     activeTraceLogs,
     activeSteps,
     pendingTasks,

@@ -12,10 +12,26 @@ export const getTaskByName = query({
     title: v.string(),
   },
   handler: async (ctx, args) => {
-    const tasks = await ctx.db
+    // Resolve user by Clerk ID
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("id", args.userId))
+      .unique();
+    const dbUserId = user ? user._id : args.userId;
+
+    let tasks = await ctx.db
       .query("tasks")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", dbUserId))
       .collect();
+
+    // Support legacy/both matches
+    if (user && user._id !== args.userId) {
+      const legacyTasks = await ctx.db
+        .query("tasks")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .collect();
+      tasks = [...tasks, ...legacyTasks];
+    }
 
     const match = tasks.find(
       (t) => t.title.toLowerCase() === args.title.toLowerCase(),
@@ -56,11 +72,32 @@ export const getTasks = query({
     // Clamp limit: default 10, max 10
     const limit = Math.min(args.limit ?? 10, 10);
 
-    const tasks = await ctx.db
+    // Resolve user by Clerk ID
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("id", args.userId))
+      .unique();
+    const dbUserId = user ? user._id : args.userId;
+
+    let tasks = await ctx.db
       .query("tasks")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", dbUserId))
       .order("desc")
       .take(limit);
+
+    // Support legacy/both matches
+    if (user && user._id !== args.userId) {
+      const legacyTasks = await ctx.db
+        .query("tasks")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .order("desc")
+        .take(limit);
+      if (legacyTasks.length > 0) {
+        const combined = [...tasks, ...legacyTasks];
+        combined.sort((a, b) => b.createdAt - a.createdAt);
+        tasks = combined.slice(0, limit);
+      }
+    }
 
     return tasks.map((t) => {
       // Compute human-readable duration from estimation timestamps
@@ -112,6 +149,24 @@ export const createTasks = mutation({
     ),
   },
   handler: async (ctx, args) => {
+    // Resolve user: try direct Convex ID first, then fallback to Clerk ID
+    let user = null;
+    try {
+      user = await ctx.db.get(args.userId as any);
+    } catch (e) {
+      // ignore invalid ID format
+    }
+    if (!user) {
+      user = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", (q) => q.eq("id", args.userId))
+        .unique();
+    }
+    if (!user) {
+      throw new Error(`User not found for ID: ${args.userId}`);
+    }
+    const dbUserId = user._id;
+
     // Hard cap: never create more than 10 tasks at once
     const batch = args.tasks.slice(0, 10);
     const now = Date.now();
@@ -122,14 +177,20 @@ export const createTasks = mutation({
     }[] = [];
 
     for (const task of batch) {
-      // Check for existing task with same title for this user
-      const existing = await ctx.db
+      // Check duplicate using both IDs
+      const existingConvex = await ctx.db
+        .query("tasks")
+        .withIndex("by_user", (q) => q.eq("userId", dbUserId))
+        .filter((q) => q.eq(q.field("title"), task.title.trim()))
+        .first();
+
+      const existingClerk = await ctx.db
         .query("tasks")
         .withIndex("by_user", (q) => q.eq("userId", args.userId))
         .filter((q) => q.eq(q.field("title"), task.title.trim()))
         .first();
 
-      if (existing) {
+      if (existingConvex || existingClerk) {
         results.push({
           title: task.title,
           status: "skipped",
@@ -139,7 +200,7 @@ export const createTasks = mutation({
       }
 
       await ctx.db.insert("tasks", {
-        userId: args.userId,
+        userId: dbUserId,
         title: task.title.trim(),
         description: task.description,
         status: "not-started",
@@ -255,4 +316,3 @@ export const getBrowserActivity = query({
     return result;
   },
 });
-

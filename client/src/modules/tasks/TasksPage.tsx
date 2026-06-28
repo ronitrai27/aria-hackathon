@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { motion, AnimatePresence } from "motion/react";
@@ -16,6 +16,7 @@ import {
   Trash2,
   SlidersHorizontal,
   Filter,
+  ChartNoAxesColumnIncreasing,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,17 +46,20 @@ import { CreateTaskDialog } from "./CreateTaskDialog";
 import { ListTab } from "./TaskListView";
 import { TableTab } from "./TableTab";
 import { KanbanTab } from "./KanbanTab";
+import AnalyticsSection from "./analytics/AnalyticsSection";
+
 
 const TABS = [
   { id: "List", label: "List", icon: LayoutList },
   { id: "Table", label: "Table", icon: Table },
   { id: "Kanban", label: "Kanban", icon: KanbanSquare },
+  { id: "Analysis", label: "Analysis", icon: ChartNoAxesColumnIncreasing },
 ];
 
 export function TasksPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tasks = useQuery((api as any).tasks.getTasks) as Task[] | undefined;
-  const [activeTab, setActiveTab] = useState<"List" | "Table" | "Kanban">(
+  const [activeTab, setActiveTab] = useState<"List" | "Table" | "Kanban" | "Analysis">(
     "List",
   );
   const [selectedTaskIds, setSelectedTaskIds] = useState<Id<"tasks">[]>([]);
@@ -66,6 +70,16 @@ export function TasksPage() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const deleteTasks = useMutation((api as any).tasks.deleteTasks);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const migrateTasks = useMutation((api as any).tasks.migrateTasks);
+
+  useEffect(() => {
+    if (tasks && tasks.some((t) => t.userId.startsWith("user_"))) {
+      migrateTasks().catch((err) => {
+        console.error("Failed to migrate legacy tasks:", err);
+      });
+    }
+  }, [tasks, migrateTasks]);
 
   const handleDeleteTasks = async () => {
     try {
@@ -128,7 +142,7 @@ export function TasksPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => {
-                  setActiveTab(tab.id as "List" | "Table" | "Kanban");
+                  setActiveTab(tab.id as "List" | "Table" | "Kanban" | "Analysis");
                 }}
                 className={cn(
                   "flex items-center gap-2 px-6 py-1.5 rounded-sm! text-sm font-medium transition-all duration-200 select-none cursor-pointer outline-none",
@@ -273,6 +287,7 @@ export function TasksPage() {
               />
             )}
             {activeTab === "Kanban" && <KanbanTab tasks={filtered} />}
+            {activeTab === "Analysis" && <AnalyticsSection tasks={filtered} />}
           </div>
         )}
       </div>

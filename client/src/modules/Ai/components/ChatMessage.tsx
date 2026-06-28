@@ -191,94 +191,144 @@ import React from "react";
 export function CustomMarkdown({ content }: { content: string }) {
   if (!content) return null;
 
-  // Strip all triple backtick markers (e.g. ```text or ```)
+  // Clean raw content
   const cleanedContent = content.replace(/```[a-zA-Z0-9]*\n?/g, "");
+  const lines = cleanedContent.split("\n");
 
-  // Split by double newlines to find paragraphs/blocks
-  const blocks = cleanedContent.split(/\n\n+/);
+  const renderedElements: React.ReactNode[] = [];
+  let currentList: { type: "ul" | "ol"; items: string[] } | null = null;
+  let currentParagraph: string[] = [];
 
-  return (
-    <div className="space-y-3.5 select-text">
-      {blocks.map((block, blockIdx) => {
-        const trimmed = block.trim();
-        if (!trimmed) return null;
+  const flushParagraph = (key: string | number) => {
+    if (currentParagraph.length > 0) {
+      renderedElements.push(
+        <p
+          key={`p-${key}`}
+          className="text-[12.5px] leading-relaxed text-zinc-800 dark:text-zinc-200 mt-2 mb-2"
+        >
+          {currentParagraph.map((line, lineIdx) => (
+            <React.Fragment key={lineIdx}>
+              {lineIdx > 0 && <br />}
+              {parseInline(line)}
+            </React.Fragment>
+          ))}
+        </p>
+      );
+      currentParagraph = [];
+    }
+  };
 
-        // 1. Check if heading
-        if (trimmed.startsWith("### ")) {
-          return (
-            <h4
-              key={blockIdx}
-              className="text-xs font-bold text-zinc-800 dark:text-zinc-100 mt-4 mb-1.5 tracking-wide uppercase"
-            >
-              {parseInline(trimmed.substring(4))}
-            </h4>
-          );
-        }
-        if (trimmed.startsWith("## ")) {
-          return (
-            <h3
-              key={blockIdx}
-              className="text-sm font-bold text-zinc-800 dark:text-zinc-100 mt-5 mb-2 border-b border-zinc-200 dark:border-zinc-800 pb-1"
-            >
-              {parseInline(trimmed.substring(3))}
-            </h3>
-          );
-        }
-        if (trimmed.startsWith("# ")) {
-          return (
-            <h2
-              key={blockIdx}
-              className="text-base font-extrabold text-zinc-900 dark:text-zinc-100 mt-5 mb-2.5"
-            >
-              {parseInline(trimmed.substring(2))}
-            </h2>
-          );
-        }
+  const flushList = (key: string | number) => {
+    if (currentList) {
+      const ListTag = currentList.type;
+      const listClass = currentList.type === "ul" ? "list-disc pl-4" : "list-decimal pl-4";
+      renderedElements.push(
+        <ListTag
+          key={`list-${key}`}
+          className={`${listClass} space-y-1.5 text-zinc-700 dark:text-zinc-300 mt-2 mb-2`}
+        >
+          {currentList.items.map((item, itemIdx) => (
+            <li key={itemIdx} className="text-[12.5px] leading-relaxed">
+              {parseInline(item)}
+            </li>
+          ))}
+        </ListTag>
+      );
+      currentList = null;
+    }
+  };
 
-        // 2. Check if bullet list block
-        if (
-          trimmed.startsWith("- ") ||
-          trimmed.startsWith("* ") ||
-          trimmed.startsWith("\n- ") ||
-          trimmed.startsWith("\n* ")
-        ) {
-          const items = trimmed
-            .split(/\n[-*]\s+/)
-            .map((item) => item.replace(/^[-*]\s+/, "").trim())
-            .filter(Boolean);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
 
-          return (
-            <ul
-              key={blockIdx}
-              className="list-disc pl-4 space-y-1.5 text-zinc-700 dark:text-zinc-300"
-            >
-              {items.map((item, itemIdx) => (
-                <li key={itemIdx} className="text-[12.5px] leading-relaxed">
-                  {parseInline(item)}
-                </li>
-              ))}
-            </ul>
-          );
-        }
+    // 1. Check for blank lines
+    if (!trimmed) {
+      flushParagraph(i);
+      flushList(i);
+      continue;
+    }
 
-        // 3. Regular paragraph
-        const lines = trimmed.split("\n");
-        return (
-          <p
-            key={blockIdx}
-            className="text-[12.5px] leading-relaxed text-zinc-800 dark:text-zinc-200"
-          >
-            {lines.map((line, lineIdx) => (
-              <React.Fragment key={lineIdx}>
-                {lineIdx > 0 && <br />}
-                {parseInline(line)}
-              </React.Fragment>
-            ))}
-          </p>
-        );
-      })}
-    </div>
-  );
+    // 2. Check for headers
+    if (trimmed.startsWith("### ")) {
+      flushParagraph(i);
+      flushList(i);
+      renderedElements.push(
+        <h4
+          key={`h4-${i}`}
+          className="text-xs font-bold text-zinc-800 dark:text-zinc-100 mt-4 mb-1.5 tracking-wide uppercase"
+        >
+          {parseInline(trimmed.substring(4))}
+        </h4>
+      );
+      continue;
+    }
+    if (trimmed.startsWith("## ")) {
+      flushParagraph(i);
+      flushList(i);
+      renderedElements.push(
+        <h3
+          key={`h3-${i}`}
+          className="text-sm font-bold text-zinc-800 dark:text-zinc-100 mt-5 mb-2 border-b border-zinc-200 dark:border-zinc-800 pb-1"
+        >
+          {parseInline(trimmed.substring(3))}
+        </h3>
+      );
+      continue;
+    }
+    if (trimmed.startsWith("# ")) {
+      flushParagraph(i);
+      flushList(i);
+      renderedElements.push(
+        <h2
+          key={`h2-${i}`}
+          className="text-base font-extrabold text-zinc-900 dark:text-zinc-100 mt-5 mb-2.5"
+        >
+          {parseInline(trimmed.substring(2))}
+        </h2>
+      );
+      continue;
+    }
+
+    // 3. Check for bullet list items
+    const bulletMatch = line.match(/^(\s*)[-*+]\s+(.*)/);
+    if (bulletMatch) {
+      flushParagraph(i);
+      const content = bulletMatch[2];
+      if (currentList && currentList.type === "ul") {
+        currentList.items.push(content);
+      } else {
+        flushList(i);
+        currentList = { type: "ul", items: [content] };
+      }
+      continue;
+    }
+
+    // 4. Check for ordered list items (e.g. 1. or 1))
+    const orderedMatch = line.match(/^(\s*)(\d+[\.\)]\s+)(.*)/);
+    if (orderedMatch) {
+      flushParagraph(i);
+      flushList(i);
+      const prefix = orderedMatch[2];
+      const content = orderedMatch[3];
+      renderedElements.push(
+        <p key={`ol-${i}`} className="text-[12.5px] leading-relaxed text-zinc-900 dark:text-zinc-100 font-bold mt-3 mb-1">
+          {prefix}{parseInline(content)}
+        </p>
+      );
+      continue;
+    }
+
+    // 5. Regular paragraph lines
+    flushList(i);
+    currentParagraph.push(line);
+  }
+
+  // Flush remaining elements
+  flushParagraph("final");
+  flushList("final");
+
+  return <div className="space-y-1 select-text">{renderedElements}</div>;
 }
 
 // Parse bold (**text**) and code backticks (`code`) inline
@@ -290,10 +340,7 @@ function parseInline(text: string): React.ReactNode[] {
   return matches.map((part, idx) => {
     if (part.startsWith("**") && part.endsWith("**")) {
       return (
-        <strong
-          key={idx}
-          className="font-bold text-zinc-900 dark:text-zinc-50"
-        >
+        <strong key={idx} className="font-bold text-zinc-900 dark:text-zinc-50">
           {part.slice(2, -2)}
         </strong>
       );

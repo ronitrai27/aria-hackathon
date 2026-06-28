@@ -81,3 +81,37 @@ INFO:     127.0.0.1:54365 - "POST /agent HTTP/1.1" 200 OK
 
 We should also see what fetch inbox agent is doing ????
 after this we get no idea and blank for 2-3 min !!
+
+<!-- ---------------------------------- -->
+
+[brain.supervisor_node] Running supervisor for user: 'Ronit Rai' (j575q101a4sycsnngr0kxz8hz5897wwm)
+[brain.supervisor_node] Invoking LLM...
+[brain.supervisor_node] LLM generated tool calls: ['get_browser_activity', 'fetch_inbox']
+[brain.should_continue] Routing to standard tool node for: ['get_browser_activity', 'fetch_inbox']
+[brain.tool_node] Running tool node for: ['get_browser_activity', 'fetch_inbox']
+
+[fetch_inbox tool] Running inbox sub-agent for user_id=j575q101a4sycsnngr0kxz8hz5897wwm with instruction: Summarize recent unread and flagged emails, and upcoming calendar events in the next 7 days. Highlight any action items, deadlines, meetings requiring prep, and people mentioned.
+
+[brain.supervisor_node] Running supervisor for user: 'Ronit Rai' (j575q101a4sycsnngr0kxz8hz5897wwm)
+[brain.supervisor_node] Invoking LLM...
+[brain.supervisor_node] LLM generated tool calls: ['create_tasks']
+[brain.should_continue] Matches create_tasks. Routing to execute_tasks (HITL gate).
+[run_brain_agent_stream] HITL interrupt hit. Staging 4 pending tasks.
+[run_brain_agent_stream] Completed stream for thread_id=brain_thread_1782652772123_zwvzco5
+
+[POST /brain/approve] thread_id: brain_thread_1782652772123_zwvzco5, approved: True, user: Ronit Rai (j575q101a4sycsnngr0kxz8hz5897wwm)
+R:\hackathon-project\agents\src\app\brain\graph.py:190: UserWarning: The 'config' parameter should be typed as 'RunnableConfig' or 'RunnableConfig | None', not 'Any'.
+  builder.add_node("supervisor", supervisor_node)
+[brain.compile_brain_graph] Compiling brain graph with interrupt_before=['execute_tasks']
+[brain.should_continue] Matches create_tasks. Routing to execute_tasks (HITL gate).
+[brain.compile_brain_graph] Compiling brain graph with interrupt_before=['execute_tasks']
+[brain.execute_tasks_node] Evaluating approval for create_tasks. Approved=True
+[brain.execute_tasks_node] Approval RECEIVED. Creating 4 tasks...
+[brain.execute_tasks_node] Convex insertion response: {'error': "Failed to create tasks: Server error '500 Internal Server Error' for url 'https://wandering-antelope-3.convex.site/api/brain/create-tasks'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500"}
+
+[brain.supervisor_node] Running supervisor for user: 'Ronit Rai' (j575q101a4sycsnngr0kxz8hz5897wwm)
+[brain.supervisor_node] Invoking LLM...
+[brain.supervisor_node] LLM generated tool calls: ['create_tasks']
+[brain.should_continue] Matches create_tasks. Routing to execute_tasks (HITL gate).
+[run_brain_agent_stream] HITL interrupt hit. Staging 4 pending tasks.
+[run_brain_agent_stream] Completed stream for thread_id=brain_thread_1782652772123_zwvzco5

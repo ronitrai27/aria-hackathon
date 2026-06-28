@@ -63,7 +63,7 @@ CONVEX_SITE_URL = os.getenv(
 # ─── Tool: get_tasks ──────────────────────────────────────────────────────────
 
 @tool
-def get_tasks(user_id: str, limit: Optional[int] = 10) -> list[dict]:
+async def get_tasks(user_id: str, limit: Optional[int] = 10) -> list[dict]:
     """
     Fetch the list of recent tasks for a given user.
 
@@ -86,9 +86,10 @@ def get_tasks(user_id: str, limit: Optional[int] = 10) -> list[dict]:
         params["limit"] = str(limit)
 
     try:
-        response = httpx.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        return response.json()
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            return response.json()
     except Exception as e:
         return [{"error": f"Failed to fetch tasks: {str(e)}"}]
 
@@ -96,7 +97,7 @@ def get_tasks(user_id: str, limit: Optional[int] = 10) -> list[dict]:
 # ─── Tool: create_tasks ────────────────────────────────────────────────────────
 
 @tool
-def create_tasks(user_id: str, tasks: list[dict]) -> dict:
+async def create_tasks(user_id: str, tasks: list[dict]) -> dict:
     """
     Bulk-create 1-10 tasks for a given user.
 
@@ -118,9 +119,10 @@ def create_tasks(user_id: str, tasks: list[dict]) -> dict:
     payload = {"userId": user_id, "tasks": tasks}
 
     try:
-        response = httpx.post(url, json=payload, timeout=10)
-        response.raise_for_status()
-        return response.json()
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, timeout=10)
+            response.raise_for_status()
+            return response.json()
     except Exception as e:
         return {"error": f"Failed to create tasks: {str(e)}"}
 
@@ -128,7 +130,7 @@ def create_tasks(user_id: str, tasks: list[dict]) -> dict:
 # ─── Tool: get_browser_activity ────────────────────────────────────────────────
 
 @tool
-def get_browser_activity(user_id: str) -> list[dict]:
+async def get_browser_activity(user_id: str) -> list[dict]:
     """
     Fetch user's recent aggregated browser activity (last 48 hours).
     Returns a list of websites/domains where the user has spent a significant
@@ -148,9 +150,10 @@ def get_browser_activity(user_id: str) -> list[dict]:
     params = {"userId": user_id}
 
     try:
-        response = httpx.get(url, params=params, timeout=15)
-        response.raise_for_status()
-        return response.json()
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params, timeout=15)
+            response.raise_for_status()
+            return response.json()
     except Exception as e:
         return [{"error": f"Failed to fetch browser activity: {str(e)}"}]
 

@@ -54,7 +54,7 @@ CRITICAL INSTRUCTIONS:
 # ─── Nodes ────────────────────────────────────────────────────────────────────
 
 def supervisor_node(state: BrainState, config: Any = None):
-    """Supervisor LLM node using gpt-5-mini."""
+    """Supervisor LLM node using gpt-4.1-nano."""
     user_name = state.get("user_name", "User")
     user_id = state.get("user_id", "default")
     
@@ -64,7 +64,7 @@ def supervisor_node(state: BrainState, config: Any = None):
     sys_prompt = SYSTEM_PROMPT.format(user_name=user_name, user_id=user_id)
     messages = [SystemMessage(content=sys_prompt)] + state["messages"]
     
-    # Initialize the gpt-5-mini model
+    # Initialize the gpt-4.1-nano model
     api_key = settings.openai_api_key or os.getenv("OPENAI_API_KEY")
     
     # Extract callbacks from config if present
@@ -73,7 +73,7 @@ def supervisor_node(state: BrainState, config: Any = None):
         callbacks = config["callbacks"]
         
     llm = ChatOpenAI(
-        model="gpt-5-mini", 
+        model="gpt-5-nano", 
         temperature=0.1, 
         api_key=api_key,
         streaming=True,
@@ -107,7 +107,7 @@ async def tool_node(state: BrainState):
     return await t_node.ainvoke(state)
 
 
-def execute_tasks_node(state: BrainState):
+async def execute_tasks_node(state: BrainState):
     """
     Executes task creation after passing the HITL gate.
     If hitl_approved is True, triggers the create_tasks Convex API.
@@ -139,7 +139,7 @@ def execute_tasks_node(state: BrainState):
     
     if approved:
         print(f"[brain.execute_tasks_node] Approval RECEIVED. Creating {len(args.get('tasks', []))} tasks...", flush=True)
-        result = create_tasks.invoke(args)
+        result = await create_tasks.ainvoke(args)
         print(f"[brain.execute_tasks_node] Convex insertion response: {result}", flush=True)
         
         return {
@@ -243,6 +243,7 @@ async def run_brain_agent_stream(
     inputs = None
     if not current_state or not current_state.values:
         yield {"type": "trace", "content": f"[run_brain_agent_stream] Starting fresh conversation thread."}
+        yield {"type": "trace", "content": "[graph update] Node 'supervisor' started execution."}
         inputs = {
             "messages": [HumanMessage(content=message)],
             "user_id": user_id,
@@ -261,6 +262,7 @@ async def run_brain_agent_stream(
             inputs = None
         else:
             yield {"type": "trace", "content": f"[run_brain_agent_stream] Appending new human message to existing thread."}
+            yield {"type": "trace", "content": "[graph update] Node 'supervisor' started execution."}
             inputs = {
                 "messages": [HumanMessage(content=message)],
                 "user_id": user_id,
@@ -315,6 +317,10 @@ async def run_brain_agent_stream(
             chunk = event["chunk"]
             for node_name, output in chunk.items():
                 yield {"type": "trace", "content": f"[graph update] Node '{node_name}' finished execution."}
+                
+                # If tools or task execution completed, the graph loops back to the supervisor node
+                if node_name in ["tools", "execute_tasks"]:
+                    yield {"type": "trace", "content": "[graph update] Node 'supervisor' started execution."}
                 
                 if "messages" in output:
                     for msg in output["messages"]:
