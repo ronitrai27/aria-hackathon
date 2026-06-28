@@ -8,9 +8,9 @@ import { redis } from "@/lib/redis";
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 const customOpenai = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  // apiKey: process.env.OPENAI_API_KEY,
   // apiKey:
-  //   "sk-proj-ZfcteT-6xfwz9q",
+  //   "sk-proj-ZfcteT-6xfwz9qUoNuGAq7AAabVleRm2Om",
 });
 
 const model = customOpenai("gpt-4.1-nano");
@@ -280,7 +280,7 @@ Rules:
     };
 
     try {
-      await redis.set(cacheKey, JSON.stringify(finalResult), { ex: 3600 });
+      await redis.set(cacheKey, JSON.stringify(finalResult), { ex: 21600 });
       console.log("[Recap API] Cached new result in Redis for user:", userId);
     } catch (redisError) {
       console.error("[Recap API] Redis write error:", redisError);

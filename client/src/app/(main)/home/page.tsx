@@ -1,12 +1,13 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { useUser } from "@clerk/nextjs";
 import { RefreshCw } from "lucide-react";
 import Image from "next/image";
-import { useState, useCallback, useRef } from "react";
-import { ImportantActionsSection } from "./ImportantActionsSection";
+import { useRouter } from "next/navigation";
+import { useCallback, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { BrowserRecapSection } from "./BrowserRecapSection";
+import { ImportantActionsSection } from "./ImportantActionsSection";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -44,7 +45,7 @@ function Spinner() {
 
 // ─── Brief Card ───────────────────────────────────────────────────────────────
 
-function BriefCard({
+function _BriefCard({
   icon,
   title,
   badge,
@@ -85,11 +86,18 @@ function BriefCard({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
+  const router = useRouter();
   const { user } = useUser();
   const firstName = user?.firstName ?? "there";
 
   const [syncing, setSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  const [counts, setCounts] = useState({
+    gmail: 0,
+    calendar: 0,
+    slack: 0,
+    tasks: 0,
+  });
 
   // Populated by ImportantActionsSection so Refresh button can trigger a real fetch
   const triggerFetchRef = useRef<(() => Promise<void>) | null>(null);
@@ -151,17 +159,31 @@ export default function HomePage() {
             alt="logo"
             width={30}
             height={30}
-            className=" shrink-0 invert"
+            className=" shrink-0 "
           />
         </div>
         <div className="w-full">
           <p className="font-semibold text-foreground text-xl">Morning Brief</p>
           <div className="flex items-center justify-between w-full">
             <p className="text-sm max-w-xl">
-              You have today 6 unread messages from gmail, 3 events today and 7
-              slack messages waiting for you.
+              You have today {counts.gmail === 0 ? "no" : counts.gmail} unread
+              messages from gmail,{" "}
+              {counts.calendar === 0 ? "no" : counts.calendar} event
+              {counts.calendar !== 1 ? "s" : ""} today,{" "}
+              {counts.slack === 0 ? "no" : counts.slack} slack messages waiting
+              for you, and {counts.tasks === 0 ? "no" : counts.tasks} task
+              {counts.tasks !== 1 ? "s" : ""} due today.
             </p>
-            <Button className="text-xs rounded-md ">Ask for Insights</Button>
+            <Button
+              className="text-xs rounded-md "
+              onClick={() =>
+                router.push(
+                  "/home/agent?mode=brain&input=give me insights about my past activity accross email , browser and others.",
+                )
+              }
+            >
+              Ask for Insights
+            </Button>
           </div>
         </div>
       </div>
@@ -170,6 +192,7 @@ export default function HomePage() {
       <ImportantActionsSection
         triggerFetchRef={triggerFetchRef}
         onSyncComplete={handleSyncComplete}
+        onCountsChange={setCounts}
       />
 
       {/* ── Browser Activity Recap & Standup ── */}

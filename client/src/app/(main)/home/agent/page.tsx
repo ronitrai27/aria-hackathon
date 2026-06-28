@@ -1,8 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { toast } from "sonner";
+import { useMutation, useQuery } from "convex/react";
 import {
   AlertCircle,
   Bell,
@@ -24,6 +22,9 @@ import {
   X,
 } from "lucide-react";
 import Image from "next/image";
+import type React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import Typewriter from "typewriter-effect";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,18 +35,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useAgentChat } from "@/hooks/useAgentChat";
 import { useAgentStore } from "@/hooks/useAgentStore";
+import { useBrainChat } from "@/hooks/useBrainChat";
 import { connectorIcons, models } from "@/lib/static";
 import { api } from "../../../../../convex/_generated/api";
-
 import ChatMessageItem, {
   StatusStepper,
 } from "../../../../modules/Ai/components/ChatMessage";
-import { useAgentChat } from "@/hooks/useAgentChat";
-import { useBrainChat } from "@/hooks/useBrainChat";
-import AgentChatMessages from "./AgentChatMessages";
-import WorkflowPanel from "../../../../modules/workflows/components/WorkflowPanel";
 import WorkflowChoiceDialog from "../../../../modules/WorkflowChoiceDialog";
+import WorkflowPanel from "../../../../modules/workflows/components/WorkflowPanel";
+import AgentChatMessages from "./AgentChatMessages";
 
 interface SuggestionItem {
   title: string;
@@ -191,6 +191,33 @@ export default function AgentPage() {
   const [savedWorkflowId, setSavedWorkflowId] = useState<string | null>(null);
   const [isStarred, setIsStarred] = useState(false);
   const [workflowTitle, setWorkflowTitle] = useState("Untitled");
+
+  // Load mode and input from URL search query parameter on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const mode = searchParams.get("mode");
+      const input = searchParams.get("input");
+      if (mode === "brain") {
+        setActiveMode("brain");
+      } else if (mode === "agent") {
+        setActiveMode("agent");
+      }
+      if (input) {
+        setInputVal(input);
+      }
+      if (mode || input) {
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete("mode");
+        cleanUrl.searchParams.delete("input");
+        window.history.replaceState(
+          {},
+          "",
+          cleanUrl.pathname + cleanUrl.search,
+        );
+      }
+    }
+  }, [setActiveMode]);
 
   // Load workflow from URL search query parameter on mount
   useEffect(() => {

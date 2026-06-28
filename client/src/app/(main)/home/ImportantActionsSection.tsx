@@ -1,19 +1,19 @@
 "use client";
 
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
+import { useMutation, useQuery } from "convex/react";
+import { Edit2 } from "lucide-react";
+import Image from "next/image";
 import {
-  useEffect,
-  useState,
-  useCallback,
-  useMemo,
   MutableRefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
 } from "react";
+import { Button } from "@/components/ui/button";
 import { useAgentStore } from "@/hooks/useAgentStore";
 import { useStoreUser } from "@/hooks/useStoreUser";
-import Image from "next/image";
-import { Edit2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { api } from "../../../../convex/_generated/api";
 
 // ─── Tool icons (from /public) ───────────────────────────────────────────────
 
@@ -204,9 +204,16 @@ function ActionCard({
 export function ImportantActionsSection({
   onSyncComplete,
   triggerFetchRef,
+  onCountsChange,
 }: {
   onSyncComplete?: (ts: Date) => void;
   triggerFetchRef?: React.MutableRefObject<(() => Promise<void>) | null>;
+  onCountsChange?: (counts: {
+    gmail: number;
+    calendar: number;
+    slack: number;
+    tasks: number;
+  }) => void;
 }) {
   // useStoreUser gives us the Convex _id — this is what Composio uses
   const { userId: convexUserId, isLoading: userLoading } = useStoreUser();
@@ -380,6 +387,24 @@ export function ImportantActionsSection({
     dueTodayTasksCount;
 
   const openConnectionDialog = useAgentStore((s) => s.openConnectionDialog);
+
+  useEffect(() => {
+    onCountsChange?.({
+      gmail: gmailConnected ? (storedData?.gmailUnreadCount ?? 0) : 0,
+      calendar: calConnected ? (storedData?.calendarEvents.length ?? 0) : 0,
+      slack: slackConnected ? (storedData?.slackMessageCount ?? 0) : 0,
+      tasks: dueTodayTasksCount,
+    });
+  }, [
+    gmailConnected,
+    calConnected,
+    slackConnected,
+    storedData?.gmailUnreadCount,
+    storedData?.calendarEvents.length,
+    storedData?.slackMessageCount,
+    dueTodayTasksCount,
+    onCountsChange,
+  ]);
 
   return (
     <div className="flex flex-col gap-4 mt-8">
