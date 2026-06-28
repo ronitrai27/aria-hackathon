@@ -129,4 +129,17 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_starred", ["userId", "isStarred"])
     .index("by_user_status", ["userId", "status"]),
+
+  brainSessions: defineTable({
+    userId: v.string(), // Convex User ID
+    threadId: v.string(), 
+    title: v.optional(v.string()), 
+    messages: v.array(v.any()), 
+    isPinned: v.optional(v.boolean()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_thread", ["threadId"])
+    .index("by_user_updated", ["userId", "updatedAt"]),
 });

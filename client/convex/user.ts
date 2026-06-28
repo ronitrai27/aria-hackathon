@@ -131,3 +131,10 @@ export const setConnectors = mutation({
     return args.names;
   },
 });
+
+export const getAllUsersInternal = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("users").collect();
+  },
+});

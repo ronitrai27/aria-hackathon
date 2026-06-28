@@ -208,23 +208,23 @@ const TaskRowMenu = ({
               <AlertCircle className="w-4 h-4" /> Delete Task
             </DropdownMenuItem>
           </AlertDialogTrigger>
-          <AlertDialogContent className="bg-neutral-900 border-neutral-800 shadow-2xl">
+          <AlertDialogContent className="bg-white border border-neutral-200 shadow-xl max-w-md rounded-xl p-6">
             <AlertDialogHeader>
-              <AlertDialogTitle className="text-primary">
+              <AlertDialogTitle className="text-neutral-900 font-semibold">
                 Are you absolutely sure?
               </AlertDialogTitle>
-              <AlertDialogDescription className="text-muted-foreground">
+              <AlertDialogDescription className="text-neutral-500">
                 This action cannot be undone. This will permanently delete this
                 task and remove all associated data.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel className="bg-neutral-800 border-neutral-700 text-primary hover:bg-neutral-700">
+              <AlertDialogCancel className="border border-neutral-200 text-neutral-700 bg-white hover:bg-neutral-50 hover:text-neutral-900">
                 Cancel
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={onDelete}
-                className="bg-red-600 text-white hover:bg-red-700"
+                className="bg-red-600 text-white hover:bg-red-700 border-none"
               >
                 Delete Permanently
               </AlertDialogAction>

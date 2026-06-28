@@ -328,11 +328,11 @@ export default function AgentChatMessages({
     if (
       messages.length > 0 ||
       isGenerating ||
-      (pendingTasks && pendingTasks.length > 0)
+      (pendingTasks && pendingTasks.length > 0 && pendingTasksStatus === "pending")
     ) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, isGenerating, activeSteps, activeTraceLogs, pendingTasks]);
+  }, [messages, isGenerating, activeSteps, activeTraceLogs, pendingTasks, pendingTasksStatus]);
 
   useEffect(() => {
     if (stepsContainerRef.current) {
@@ -344,6 +344,31 @@ export default function AgentChatMessages({
 
   return (
     <div className="flex-1 w-full max-w-4xl overflow-y-auto py-4 space-y-6 pr-2 select-text scrollbar-none flex flex-col">
+      <style>{`
+        @keyframes aria-morph-rotate {
+          0% {
+            transform: rotate(0deg);
+            border-radius: 50%;
+          }
+          35% {
+            border-radius: 50%;
+          }
+          50% {
+            transform: rotate(180deg);
+            border-radius: 8px;
+          }
+          85% {
+            border-radius: 8px;
+          }
+          100% {
+            transform: rotate(360deg);
+            border-radius: 50%;
+          }
+        }
+        .aria-morph-loading {
+          animation: aria-morph-rotate 3s infinite ease-in-out;
+        }
+      `}</style>
       {messages.map((msg, idx) => (
         <ChatMessageItem key={idx} message={msg} />
       ))}
@@ -351,7 +376,7 @@ export default function AgentChatMessages({
 
 
       {/* HITL Task Confirmation Panel */}
-      {pendingTasks && pendingTasks.length > 0 && (
+      {pendingTasks && pendingTasks.length > 0 && pendingTasksStatus === "pending" && (
         <div className="flex gap-3.5 w-full justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="h-8 w-8 rounded-lg bg-linear-to-tr from-blue-600 via-purple-500 to-red-500 p-0.5 shadow-md flex items-center justify-center shrink-0">
             <svg
@@ -472,7 +497,7 @@ export default function AgentChatMessages({
             return (
               <div className="flex gap-3.5 w-full justify-start animate-in fade-in duration-300 mt-4">
                 {/* Aria Avatar */}
-                <div className="h-8 w-8 rounded-lg bg-linear-to-tr from-blue-600 via-purple-500 to-red-500 p-0.5 shadow-md flex items-center justify-center shrink-0 animate-pulse">
+                <div className="h-8 w-8 bg-linear-to-tr from-blue-600 via-purple-500 to-red-500 p-0.5 shadow-md flex items-center justify-center shrink-0 aria-morph-loading mt-1">
                   <svg
                     fill="currentColor"
                     viewBox="0 0 36 48"
@@ -619,7 +644,7 @@ export default function AgentChatMessages({
           // Fallback Standard mode Loader (Unchanged)
           return (
             <div className="flex gap-3.5 w-full justify-start mt-4">
-              <div className="h-8 w-8 rounded-lg bg-linear-to-tr from-blue-600 via-purple-500 to-red-500 p-0.5 shadow-md flex items-center justify-center shrink-0 animate-pulse">
+              <div className="h-8 w-8 bg-linear-to-tr from-blue-600 via-purple-500 to-red-500 p-0.5 shadow-md flex items-center justify-center shrink-0 aria-morph-loading mt-1">
                 <svg
                   fill="currentColor"
                   viewBox="0 0 36 48"

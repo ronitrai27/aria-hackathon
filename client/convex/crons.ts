@@ -34,6 +34,31 @@ export const runScheduledFetch = internalAction({
   },
 });
 
+export const runNightlyMemorySync = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    const siteUrl =
+      process.env.NEXT_PUBLIC_CONVEX_SITE_URL || process.env.SITE_URL;
+
+    if (!siteUrl) {
+      console.error("[Cron] SITE_URL is not configured");
+      return;
+    }
+
+    const response = await fetch(`${siteUrl}/api/cron/sync-memory`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("[Cron] nightly memory sync failed:", response.status, text);
+    } else {
+      console.log("[Cron] nightly memory sync triggered successfully.");
+    }
+  },
+});
+
 const crons = cronJobs();
 
 // Run every 6 hours
@@ -41,6 +66,13 @@ crons.interval(
   "fetch-important-actions",
   { hours: 6 },
   internal.crons.runScheduledFetch,
+);
+
+// Run daily at 12:00 PM IST (6:30 AM UTC)
+crons.daily(
+  "nightly-sync-memory",
+  { hourUTC: 6, minuteUTC: 30 },
+  internal.crons.runNightlyMemorySync,
 );
 
 export default crons;

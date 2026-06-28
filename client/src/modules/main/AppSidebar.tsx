@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useClerk } from "@clerk/nextjs";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import {
   Bot,
   Brain,
@@ -14,10 +15,17 @@ import {
   LogOut,
   Network,
   Workflow,
+  MessageSquare,
+  Plus,
+  Trash2,
+  Pin,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -40,6 +48,7 @@ import {
 import { connectorIcons } from "@/lib/static";
 import { cn } from "@/lib/utils";
 import { api } from "../../../convex/_generated/api";
+import { Button } from "@/components/ui/button";
 
 const mainMenuItems = [
   { name: "Home", url: "/home", icon: Home },
@@ -51,9 +60,64 @@ const mainMenuItems = [
 
 export function AppSidebar() {
   const user = useQuery(api.user.getCurrentUser);
+  const sessions = useQuery(
+    api.brain.getSessions,
+    user?._id ? { userId: user._id } : "skip",
+  );
   const { signOut } = useClerk();
   const router = useRouter();
   const pathname = usePathname();
+
+  const clearSessions = useMutation(api.brain.clearSessions);
+  const renameSession = useMutation(api.brain.renameSession);
+  const togglePinSession = useMutation(api.brain.togglePinSession);
+  const deleteSession = useMutation(api.brain.deleteSession);
+
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+
+  const searchParams = useSearchParams();
+  const currentThreadId = searchParams?.get("threadId");
+
+  const handleRenameSubmit = async (sessionId: any) => {
+    if (!editTitle.trim()) return;
+    try {
+      await renameSession({ sessionId, title: editTitle });
+      setEditingSessionId(null);
+      toast.success("Conversation renamed");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to rename conversation");
+    }
+  };
+
+  const handleTogglePin = async (sessionId: any) => {
+    try {
+      await togglePinSession({ sessionId });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to pin/unpin conversation");
+    }
+  };
+
+  const handleDeleteSession = async (
+    sessionId: any,
+    threadIdToDelete: string,
+  ) => {
+    const ok = window.confirm(
+      "Are you sure you want to delete this conversation?",
+    );
+    if (!ok) return;
+
+    try {
+      await deleteSession({ sessionId });
+      toast.success("Conversation deleted");
+      if (currentThreadId === threadIdToDelete) {
+        const newId = `brain_thread_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        router.push(`/home/agent?threadId=${newId}`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete conversation");
+    }
+  };
 
   const handleSignOut = async () => {
     const toastId = toast.loading("Logging you out...", {
@@ -65,6 +129,35 @@ export function AppSidebar() {
       router.push("/");
     } catch {
       toast.error("Failed to log out", { id: toastId });
+    }
+  };
+
+  const handleNewChat = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const newId = `brain_thread_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    router.push(`/home/agent?threadId=${newId}`);
+  };
+
+  const handleClearHistory = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!user?._id) return;
+    const ok = window.confirm(
+      "Are you sure you want to clear all chat sessions? This cannot be undone.",
+    );
+    if (!ok) return;
+
+    const toastId = toast.loading("Clearing chat history...", {
+      position: "top-center",
+    });
+    try {
+      await clearSessions({ userId: user._id });
+      toast.success("Chat history cleared!", { id: toastId });
+      const newId = `brain_thread_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      router.push(`/home/agent?threadId=${newId}`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to clear chat history", {
+        id: toastId,
+      });
     }
   };
 
@@ -206,15 +299,169 @@ export function AppSidebar() {
           <SidebarGroupLabel className="text-[10px] font-semibold tracking-wider text-foreground flex items-center justify-center uppercase px-3 mb-1.5 select-none">
             Chat History
           </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <div className="px-3 py-6 text-center border border-dashed border-neutral-300 rounded-md bg-muted  mx-1 select-none">
-              <p className="text-xs font-semibold text-foreground/80 dark:text-foreground/70">
-                No history available
-              </p>
-              <p className="text-[10px] text-muted-foreground/70 dark:text-muted-foreground/50 mt-1.5 max-w-[160px] mx-auto">
-                Recent conversations will display here.
-              </p>
+          <SidebarGroupContent className="px-2">
+            <div className="flex gap-2 mb-2">
+              <Button
+                variant={"outline"}
+                onClick={handleNewChat}
+                className={cn(
+                  "flex-1 flex items-center gap-1 rounded text-[10px] cursor-pointer",
+                )}
+              >
+                <Plus className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">New Chat</span>
+              </Button>
+              <Button
+                onClick={handleClearHistory}
+                variant={"destructive"}
+                className={cn(
+                  "flex-1 flex items-center gap-1 rounded text-[10px] cursor-pointer",
+                )}
+              >
+                <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">Clear </span>
+              </Button>
             </div>
+
+            {sessions && sessions.length > 0 ? (
+              <div className="flex flex-col gap-1">
+                {sessions.map((session) => {
+                  const isCurrent = currentThreadId === session.threadId;
+                  const isEditing = editingSessionId === session._id;
+                  const isPinned = !!session.isPinned;
+
+                  return (
+                    <div
+                      key={session._id}
+                      className={cn(
+                        "group relative flex items-center justify-between px-2 py-1.5 rounded-sm text-sm transition-colors cursor-pointer",
+                        isCurrent
+                          ? " text-sidebar-accent-foreground font-medium"
+                          : "",
+                      )}
+                    >
+                      {isEditing ? (
+                        <div className="flex items-center gap-1.5 w-full">
+                          <input
+                            type="text"
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                handleRenameSubmit(session._id);
+                              } else if (e.key === "Escape") {
+                                setEditingSessionId(null);
+                              }
+                            }}
+                            className="flex-1 min-w-0 bg-background border border-input rounded-sm px-1.5 py-0.5 text-xs focus-visible:outline-hidden"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => handleRenameSubmit(session._id)}
+                            className="p-0.5 text-green-600 hover:bg-green-500/10 rounded-sm transition-colors cursor-pointer"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setEditingSessionId(null)}
+                            className="p-0.5 text-red-500 hover:bg-red-500/10 rounded-sm transition-colors cursor-pointer"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <Link
+                            href={`/home/agent?threadId=${session.threadId}`}
+                            className="flex-1 flex items-center gap-2 min-w-0 pr-16"
+                          >
+                            <MessageSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                            <span className="truncate">
+                              {session.title || "New Conversation"}
+                            </span>
+                          </Link>
+
+                          {/* Actions overlay visible on hover */}
+                          <div
+                            className={cn(
+                              "absolute right-2 flex items-center gap-1 pl-4 py-0.5 group-hover:flex hidden",
+                              isCurrent ? "bg-sidebar-accent" : "bg-sidebar",
+                            )}
+                          >
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleTogglePin(session._id);
+                              }}
+                              className={cn(
+                                "p-1 rounded-sm transition-colors hover:bg-muted-foreground/10 cursor-pointer",
+                                isPinned
+                                  ? "text-purple-600 dark:text-purple-400"
+                                  : "text-muted-foreground hover:text-foreground",
+                              )}
+                              title={isPinned ? "Unpin chat" : "Pin chat"}
+                            >
+                              <Pin
+                                className={cn(
+                                  "h-3.5 w-3.5",
+                                  isPinned &&
+                                    "fill-purple-600 dark:fill-purple-400",
+                                )}
+                              />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setEditingSessionId(session._id);
+                                setEditTitle(
+                                  session.title || "New Conversation",
+                                );
+                              }}
+                              className="p-1 rounded-sm text-muted-foreground hover:text-foreground transition-colors hover:bg-muted-foreground/10 cursor-pointer"
+                              title="Rename chat"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleDeleteSession(
+                                  session._id,
+                                  session.threadId,
+                                );
+                              }}
+                              className="p-1 rounded-sm text-muted-foreground hover:text-red-500 transition-colors hover:bg-muted-foreground/10 cursor-pointer"
+                              title="Delete chat"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+
+                          {/* Pinned indicator visible when not active/hovered */}
+                          {isPinned && (
+                            <div className="absolute right-2 flex items-center group-hover:hidden">
+                              <Pin className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 fill-purple-600 dark:fill-purple-400 shrink-0" />
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="px-3 py-6 text-center border border-dashed border-neutral-300 rounded-md bg-muted select-none">
+                <p className="text-xs font-semibold text-foreground/80 dark:text-foreground/70">
+                  No history available
+                </p>
+                <p className="text-[10px] text-muted-foreground/70 dark:text-muted-foreground/50 mt-1.5 max-w-[160px] mx-auto">
+                  Recent conversations will display here.
+                </p>
+              </div>
+            )}
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>

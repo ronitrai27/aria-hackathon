@@ -48,6 +48,7 @@
     "react": "19.2.4",
     "react-day-picker": "^10.0.1",
     "react-dom": "19.2.4",
+    "react-force-graph-2d": "^1.29.1",
     "react-resizable-panels": "^4.11.2",
     "recharts": "3.8.0",
     "serpapi": "^2.2.1",
@@ -59,6 +60,7 @@
     "typewriter-effect": "^2.22.0",
     "uuid": "13.0.0",
     "vaul": "^1.1.2",
+    "vis-network": "^10.1.0",
     "zod": "^4.3.6",
     "zustand": "^5.0.14"
   },

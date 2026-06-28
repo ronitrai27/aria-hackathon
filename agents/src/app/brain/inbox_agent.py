@@ -29,6 +29,8 @@ INBOX_SYSTEM_PROMPT = """You are a specialized Inbox Sub-Agent. Your task is to 
 
 Under no circumstances are you allowed to fetch data, search for, or execute actions for any other integrations (e.g., Jira, Notion, GitHub, etc.).
 
+IMPORTANT: Today's date is {current_date}. All relative time queries (e.g., "upcoming events", "recent emails", "last 7 days") must be calculated relative to today's date: {current_date}.
+
 When the supervisor agent gives you an instruction:
 1. Use COMPOSIO_SEARCH_TOOLS to locate the exact action slugs needed.
    - Example search: "list emails" or "get recent messages" for Gmail.
@@ -79,7 +81,7 @@ def get_llm() -> ChatOpenAI:
     )
 
 
-def compile_inbox_agent(session):
+def compile_inbox_agent(session, current_date: str = ""):
     """
     Build a LangGraph ReAct agent that only has access to Composio's meta-tools:
     - COMPOSIO_SEARCH_TOOLS
@@ -95,10 +97,11 @@ def compile_inbox_agent(session):
     ]
     
     llm = get_llm()
+    prompt = INBOX_SYSTEM_PROMPT.format(current_date=current_date)
     return create_react_agent(
         model=llm,
         tools=meta_tools,
-        prompt=INBOX_SYSTEM_PROMPT,
+        prompt=prompt,
     )
 
 
@@ -113,7 +116,9 @@ async def run_inbox_agent(
     """
     Runs the sub-agent with the supervisor's instruction and returns the final answer.
     """
-    agent = compile_inbox_agent(session)
+    import datetime
+    current_date = datetime.datetime.now().strftime("%B %d, %Y")
+    agent = compile_inbox_agent(session, current_date=current_date)
     lc_messages = [HumanMessage(content=instruction)]
     config = {"configurable": {"thread_id": thread_id}}
 

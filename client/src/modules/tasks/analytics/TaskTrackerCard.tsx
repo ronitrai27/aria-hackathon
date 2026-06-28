@@ -278,42 +278,6 @@ export const TaskTrackerCard = ({
             </div>
           </div>
 
-          {/* TASK OVERDUE */}
-          <div className="space-y-1.5 cursor-pointer hover:bg-white dark:hover:bg-neutral-800/40 p-1.5 rounded-lg transition-colors group relative">
-            <div className="flex justify-between text-xs font-semibold text-primary items-center">
-              <span className="flex items-center gap-1">
-                Tasks Overdue
-                <Info className="w-3.5 h-3.5 cursor-help" />
-              </span>
-              <span className="text-muted-foreground">
-                {overdueTasks} / {totalTasks}
-              </span>
-            </div>
-            <div className="flex gap-[2px] h-6 w-full">
-              {Array.from({ length: totalBlocks }).map((_, i) => (
-                <div
-                  key={`overdue-${i}`}
-                  className={cn(
-                    "flex-1 rounded-[1.5px] transition-colors",
-                    i < overdueBlocks
-                      ? "bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.3)]"
-                      : "bg-neutral-200 dark:bg-neutral-800",
-                  )}
-                />
-              ))}
-            </div>
-            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-50 flex flex-col items-start bg-card/95 backdrop-blur-xs border border-neutral-200/65 dark:border-neutral-850/65 text-foreground rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.08)] p-3.5 pointer-events-none w-[260px] opacity-0 scale-95 origin-bottom group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 text-left">
-              <div className="flex items-center gap-1.5 justify-start mb-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                <span className="font-bold text-rose-500 tracking-wider text-[10px] uppercase">
-                  Overdue Tasks
-                </span>
-              </div>
-              <span className="font-medium text-neutral-500 dark:text-neutral-400 text-[11px] leading-relaxed">
-                Incomplete tasks whose deadline has already passed.
-              </span>
-            </div>
-          </div>
         </div>
       </div>
     </div>

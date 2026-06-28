@@ -1,10 +1,12 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   ChatMessage,
   formatMessageContent,
 } from "@/modules/Ai/components/ChatMessage";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { toast } from "sonner";
+import { useSearchParams, useRouter } from "next/navigation";
 
 export function useBrainChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -16,12 +18,56 @@ export function useBrainChat() {
   >([]);
   const [pendingTasks, setPendingTasks] = useState<any[] | null>(null);
   const [pendingTasksStatus, setPendingTasksStatus] = useState<"pending" | "approved" | "rejected" | null>(null);
-  const [threadId] = useState(
-    () =>
-      `brain_thread_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+  
+  const searchParams = useSearchParams();
+  const [threadId, setThreadId] = useState(
+    () => searchParams?.get("threadId") || `brain_thread_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
   );
 
+  const router = useRouter();
+
+  // Sync threadId from URL to state, and clear messages when switching
+  useEffect(() => {
+    const urlThreadId = searchParams?.get("threadId");
+    if (urlThreadId && urlThreadId !== threadId) {
+      setThreadId(urlThreadId);
+      setMessages([]);
+      setActiveSteps([]);
+      setActiveTraceLogs([]);
+    }
+  }, [searchParams, threadId]);
+
+  // Redirect if URL has no threadId (e.g. direct landing on /home/agent)
+  useEffect(() => {
+    const urlThreadId = searchParams?.get("threadId");
+    if (!urlThreadId) {
+      router.replace(`/home/agent?threadId=${threadId}`);
+    }
+  }, [searchParams, threadId, router]);
+
   const user = useQuery(api.user.getCurrentUser);
+  const existingSession = useQuery(api.brain.getSession, { threadId });
+  const saveSession = useMutation(api.brain.saveSession);
+
+  const isLoadingSession = existingSession === undefined;
+
+  // Hydrate messages on load
+  useEffect(() => {
+    if (existingSession && messages.length === 0 && existingSession.messages.length > 0) {
+      setMessages(existingSession.messages);
+    }
+  }, [existingSession, messages.length]);
+
+  // Sync conversation to database when generation finishes
+  useEffect(() => {
+    if (messages.length > 0 && user?._id && !isGenerating) {
+      saveSession({
+        userId: user._id,
+        threadId: threadId,
+        messages: messages,
+      }).catch((err) => console.error("Failed to save session:", err));
+    }
+  }, [messages, user?._id, threadId, saveSession, isGenerating]);
 
   // Core SSE stream consumer
   const consumeStream = async (
@@ -34,8 +80,48 @@ export function useBrainChat() {
     const accumulatedTraceLogs: string[] = [];
     const accumulatedSteps = [...initialSteps];
 
-    // Ensure we start with an assistant message block staged if we receive thoughts
-    let hasStagedAssistant = false;
+    // Helper to safely update or append the current turn's assistant message
+    const updateOrAddAssistantMessage = (content: string, overwrite = false) => {
+      setMessages((prev) => {
+        const list = [...prev];
+        
+        // Find the index of the last user message
+        let lastUserIdx = -1;
+        for (let i = list.length - 1; i >= 0; i--) {
+          if (list[i].role === "user") {
+            lastUserIdx = i;
+            break;
+          }
+        }
+
+        // Find the assistant message belonging to the current turn (after the last user message)
+        let assistantIdx = -1;
+        if (lastUserIdx !== -1) {
+          for (let i = list.length - 1; i > lastUserIdx; i--) {
+            if (list[i].role === "assistant" && !(list[i] as any).isSystemNotification) {
+              assistantIdx = i;
+              break;
+            }
+          }
+        }
+
+        if (assistantIdx !== -1) {
+          list[assistantIdx] = {
+            ...list[assistantIdx],
+            content: overwrite ? content : (list[assistantIdx].content + content),
+          };
+        } else {
+          list.push({
+            role: "assistant",
+            content: content,
+          });
+        }
+        return list;
+      });
+    };
+
+    let hasHitlRequest = false;
+    let hasError = false;
 
     try {
       while (true) {
@@ -72,23 +158,10 @@ export function useBrainChat() {
                 setActiveTraceLogs([...accumulatedTraceLogs]);
               } else if (eventName === "brain_thought") {
                 const thought = payload.message || "";
-                setIsStreamingResponse(true);
-
-                // Append the streamed thoughts to the assistant message in real-time without mutation
-                setMessages((prev) => {
-                  const list = [...prev];
-                  const last = list[list.length - 1];
-                  if (last && last.role === "assistant" && hasStagedAssistant) {
-                    list[list.length - 1] = {
-                      ...last,
-                      content: last.content + thought,
-                    };
-                    return list;
-                  } else {
-                    hasStagedAssistant = true;
-                    return [...list, { role: "assistant", content: thought }];
-                  }
-                });
+                if (thought) {
+                  setIsStreamingResponse(true);
+                  updateOrAddAssistantMessage(thought, false);
+                }
               } else if (eventName === "brain_tool_call") {
                 const toolName = payload.tool_name || "";
                 const argsStr = JSON.stringify(payload.args || {});
@@ -174,6 +247,33 @@ export function useBrainChat() {
                   });
                 }
                 setActiveSteps([...accumulatedSteps]);
+              } else if (eventName === "memory_updated") {
+                const status = payload.status || "success";
+                if (status === "success") {
+                  const facts: string[] = payload.facts || [];
+                  console.log("[useBrainChat] Memory successfully updated in DB:", facts);
+                  
+                  const firstFact = facts[0] || "No facts updated";
+                  const extraCount = facts.length - 1;
+                  const description = extraCount > 0 ? `• ${firstFact} (+${extraCount} more)` : `• ${firstFact}`;
+
+                  toast.success("🧠 Brain Memory Updated", {
+                    id: "brain-memory-update",
+                    position: "top-center",
+                    description: description,
+                    duration: 4000,
+                  });
+
+                  accumulatedTraceLogs.push(
+                    `🧠 [Memory Updated] Saved: ${facts.join(", ")}`
+                  );
+                  setActiveTraceLogs([...accumulatedTraceLogs]);
+                } else {
+                  console.error("[useBrainChat] Memory update FAILED:", payload.error);
+                  toast.error("Memory update failed", {
+                    description: payload.error || "Unknown database error",
+                  });
+                }
               } else if (eventName === "hitl_request") {
                 const tasks = payload.tasks || [];
                 console.log(
@@ -184,26 +284,13 @@ export function useBrainChat() {
                 setPendingTasksStatus("pending");
                 // Turn off generation loader during HITL wait
                 setIsGenerating(false);
+                hasHitlRequest = true;
               } else if (eventName === "supervisor_data") {
                 setIsStreamingResponse(true);
                 // Done event. Can verify final text output.
                 if (payload.status === "done" && payload.final_response) {
                   const finalTxt = payload.final_response;
-                  setMessages((prev) => {
-                    const list = [...prev];
-                    const last = list[list.length - 1];
-                    if (last && last.role === "assistant") {
-                      last.content = formatMessageContent(finalTxt);
-                      return list;
-                    }
-                    return [
-                      ...list,
-                      {
-                        role: "assistant",
-                        content: formatMessageContent(finalTxt),
-                      },
-                    ];
-                  });
+                  updateOrAddAssistantMessage(formatMessageContent(finalTxt), true);
                 }
 
                 // Mark supervisor node as completed
@@ -215,16 +302,11 @@ export function useBrainChat() {
                 }
                 setActiveSteps([...accumulatedSteps]);
               } else if (eventName === "error") {
+                hasError = true;
                 console.error("Brain SSE error payload:", payload.error);
                 accumulatedTraceLogs.push(`❌ Error: ${payload.error}`);
                 setActiveTraceLogs([...accumulatedTraceLogs]);
-                setMessages((prev) => [
-                  ...prev,
-                  {
-                    role: "assistant",
-                    content: `An error occurred during execution: ${payload.error || "Unknown error"}`,
-                  },
-                ]);
+                updateOrAddAssistantMessage(`An error occurred during execution: ${payload.error || "Unknown error"}`, true);
               }
             } catch (err) {
               console.error(
@@ -237,25 +319,45 @@ export function useBrainChat() {
         }
       }
     } catch (err: any) {
+      hasError = true;
       console.error("Error consuming stream:", err);
       accumulatedTraceLogs.push(
         `❌ Network stream error: ${err.message || err}`,
       );
       setActiveTraceLogs([...accumulatedTraceLogs]);
+      updateOrAddAssistantMessage(`An error occurred during execution: ${err.message || err}`, true);
     } finally {
       // Finalize the last assistant message with execution time
       const finalTime = Math.round((Date.now() - startTime) / 1000);
 
       setMessages((prev) => {
         const list = [...prev];
-        const last = list[list.length - 1];
-        if (last && last.role === "assistant") {
-          list[list.length - 1] = {
-            ...last,
+        
+        let lastUserIdx = -1;
+        for (let i = list.length - 1; i >= 0; i--) {
+          if (list[i].role === "user") {
+            lastUserIdx = i;
+            break;
+          }
+        }
+
+        let assistantIdx = -1;
+        if (lastUserIdx !== -1) {
+          for (let i = list.length - 1; i > lastUserIdx; i--) {
+            if (list[i].role === "assistant" && !(list[i] as any).isSystemNotification) {
+              assistantIdx = i;
+              break;
+            }
+          }
+        }
+
+        if (assistantIdx !== -1) {
+          list[assistantIdx] = {
+            ...list[assistantIdx],
             executionTime: finalTime,
           };
-        } else {
-          // Fallback if no assistant message was staged yet
+        } else if (!hasHitlRequest && !hasError) {
+          // Fallback if no assistant message was staged yet and it's not a resume/interrupt/error
           list.push({
             role: "assistant",
             content: "Execution completed.",
@@ -312,6 +414,17 @@ export function useBrainChat() {
             user_name: clerkUserName,
           }),
         });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          let parsedError = "";
+          try {
+            parsedError = JSON.parse(errText).error;
+          } catch {
+            parsedError = errText;
+          }
+          throw new Error(parsedError || `HTTP error ${response.status}`);
+        }
 
         if (!response.body) {
           throw new Error("No response body received.");
@@ -377,6 +490,17 @@ export function useBrainChat() {
           }),
         });
 
+        if (!response.ok) {
+          const errText = await response.text();
+          let parsedError = "";
+          try {
+            parsedError = JSON.parse(errText).error;
+          } catch {
+            parsedError = errText;
+          }
+          throw new Error(parsedError || `HTTP error ${response.status}`);
+        }
+
         if (!response.body) {
           throw new Error("No response body received.");
         }
@@ -415,5 +539,6 @@ export function useBrainChat() {
     pendingTasksStatus,
     sendMessage,
     handleApprove,
+    isLoadingSession,
   };
 }

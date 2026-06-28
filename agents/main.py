@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -28,6 +28,9 @@ from src.app.brain.graph import run_brain_agent_stream
 from src.app.brain.brain_sse_emitter import map_brain_stream_to_sse
 from src.utils.checkpointer import get_checkpointer
 from src.config import settings
+import httpx
+import json
+import os
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -506,6 +509,195 @@ def brain_stop_endpoint(body: ChatRequest):
     print(f"[POST /brain/stop] No active brain session for thread_id: {thread_id}", flush=True)
     return {"stopped": False, "thread_id": thread_id, "message": "No active session found."}
 
+
+async def sync_single_user_memory(user_id: str, user_name: str) -> bool:
+    """
+    Syncs memory for a single user by fetching Convex browser telemetry and workflows,
+    summarizing with gpt-4o-mini, and writing to Pinecone and Neo4j.
+    """
+    print(f"\n[Memory Sync] Syncing memory for: {user_name} ({user_id})", flush=True)
+    
+    from langchain_openai import ChatOpenAI
+    from src.utils.vector_store import upsert_vector_store
+    from src.utils.graph_db import upsert_knowledge_graph
+    from src.utils.entity_extractor import extract_knowledge_graph_elements
+
+    api_key = settings.openai_api_key or os.getenv("OPENAI_API_KEY")
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1, api_key=api_key)
+
+    try:
+        async with httpx.AsyncClient() as client:
+            # 1. Fetch browser activity
+            browser_url = f"{settings.convex_site_url}/api/brain/get-browser-activity"
+            browser_res = await client.get(browser_url, params={"userId": user_id}, timeout=15)
+            browser_data = browser_res.json() if browser_res.status_code == 200 else []
+
+            # 2. Fetch workflows
+            workflows_url = f"{settings.convex_site_url}/api/brain/get-workflows"
+            workflows_res = await client.get(workflows_url, params={"userId": user_id}, timeout=15)
+            workflows_data = workflows_res.json() if workflows_res.status_code == 200 else []
+
+            if not browser_data and not workflows_data:
+                print(f"[Memory Sync] No browser activity or workflows found for {user_name}. Skipping.", flush=True)
+                return False
+
+            # 3. Synthesize context summaries using LLM
+            summary_prompt = f"""
+            You are a smart background worker analyzing developer workspace activity.
+            Synthesize the following telemetry details for the user "{user_name}" into a list of 1-5 concise, high-value declarative sentences describing the user's focus, projects, tools used, and preferences.
+            Avoid transient or generic info. Do not include time words like "yesterday" or "today".
+            
+            Browser Activity:
+            {json.dumps(browser_data, indent=2)}
+
+            Workflows Built:
+            {json.dumps(workflows_data, indent=2)}
+            
+            Declarative Summaries (Max 5, return as JSON list of strings):
+            """
+            llm_res = await llm.ainvoke(summary_prompt)
+            content = llm_res.content.strip()
+            
+            try:
+                if "```" in content:
+                    content = content.split("```")[1]
+                    if content.startswith("json"):
+                        content = content[4:]
+                facts = json.loads(content.strip())
+            except Exception as je:
+                print(f"[Memory Sync] Failed to parse JSON list from LLM output: {content!r}. Error: {str(je)}", flush=True)
+                facts = [line.strip("- *12345. ") for line in content.split("\n") if line.strip()]
+
+            print(f"[Memory Sync] Distilled facts for {user_name}: {facts}", flush=True)
+
+            if facts:
+                # 4. Upsert to Pinecone
+                upsert_vector_store(user_id, facts)
+
+                # 5. Extract KG entities & relations using spaCy and write to Neo4j
+                combined_elements = {"entities": [], "relations": []}
+                for fact in facts:
+                    # Pass user_name so spaCy maps user occurrences to USER!
+                    elements = extract_knowledge_graph_elements(fact, user_name=user_name)
+                    combined_elements["entities"].extend(elements.get("entities", []))
+                    combined_elements["relations"].extend(elements.get("relations", []))
+
+                # Deduplicate entities
+                seen_entities = {}
+                for ent in combined_elements["entities"]:
+                    seen_entities[ent["name"].lower()] = ent
+                combined_elements["entities"] = list(seen_entities.values())
+
+                # Write to Neo4j Graph
+                upsert_knowledge_graph(user_id, combined_elements)
+                return True
+            return False
+    except Exception as e:
+        print(f"[Memory Sync Error] Failed for {user_name}: {str(e)}", flush=True)
+        return False
+
+
+async def sync_all_users_memory():
+    """
+    Nightly memory sync background worker:
+    1. Fetch all users from Convex.
+    2. Sync each user's memory.
+    """
+    print("\n[Cron] Starting nightly memory synchronization task...", flush=True)
+    try:
+        async with httpx.AsyncClient() as client:
+            users_url = f"{settings.convex_site_url}/api/brain/get-all-users"
+            print(f"[Cron] Fetching all users from {users_url}", flush=True)
+            res = await client.get(users_url, timeout=15)
+            res.raise_for_status()
+            users = res.json()
+            print(f"[Cron] Found {len(users)} users to process.", flush=True)
+
+            for u in users:
+                user_id = u.get("_id") or u.get("id")
+                user_name = u.get("name", "User")
+                if not user_id:
+                    continue
+                await sync_single_user_memory(user_id, user_name)
+                
+        print("[Cron] Nightly memory synchronization completed successfully.", flush=True)
+    except Exception as e:
+        print(f"[Cron Error] Failed during memory synchronization: {str(e)}", flush=True)
+
+
+from src.utils.graph_db import get_user_graph_data, delete_user_graph_data
+
+async def resolve_convex_user_id(clerk_user_id: str) -> str:
+    """Helper to query Convex and resolve the Clerk ID to Convex document ID."""
+    if not clerk_user_id or not clerk_user_id.startswith("user_"):
+        return clerk_user_id
+        
+    url = f"{settings.convex_site_url}/api/brain/resolve-user"
+    params = {"userId": clerk_user_id}
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            return data.get("_id", clerk_user_id)
+    except Exception as e:
+        print(f"[resolve_convex_user_id error] {str(e)}", flush=True)
+        return clerk_user_id
+
+@app.get("/graph/{user_id}")
+async def get_graph_endpoint(user_id: str):
+    """
+    GET /graph/{user_id}
+    Returns the user's entire knowledge graph formatted for graph visualization.
+    """
+    resolved_id = await resolve_convex_user_id(user_id)
+    print(f"\n[GET /graph/{user_id}] Fetching graph data. Resolved: {resolved_id}", flush=True)
+    graph_data = get_user_graph_data(resolved_id)
+    return graph_data
+
+@app.post("/graph/{user_id}/clear")
+async def clear_graph_endpoint(user_id: str):
+    """
+    POST /graph/{user_id}/clear
+    Deletes all graph nodes and relationships for the user.
+    """
+    resolved_id = await resolve_convex_user_id(user_id)
+    print(f"\n[POST /graph/{user_id}/clear] Clearing graph data. Resolved: {resolved_id}", flush=True)
+    success = delete_user_graph_data(resolved_id)
+    return {"status": "success" if success else "failed"}
+
+class RebuildRequest(BaseModel):
+    user_name: str
+
+@app.post("/graph/{user_id}/rebuild")
+async def rebuild_graph_endpoint(user_id: str, body: RebuildRequest):
+    """
+    POST /graph/{user_id}/rebuild
+    Clears the user's graph, fetches their Convex activities/workflows,
+    distills insights, and generates a fresh clean graph.
+    """
+    resolved_id = await resolve_convex_user_id(user_id)
+    print(f"\n[POST /graph/{user_id}/rebuild] Rebuilding graph data for {body.user_name} ({user_id}). Resolved: {resolved_id}", flush=True)
+    # 1. Clear current graph
+    delete_user_graph_data(resolved_id)
+    
+    # 2. Run sync synchronously for this user
+    await sync_single_user_memory(resolved_id, body.user_name)
+    
+    # 3. Return the new graph
+    graph_data = get_user_graph_data(resolved_id)
+    return graph_data
+
+@app.post("/cron/sync-memory")
+def trigger_nightly_sync_endpoint(background_tasks: BackgroundTasks):
+    """
+    POST /cron/sync-memory
+    Exposed HTTP endpoint triggered by Convex Scheduler.
+    Spawns memory sync processing for all active users in the background.
+    """
+    print("\n[POST /cron/sync-memory] Trigger received from cron scheduler.", flush=True)
+    background_tasks.add_task(sync_all_users_memory)
+    return {"status": "sync_initiated", "message": "Memory sync started in the background."}
 
 
 if __name__ == "__main__":

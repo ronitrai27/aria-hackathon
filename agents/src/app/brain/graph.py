@@ -21,7 +21,7 @@ from langgraph.prebuilt import ToolNode
 
 from src.config import settings
 from src.app.brain.state import BrainState
-from src.app.tools.tools import BRAIN_TOOLS, get_tasks, create_tasks, get_browser_activity, fetch_inbox, fetch_memory
+from src.app.tools.tools import BRAIN_TOOLS, get_tasks, create_tasks, get_browser_activity, fetch_inbox, fetch_memory, save_to_memory
 from src.utils.checkpointer import get_checkpointer
 
 # Load environment variables
@@ -35,17 +35,21 @@ load_dotenv(_ROOT / ".env", override=True)
 SYSTEM_PROMPT = """You are Aria's Brain Agent, a super intelligent personal companion agent.
 You are speaking to {user_name} (User ID: {user_id}). Always refer to them by their name and greet them warmly if starting a conversation!
 
+IMPORTANT: Today's date is {current_date}. All relative time queries (e.g., "upcoming events", "recent emails", "last 7 days") must be resolved using today's date: {current_date}.
+
 You have direct access to these tools to assist {user_name}:
 1. get_tasks: Retrieve the user's tasks list.
 2. create_tasks: Propose/create new tasks (requires user's Human-In-The-Loop approval before final insertion).
 3. get_browser_activity: Fetch aggregated browsing history for the last 48 hours to analyze visited websites.
 4. fetch_inbox: Fetch emails, calendar events, and Slack messages.
 5. fetch_memory: Search long-term vector store and Neo4j graph db for past work and personal facts.
+6. save_to_memory: Commit key workspace facts, technology preferences, task constraints, or client contacts about the user to their long-term memory graph and vector DB.
 
 Answer questions directly and intelligently. ALWAYS use rich markdown formatting (bolding, headers, bullet points, code blocks) to organize your answers beautifully so they look clean and structured on the user interface. If you invoke a tool, summarize its results elegantly in clear bullet points.
 
 CRITICAL INSTRUCTIONS:
 - ALWAYS be extremely concise and cover important topics, summaries, and actions. Keep responses short, highly accurate, and focused on suggestions the user wants to hear. Avoid unnecessary introductory text or verbose details.
+- SAVE USER MEMORIES: Whenever the user shares new, valuable, long-term workspace context (such as technology preferences, project descriptions, specific task details, or important contacts), call `save_to_memory` with a list of concise, declarative sentences summarizing the facts (e.g., `["User prefers Vanilla CSS over TailwindCSS", "User is working on Project Orion"]`). Only call this when new information is shared. Do not call this for trivial chat turns, greetings, or questions.
 - DIRECT TOOL CALLS FOR TASKS: If you propose to create tasks for the user, call the `create_tasks` tool directly in your response. Do NOT ask the user for permission, confirmation, or options (such as "Should I create them?", "Reply Go ahead", or "Which do you prefer?") in your text. The system automatically prompts the user for approval, so proceed straight to calling the tool.
 - WORKFLOW CREATION LIMITATION: If the user asks you to create, build, or design a workflow (or a flow), you MUST state: "I can suggest and help with tasks and am here to make you achieve your goals, but I cannot directly create workflows. You need to switch to Agent Mode to do so!" (Direct them to use the Agent Mode toggle in the sidebar).
 """
@@ -54,17 +58,18 @@ CRITICAL INSTRUCTIONS:
 # ─── Nodes ────────────────────────────────────────────────────────────────────
 
 def supervisor_node(state: BrainState, config: Any = None):
-    """Supervisor LLM node using gpt-4.1-nano."""
+    """Supervisor LLM node """
     user_name = state.get("user_name", "User")
     user_id = state.get("user_id", "default")
     
     print(f"\n[brain.supervisor_node] Running supervisor for user: '{user_name}' ({user_id})", flush=True)
     
     # Construct prompt messages
-    sys_prompt = SYSTEM_PROMPT.format(user_name=user_name, user_id=user_id)
+    import datetime
+    current_date = datetime.datetime.now().strftime("%B %d, %Y")
+    sys_prompt = SYSTEM_PROMPT.format(user_name=user_name, user_id=user_id, current_date=current_date)
     messages = [SystemMessage(content=sys_prompt)] + state["messages"]
-    
-    # Initialize the gpt-4.1-nano model
+   
     api_key = settings.openai_api_key or os.getenv("OPENAI_API_KEY")
     
     # Extract callbacks from config if present
@@ -73,10 +78,11 @@ def supervisor_node(state: BrainState, config: Any = None):
         callbacks = config["callbacks"]
         
     llm = ChatOpenAI(
-        model="gpt-5-nano", 
+        model="gpt-4.1-mini", 
         temperature=0.1, 
         api_key=api_key,
         streaming=True,
+        # reasoning={"effort": "none"},
         callbacks=callbacks
     )
     
@@ -97,12 +103,23 @@ def supervisor_node(state: BrainState, config: Any = None):
 
 
 async def tool_node(state: BrainState):
-    """Executes standard non-HITL tools (get_tasks, get_browser_activity, fetch_inbox, fetch_memory)."""
-    non_hitl_tools = [get_tasks, get_browser_activity, fetch_inbox, fetch_memory]
+    """Executes standard non-HITL tools (get_tasks, get_browser_activity, fetch_inbox, fetch_memory, save_to_memory)."""
+    non_hitl_tools = [get_tasks, get_browser_activity, fetch_inbox, fetch_memory, save_to_memory]
     t_node = ToolNode(non_hitl_tools)
     
     last_message = state["messages"][-1]
-    print(f"[brain.tool_node] Running tool node for: {[tc['name'] for tc in last_message.tool_calls]}", flush=True)
+    
+    # Inject user_name into save_to_memory arguments if available in state
+    user_name = state.get("user_name")
+    if user_name and hasattr(last_message, "tool_calls") and last_message.tool_calls:
+        for tc in last_message.tool_calls:
+            tc_name = tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", None)
+            if tc_name == "save_to_memory":
+                tc_args = tc.get("args") if isinstance(tc, dict) else getattr(tc, "args", {})
+                if isinstance(tc_args, dict):
+                    tc_args["user_name"] = user_name
+                    
+    print(f"[brain.tool_node] Running tool node for: {[tc.get('name') if isinstance(tc, dict) else getattr(tc, 'name', '') for tc in last_message.tool_calls]}", flush=True)
     
     return await t_node.ainvoke(state)
 
@@ -213,10 +230,87 @@ class QueueCallbackHandler(AsyncCallbackHandler):
     """Callback handler to stream LLM tokens directly to the SSE queue in real time."""
     def __init__(self, queue: asyncio.Queue):
         self.queue = queue
+        self.active_runs = {}
 
-    async def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
-        if token:
-            await self.queue.put({"type": "token", "content": token})
+    async def on_llm_new_token(self, token: Any, chunk: Optional[Any] = None, **kwargs: Any) -> None:
+        token_text = ""
+        
+        # 1. Inspect chunk if passed
+        if chunk is not None:
+            # chunk is a ChatGenerationChunk or GenerationChunk
+            message_chunk = getattr(chunk, "message", None)
+            if message_chunk is not None:
+                token_text = getattr(message_chunk, "content", "")
+        
+        # 2. Fallback to token parameter
+        if not token_text and token:
+            if isinstance(token, str):
+                token_text = token
+            elif isinstance(token, dict):
+                token_text = token.get("text", "") or token.get("content", "")
+            else:
+                token_text = getattr(token, "text", "") or getattr(token, "content", "")
+
+        # 3. Parse block structured list content
+        if isinstance(token_text, list):
+            parts = []
+            for block in token_text:
+                if isinstance(block, dict):
+                    parts.append(block.get("text", ""))
+                elif isinstance(block, str):
+                    parts.append(block)
+            token_text = "".join(parts)
+
+        # Print detailed diagnostics to terminal log
+        if token_text:
+            await self.queue.put({
+                "type": "token",
+                "content": token_text
+            })
+
+    async def on_tool_start(self, serialized: dict[str, Any], input_str: str, *, run_id: Any = None, **kwargs: Any) -> None:
+        tool_name = serialized.get("name", "")
+        if run_id:
+            self.active_runs[run_id] = tool_name
+        print(f"[on_tool_start] Tool {tool_name} started with input: {input_str}", flush=True)
+        await self.queue.put({
+            "type": "tool_start",
+            "tool": tool_name,
+            "input": input_str
+        })
+
+    async def on_tool_end(self, output: Any, *, run_id: Any = None, **kwargs: Any) -> None:
+        tool_name = self.active_runs.pop(run_id, "tool")
+        
+        # Safe string coercion / serialization
+        output_str = ""
+        if isinstance(output, str):
+            output_str = output
+        elif isinstance(output, (dict, list)):
+            try:
+                output_str = json.dumps(output)
+            except Exception:
+                output_str = str(output)
+        else:
+            # It could be a ToolMessage or other LangChain object
+            content = getattr(output, "content", None)
+            if content is not None:
+                if isinstance(content, (dict, list)):
+                    try:
+                        output_str = json.dumps(content)
+                    except Exception:
+                        output_str = str(content)
+                else:
+                    output_str = str(content)
+            else:
+                output_str = str(output)
+
+        print(f"[on_tool_end] Tool {tool_name} finished. Output: {output_str!r}", flush=True)
+        await self.queue.put({
+            "type": "tool_end",
+            "tool": tool_name,
+            "output": output_str
+        })
 
 
 async def run_brain_agent_stream(
@@ -307,8 +401,23 @@ async def run_brain_agent_stream(
             yield {"type": "error", "content": event["error"]}
             break
         elif event["type"] == "token":
-            # Stream tokens to the client
-            yield {"type": "thought", "content": event["content"]}
+            # Stream tokens to the client (only text content)
+            yield {
+                "type": "thought",
+                "content": event.get("content", "")
+            }
+        elif event["type"] == "tool_start":
+            yield {
+                "type": "tool_call",
+                "name": event["tool"],
+                "args": event["input"]
+            }
+        elif event["type"] == "tool_end":
+            yield {
+                "type": "tool_output",
+                "name": event["tool"],
+                "content": event["output"]
+            }
         elif event["type"] == "inbox_agent_event":
             # Stream inbox agent sub-steps
             yield {"type": "inbox_agent_event", "data": event["data"]}
@@ -327,7 +436,16 @@ async def run_brain_agent_stream(
                         if isinstance(msg, AIMessage):
                             # Capture final content string for the final summary yield
                             if msg.content:
-                                final_text = msg.content
+                                if isinstance(msg.content, list):
+                                    text_parts = []
+                                    for block in msg.content:
+                                        if isinstance(block, dict) and block.get("type") == "text":
+                                            text_parts.append(block.get("text", ""))
+                                        elif isinstance(block, str):
+                                            text_parts.append(block)
+                                    final_text = "".join(text_parts)
+                                else:
+                                    final_text = msg.content
                             
                             # Yield tool calls if LLM decided to invoke tools
                             if msg.tool_calls:

@@ -162,6 +162,25 @@ from langchain_core.runnables import RunnableConfig
 
 # ─── Tool: fetch_inbox ─────────────────────────────────────────────────────────
 
+async def resolve_convex_user_id(clerk_user_id: str) -> str:
+    """Helper to query Convex and resolve the Clerk ID to Convex document ID."""
+    if not clerk_user_id or not clerk_user_id.startswith("user_"):
+        return clerk_user_id
+        
+    url = f"{CONVEX_SITE_URL}/api/brain/resolve-user"
+    params = {"userId": clerk_user_id}
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            # Return the Convex user document ID if found
+            return data.get("_id", clerk_user_id)
+    except Exception as e:
+        print(f"[resolve_convex_user_id error] {str(e)}", flush=True)
+        return clerk_user_id
+
+
 @tool
 async def fetch_inbox(user_id: str, instruction: str, config: RunnableConfig = None) -> str:
     """
@@ -179,7 +198,11 @@ async def fetch_inbox(user_id: str, instruction: str, config: RunnableConfig = N
 
     print(f"\n[fetch_inbox tool] Running inbox sub-agent for user_id={user_id} with instruction: {instruction}", flush=True)
     try:
-        session = create_inbox_session(user_id)
+        # Resolve Clerk user_id to Convex user document ID
+        resolved_id = await resolve_convex_user_id(user_id)
+        print(f"[fetch_inbox tool] Resolved user Clerk ID {user_id} -> Convex ID {resolved_id}", flush=True)
+        
+        session = create_inbox_session(resolved_id)
         
         # Extract progress callback if registered in configurable metadata
         if isinstance(config, dict):
@@ -237,10 +260,63 @@ def fetch_memory(user_id: str, query_text: str, source: str = "all") -> dict:
     }
 
 
+# ─── Tool: save_to_memory ───────────────────────────────────────────────────────
+
+@tool
+async def save_to_memory(user_id: str, facts: list[str], user_name: Optional[str] = None) -> str:
+    """
+    Save key workspace facts, technology preferences, task constraints, 
+    or client contacts about the user to their long-term memory graph and vector DB.
+    Only invoke this when the user shares new, valuable, long-term information.
+
+    Args:
+        user_id: The Clerk user ID (e.g. "").
+        facts:   A list of concise fact/preference sentences to commit to memory (e.g., ["User prefers Vanilla CSS over TailwindCSS", "User is working on Project Orion"]).
+        user_name: Optional name of the user to resolve personal pronouns to central USER node.
+
+    Returns:
+        A JSON string containing the status, facts, or error.
+    """
+    import json
+    print(f"\n[save_to_memory tool] Invoked for user_id={user_id} (name={user_name}) with facts: {facts}", flush=True)
+    if not facts:
+        return json.dumps({"status": "failed", "error": "No facts provided."})
+
+    from src.utils.vector_store import upsert_vector_store
+    from src.utils.graph_db import upsert_knowledge_graph
+    from src.utils.entity_extractor import extract_knowledge_graph_elements
+
+    try:
+        # 1. Update Pinecone
+        upsert_vector_store(user_id, facts)
+
+        # 2. Extract Entities and Relations from each fact
+        combined_elements = {"entities": [], "relations": []}
+        for fact in facts:
+            elements = extract_knowledge_graph_elements(fact, user_name=user_name)
+            combined_elements["entities"].extend(elements.get("entities", []))
+            combined_elements["relations"].extend(elements.get("relations", []))
+
+        # Deduplicate extracted elements
+        seen_entities = {}
+        for ent in combined_elements["entities"]:
+            seen_entities[ent["name"].lower()] = ent
+        combined_elements["entities"] = list(seen_entities.values())
+
+        # 3. Update Neo4j Graph
+        upsert_knowledge_graph(user_id, combined_elements)
+        print("[save_to_memory tool] Completed DB updates successfully.", flush=True)
+        return json.dumps({"status": "success", "facts": facts})
+    except Exception as e:
+        err_msg = str(e)
+        print(f"[save_to_memory tool error] {err_msg}", flush=True)
+        return json.dumps({"status": "failed", "error": err_msg})
+
+
 # ─── Exported tool list (register all agent tools here) ──────────────────────
 
 # AGENT_TOOLS = [get_task_by_name]
-BRAIN_TOOLS = [get_tasks, create_tasks, get_browser_activity, fetch_inbox, fetch_memory]
+BRAIN_TOOLS = [get_tasks, create_tasks, get_browser_activity, fetch_inbox, fetch_memory, save_to_memory]
 
 
 

@@ -225,7 +225,7 @@ export const OverdueDebtCard = ({ tasks }: OverdueDebtCardProps) => {
         {/* Scrollable list with thin visible right scrollbar */}
         <div
           className={cn(
-            "space-y-1 max-h-[130px] overflow-y-auto pr-1",
+            "space-y-1 max-h-[92px] overflow-y-auto pr-1",
             "[&::-webkit-scrollbar]:w-[3px]",
             "[&::-webkit-scrollbar-track]:bg-transparent",
             "[&::-webkit-scrollbar-thumb]:bg-neutral-300",

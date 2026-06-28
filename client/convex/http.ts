@@ -271,6 +271,104 @@ http.route({
   }),
 });
 
+// ─── Brain Tool: GET /api/brain/get-all-users ───────────────────────────────
+http.route({
+  path: "/api/brain/get-all-users",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const result = await ctx.runQuery(api.user.getAllUsersInternal);
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (err: any) {
+      return new Response(JSON.stringify({ error: err.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }),
+});
+
+http.route({
+  path: "/api/brain/get-all-users",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }),
+});
+
+// ─── Brain Tool: GET /api/brain/get-workflows ───────────────────────────────
+http.route({
+  path: "/api/brain/get-workflows",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const url = new URL(request.url);
+      const userId = url.searchParams.get("userId");
+      if (!userId) {
+        return new Response(
+          JSON.stringify({ error: "Missing required param: userId" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+      const result = await ctx.runQuery(api.workflows.getWorkflowsForUserInternal, { userId });
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (err: any) {
+      return new Response(JSON.stringify({ error: err.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }),
+});
+
+// ─── Brain Tool: GET /api/brain/resolve-user ─────────────────────────────────
+http.route({
+  path: "/api/brain/resolve-user",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const url = new URL(request.url);
+      const userId = url.searchParams.get("userId");
+      if (!userId) {
+        return new Response(
+          JSON.stringify({ error: "Missing required param: userId" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+      const result = await ctx.runQuery(api.agentTools.resolveUser, { clerkUserId: userId });
+      return new Response(JSON.stringify(result || {}), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (err: any) {
+      return new Response(JSON.stringify({ error: err.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }),
+});
+
+http.route({
+  path: "/api/brain/resolve-user",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }),
+});
+
 export default http;
 
 

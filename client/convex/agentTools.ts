@@ -240,10 +240,17 @@ export const getBrowserActivity = query({
     const fortyEightHoursAgo = args.now - 48 * 60 * 60 * 1000;
     const tenMinutesMs = 10 * 60 * 1000;
 
+    // Resolve Convex ID to Clerk ID if needed
+    let user = null;
+    try {
+      user = await ctx.db.get(args.userId as any);
+    } catch (e) {}
+    const clerkId = user ? user.id : args.userId;
+
     // Fetch recent browser data entries for the user
     const rows = await ctx.db
       .query("browserData")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", clerkId))
       .order("desc")
       .take(1000);
 
@@ -314,5 +321,16 @@ export const getBrowserActivity = query({
 
     console.log("[getBrowserActivity Query] Returning aggregated items count:", result.length);
     return result;
+  },
+});
+
+export const resolveUser = query({
+  args: { clerkUserId: v.string() },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("id", args.clerkUserId))
+      .unique();
+    return user ? { _id: user._id, name: user.name } : null;
   },
 });

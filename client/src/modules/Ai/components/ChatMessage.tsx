@@ -16,6 +16,7 @@ export interface ChatMessage {
   steps?: Array<{ worker: string; status: string; message: string }>;
   traceLogs?: string[];
   executionTime?: number;
+  isSystemNotification?: boolean;
 }
 
 export function TraceLogsViewer({
@@ -164,9 +165,27 @@ export function StatusStepper({
   );
 }
 
-export const formatMessageContent = (content: string) => {
+export const formatMessageContent = (content: any) => {
   if (!content) return "";
-  const trimmed = content.trim();
+  let text = "";
+  if (typeof content !== "string") {
+    if (Array.isArray(content)) {
+      text = content
+        .map((block) => {
+          if (block && typeof block === "object") {
+            if (block.type === "text") return block.text || "";
+            return "";
+          }
+          return String(block);
+        })
+        .join("");
+    } else {
+      text = String(content);
+    }
+  } else {
+    text = content;
+  }
+  const trimmed = text.trim();
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
     try {
       const parsed = JSON.parse(trimmed);
@@ -179,20 +198,20 @@ export const formatMessageContent = (content: string) => {
       // ignore
     }
   }
-  if (content.includes('"nodes"') && content.includes('"edges"')) {
+  if (text.includes('"nodes"') && text.includes('"edges"')) {
     return "I have successfully created the workflow. Feel free to modify it or ask me to add anything else!";
   }
-  return content;
+  return text;
 };
 
 import React from "react";
 
-// ─── Custom Markdown Parser ──────────────────────────────────────────────────
-export function CustomMarkdown({ content }: { content: string }) {
+export function CustomMarkdown({ content }: { content: any }) {
   if (!content) return null;
 
+  const contentStr = typeof content === "string" ? content : String(content);
   // Clean raw content
-  const cleanedContent = content.replace(/```[a-zA-Z0-9]*\n?/g, "");
+  const cleanedContent = contentStr.replace(/```[a-zA-Z0-9]*\n?/g, "");
   const lines = cleanedContent.split("\n");
 
   const renderedElements: React.ReactNode[] = [];
@@ -361,6 +380,55 @@ function parseInline(text: string): React.ReactNode[] {
   });
 }
 
+export function MemoryUpdateCard({ content }: { content: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [timestamp] = useState(() => {
+    return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  });
+  
+  // Extract facts list
+  const factsLines = content
+    .split("\n")
+    .filter(line => line.trim().startsWith("- "))
+    .map(line => line.trim().substring(2));
+
+  return (
+    <div className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-3 bg-zinc-50/50 dark:bg-zinc-900/10 shadow-xs max-w-xl transition-all duration-300">
+      <div 
+        className="flex items-center justify-between cursor-pointer select-none"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-[14px]">🧠</span>
+          <span className="text-[12.5px] font-bold text-zinc-900 dark:text-zinc-100">
+            Brain Memory Updated
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">
+          <span className="text-[10px] font-medium font-mono bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">
+            {factsLines.length} updates
+          </span>
+          <span className="text-[10px] font-medium font-mono bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-400 dark:text-zinc-500">
+            {timestamp}
+          </span>
+          <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isOpen ? "transform rotate-180" : ""}`} />
+        </div>
+      </div>
+      
+      {isOpen && (
+        <div className="mt-3 pt-3 border-t border-zinc-205 dark:border-zinc-800 space-y-2 animate-in slide-in-from-top-1 duration-250">
+          {factsLines.map((fact, idx) => (
+            <div key={idx} className="flex items-start gap-2 text-[12px] text-zinc-600 dark:text-zinc-400">
+              <span className="text-zinc-400 dark:text-zinc-600 mt-1 shrink-0">•</span>
+              <span className="leading-relaxed">{fact}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export interface ChatMessageItemProps {
   message: ChatMessage;
 }
@@ -369,6 +437,12 @@ export default function ChatMessageItem({ message }: ChatMessageItemProps) {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
   const [liked, setLiked] = useState<"up" | "down" | null>(null);
+
+  const isMemoryUpdate = !isUser && (
+    message.isSystemNotification ||
+    message.content.startsWith("🧠 **Brain Memory Updated:**") || 
+    message.content.includes("Brain Memory Updated")
+  );
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
@@ -380,10 +454,10 @@ export default function ChatMessageItem({ message }: ChatMessageItemProps) {
     <div
       className={`flex gap-3.5 w-full ${
         isUser ? "justify-end" : "justify-start"
-      }`}
+      } ${isMemoryUpdate ? "pl-[46px]" : ""}`}
     >
-      {!isUser && (
-        <div className="h-8 w-8 rounded-lg bg-linear-to-tr from-blue-600 via-purple-500 to-red-500 p-0.5 shadow-md flex items-center justify-center shrink-0">
+      {!isUser && !isMemoryUpdate && (
+        <div className="h-8 w-8 rounded-lg bg-linear-to-tr from-blue-600 via-purple-500 to-red-500 p-0.5 shadow-md flex items-center justify-center shrink-0 mt-1">
           <svg
             fill="currentColor"
             viewBox="0 0 36 48"
@@ -405,6 +479,8 @@ export default function ChatMessageItem({ message }: ChatMessageItemProps) {
         >
           {isUser ? (
             <p className="text-[12.5px] leading-relaxed">{message.content}</p>
+          ) : isMemoryUpdate ? (
+            <MemoryUpdateCard content={message.content} />
           ) : (
             <CustomMarkdown content={formatMessageContent(message.content)} />
           )}
@@ -421,7 +497,7 @@ export default function ChatMessageItem({ message }: ChatMessageItemProps) {
             message.steps.length > 0 && <StatusStepper steps={message.steps} />
           )}
 
-          {!isUser && message.executionTime !== undefined && (
+          {!isUser && !isMemoryUpdate && message.executionTime !== undefined && (
             <div className="flex items-center gap-3.5 mt-3 pt-2 border-t border-zinc-200  text-[10.5px]  select-none">
               <span className="flex items-center gap-1 shrink-0 font-medium">
                 <Clock className="h-3.5 w-3.5 text-zinc-400" />

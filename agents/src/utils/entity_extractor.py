@@ -212,8 +212,15 @@ def _normalize_node_name(name: str, user_name: Optional[str] = None) -> str:
     temp_lower = temp_cleaned.lower()
     if temp_lower in ("i", "me", "my", "myself", "user", "the user", "he", "she", "his", "her", "him"):
         return "USER"
-    if user_name and temp_lower == user_name.lower():
-        return "USER"
+        
+    if user_name:
+        u_name = user_name.lower()
+        # If the name is exactly user_name, contains it, is contained in it, or is a component of it
+        if (temp_lower == u_name or 
+            temp_lower in u_name.split() or 
+            u_name in temp_lower or 
+            any(part in temp_lower for part in u_name.split() if len(part) > 2)):
+            return "USER"
         
     cleaned = _clean_and_validate_node(name)
     return cleaned

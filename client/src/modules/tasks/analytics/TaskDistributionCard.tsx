@@ -105,8 +105,8 @@ export const TaskDistributionCard = ({ tasks }: TaskDistributionCardProps) => {
             No tasks found
           </div>
         ) : (
-          <div className="w-full relative flex items-center justify-center min-h-[180px]">
-            <ChartContainer config={chartConfig} className="h-[180px] w-full">
+          <div className="w-full relative flex items-center justify-center min-h-[140px]">
+            <ChartContainer config={chartConfig} className="h-[140px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <ChartTooltip
@@ -137,8 +137,8 @@ export const TaskDistributionCard = ({ tasks }: TaskDistributionCardProps) => {
                     data={chartData}
                     dataKey="value"
                     nameKey="name"
-                    innerRadius={60}
-                    outerRadius={80}
+                    innerRadius={48}
+                    outerRadius={64}
                     paddingAngle={4}
                     stroke="none"
                   >

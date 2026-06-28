@@ -195,3 +195,20 @@ export const deleteWorkflow = mutation({
     await ctx.db.delete(args.id);
   },
 });
+
+export const getWorkflowsForUserInternal = query({
+  args: { userId: v.string() },
+  handler: async (ctx, args) => {
+    // Resolve Convex ID to Clerk ID if needed
+    let user = null;
+    try {
+      user = await ctx.db.get(args.userId as any);
+    } catch (e) {}
+    const clerkId = user ? user.id : args.userId;
+
+    return await ctx.db
+      .query("workflows")
+      .withIndex("by_user", (q) => q.eq("userId", clerkId))
+      .collect();
+  },
+});

@@ -176,6 +176,7 @@ export default function AgentPage() {
     pendingTasksStatus,
     sendMessage: sendBrainMessage,
     handleApprove: handleBrainApprove,
+    isLoadingSession,
   } = useBrainChat();
 
   const isBrainMode = activeMode === "brain";
@@ -1171,7 +1172,14 @@ export default function AgentPage() {
               </div>
 
               {/* Scrolling chat messages history list */}
-              {messages.length > 0 ? (
+              {isLoadingSession ? (
+                <div className="flex-1 flex flex-col items-center justify-center w-full my-auto opacity-70">
+                   <div className="h-12 w-12 bg-linear-to-tr from-blue-600 via-purple-500 to-red-500 p-0.5 shadow-md flex items-center justify-center shrink-0 aria-morph-loading mb-4 animate-spin rounded-xl">
+                      <svg fill="currentColor" viewBox="0 0 36 48" className="w-6 h-7 text-white" xmlns="http://www.w3.org/2000/svg"><path d="m0 6c10.1433 9.4404 25.8567 9.4404 36 0-9.4404 10.1433-9.4404 25.8567 0 36-10.1433-9.4404-25.8567-9.4404-36 0 9.44041-10.1433 9.44041-25.8567 0-36z" /></svg>
+                   </div>
+                   <p className="text-sm font-medium text-muted-foreground animate-pulse">Loading chat...</p>
+                </div>
+              ) : messages.length > 0 ? (
                 <AgentChatMessages
                   messages={messages}
                   isGenerating={isGenerating}

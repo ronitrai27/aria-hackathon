@@ -29,24 +29,40 @@ async def map_brain_stream_to_sse(agent_stream: AsyncGenerator[dict, None]) -> A
                 })
 
             elif event_type == "thought":
-                # Stream thought reasoning directly
+                # Stream thought text directly
                 yield format_sse("brain_thought", {
                     "message": event.get("content", "")
                 })
 
             elif event_type == "tool_call":
+                tool_name = event.get("name", "")
+                args = event.get("args", {})
+                
                 # Signal a tool invocation for detailed status
                 yield format_sse("brain_tool_call", {
-                    "tool_name": event.get("name", ""),
-                    "args": event.get("args", {})
+                    "tool_name": tool_name,
+                    "args": args
                 })
 
             elif event_type == "tool_output":
+                tool_name = event.get("name", "")
+                content = event.get("content", "")
+                
                 # Signal tool completion and results
                 yield format_sse("brain_tool_result", {
-                    "tool_name": event.get("name", ""),
-                    "content": event.get("content", "")
+                    "tool_name": tool_name,
+                    "content": content
                 })
+
+                if tool_name == "save_to_memory":
+                    try:
+                        res = json.loads(content)
+                        yield format_sse("memory_updated", res)
+                    except Exception:
+                        yield format_sse("memory_updated", {
+                            "status": "failed",
+                            "error": content
+                        })
 
             elif event_type == "inbox_agent_event":
                 # Detailed progress events from the inbox sub-agent
