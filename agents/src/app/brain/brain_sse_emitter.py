@@ -48,6 +48,10 @@ async def map_brain_stream_to_sse(agent_stream: AsyncGenerator[dict, None]) -> A
                     "content": event.get("content", "")
                 })
 
+            elif event_type == "inbox_agent_event":
+                # Detailed progress events from the inbox sub-agent
+                yield format_sse("inbox_agent_event", event.get("data", {}))
+
             elif event_type == "hitl_request":
                 # Frontend task verification request (interrupt state)
                 yield format_sse("hitl_request", {
@@ -60,6 +64,12 @@ async def map_brain_stream_to_sse(agent_stream: AsyncGenerator[dict, None]) -> A
                 yield format_sse("supervisor_data", {
                     "status": "done",
                     "final_response": event.get("content", "")
+                })
+
+            elif event_type == "error":
+                # Server-side graph exception
+                yield format_sse("error", {
+                    "error": event.get("content", "")
                 })
 
     except Exception as e:

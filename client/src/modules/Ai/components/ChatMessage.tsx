@@ -191,8 +191,11 @@ import React from "react";
 export function CustomMarkdown({ content }: { content: string }) {
   if (!content) return null;
 
+  // Strip all triple backtick markers (e.g. ```text or ```)
+  const cleanedContent = content.replace(/```[a-zA-Z0-9]*\n?/g, "");
+
   // Split by double newlines to find paragraphs/blocks
-  const blocks = content.split(/\n\n+/);
+  const blocks = cleanedContent.split(/\n\n+/);
 
   return (
     <div className="space-y-3.5 select-text">
@@ -289,19 +292,21 @@ function parseInline(text: string): React.ReactNode[] {
       return (
         <strong
           key={idx}
-          className="font-semibold text-zinc-900 dark:text-zinc-50"
+          className="font-bold text-zinc-900 dark:text-zinc-50"
         >
           {part.slice(2, -2)}
         </strong>
       );
     }
     if (part.startsWith("`") && part.endsWith("`")) {
+      const codeContent = part.slice(1, -1);
+      if (!codeContent.trim()) return null;
       return (
         <code
           key={idx}
           className="px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded font-mono text-[10.5px] text-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700/50"
         >
-          {part.slice(1, -1)}
+          {codeContent}
         </code>
       );
     }

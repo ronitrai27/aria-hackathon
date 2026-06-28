@@ -14,6 +14,7 @@ export function useBrainChat() {
     Array<{ worker: string; status: string; message: string }>
   >([]);
   const [pendingTasks, setPendingTasks] = useState<any[] | null>(null);
+  const [pendingTasksStatus, setPendingTasksStatus] = useState<"pending" | "approved" | "rejected" | null>(null);
   const [threadId] = useState(
     () =>
       `brain_thread_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
@@ -133,6 +134,44 @@ export function useBrainChat() {
                   }
                 }
                 setActiveSteps([...accumulatedSteps]);
+              } else if (eventName === "inbox_agent_event") {
+                const status = payload.status || "";
+                const message = payload.message || "";
+
+                // Add to trace log
+                const logPrefix =
+                  status === "connection_error"
+                    ? "❌"
+                    : status === "tool_call"
+                      ? "🔍"
+                      : status === "tool_result"
+                        ? "📥"
+                        : "💭";
+                const log = `${logPrefix} [Inbox Agent] ${message}`;
+                accumulatedTraceLogs.push(log);
+                setActiveTraceLogs([...accumulatedTraceLogs]);
+
+                // Update active steps
+                const existingIdx = accumulatedSteps.findIndex(
+                  (s) => s.worker === "Inbox Agent",
+                );
+                const stepStatus =
+                  status === "connection_error" ? "failed" : "running";
+
+                if (existingIdx !== -1) {
+                  accumulatedSteps[existingIdx] = {
+                    worker: "Inbox Agent",
+                    status: stepStatus,
+                    message: message,
+                  };
+                } else {
+                  accumulatedSteps.push({
+                    worker: "Inbox Agent",
+                    status: stepStatus,
+                    message: message,
+                  });
+                }
+                setActiveSteps([...accumulatedSteps]);
               } else if (eventName === "hitl_request") {
                 const tasks = payload.tasks || [];
                 console.log(
@@ -140,6 +179,7 @@ export function useBrainChat() {
                   tasks,
                 );
                 setPendingTasks(tasks);
+                setPendingTasksStatus("pending");
                 // Turn off generation loader during HITL wait
                 setIsGenerating(false);
               } else if (eventName === "supervisor_data") {
@@ -175,6 +215,13 @@ export function useBrainChat() {
                 console.error("Brain SSE error payload:", payload.error);
                 accumulatedTraceLogs.push(`❌ Error: ${payload.error}`);
                 setActiveTraceLogs([...accumulatedTraceLogs]);
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    role: "assistant",
+                    content: `An error occurred during execution: ${payload.error || "Unknown error"}`,
+                  },
+                ]);
               }
             } catch (err) {
               console.error(
@@ -237,12 +284,13 @@ export function useBrainChat() {
       setActiveTraceLogs([]);
       setActiveSteps(initialSteps);
       setPendingTasks(null);
+      setPendingTasksStatus(null);
 
-      const clerkUserId = user?.id || "";
+      const convexUserId = user?._id || "";
       const clerkUserName = user?.name || "User";
 
       console.log(
-        `[useBrainChat] Send message: "${textToSend}", Clerk ID: "${clerkUserId}", Username: "${clerkUserName}"`,
+        `[useBrainChat] Send message: "${textToSend}", Convex ID: "${convexUserId}", Username: "${clerkUserName}"`,
       );
 
       try {
@@ -255,9 +303,9 @@ export function useBrainChat() {
             message: textToSend,
             thread_id: threadId,
             mode: "brain",
-            userId: clerkUserId, // Clerk unique identifier
-            user_id: clerkUserId,
-            userName: clerkUserName, // Display name
+            userId: convexUserId,
+            user_id: convexUserId,
+            userName: clerkUserName,
             user_name: clerkUserName,
           }),
         });
@@ -283,7 +331,7 @@ export function useBrainChat() {
         setActiveTraceLogs([]);
       }
     },
-    [user?.id, user?.name, threadId],
+    [user?._id, user?.name, threadId],
   );
 
   // ── Approve/Reject Tasks ───────────────────────────────────────────────────
@@ -299,10 +347,10 @@ export function useBrainChat() {
       ];
 
       setIsGenerating(true);
-      setPendingTasks(null);
+      setPendingTasksStatus(approved ? "approved" : "rejected");
       setActiveSteps(initialSteps);
 
-      const clerkUserId = user?.id || "";
+      const convexUserId = user?._id || "";
       const clerkUserName = user?.name || "User";
 
       console.log(
@@ -318,8 +366,8 @@ export function useBrainChat() {
           body: JSON.stringify({
             thread_id: threadId,
             approved: approved,
-            userId: clerkUserId,
-            user_id: clerkUserId,
+            userId: convexUserId,
+            user_id: convexUserId,
             userName: clerkUserName,
             user_name: clerkUserName,
           }),
@@ -344,9 +392,11 @@ export function useBrainChat() {
         setIsGenerating(false);
         setActiveSteps([]);
         setActiveTraceLogs([]);
+        setPendingTasks(null);
+        setPendingTasksStatus(null);
       }
     },
-    [user?.id, user?.name, threadId],
+    [user?._id, user?.name, threadId],
   );
 
   return {
@@ -356,6 +406,7 @@ export function useBrainChat() {
     activeTraceLogs,
     activeSteps,
     pendingTasks,
+    pendingTasksStatus,
     sendMessage,
     handleApprove,
   };

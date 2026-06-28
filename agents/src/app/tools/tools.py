@@ -155,10 +155,12 @@ def get_browser_activity(user_id: str) -> list[dict]:
         return [{"error": f"Failed to fetch browser activity: {str(e)}"}]
 
 
+from langchain_core.runnables import RunnableConfig
+
 # ─── Tool: fetch_inbox ─────────────────────────────────────────────────────────
 
 @tool
-def fetch_inbox(user_id: str, instruction: str) -> str:
+async def fetch_inbox(user_id: str, instruction: str, config: RunnableConfig = None) -> str:
     """
     Query Gmail, Slack, and Google Calendar for the user.
     The agent searches and executes actions across these three services using Composio.
@@ -175,11 +177,22 @@ def fetch_inbox(user_id: str, instruction: str) -> str:
     print(f"\n[fetch_inbox tool] Running inbox sub-agent for user_id={user_id} with instruction: {instruction}", flush=True)
     try:
         session = create_inbox_session(user_id)
-        result = run_inbox_agent(session, instruction)
+        
+        # Extract progress callback if registered in configurable metadata
+        if isinstance(config, dict):
+            configurable = config.get("configurable", {})
+        elif config:
+            configurable = getattr(config, "configurable", {})
+        else:
+            configurable = {}
+        inbox_callback = configurable.get("inbox_callback")
+        
+        result = await run_inbox_agent(session, instruction, on_step_callback=inbox_callback)
         return result
     except Exception as e:
         print(f"[fetch_inbox tool error] {str(e)}", flush=True)
         return f"Error executing inbox agent: {str(e)}"
+
 
 
 # ─── Tool: fetch_memory ────────────────────────────────────────────────────────

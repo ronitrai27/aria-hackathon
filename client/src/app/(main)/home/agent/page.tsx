@@ -172,6 +172,7 @@ export default function AgentPage() {
     activeTraceLogs: brainTraceLogs,
     activeSteps: brainSteps,
     pendingTasks,
+    pendingTasksStatus,
     sendMessage: sendBrainMessage,
     handleApprove: handleBrainApprove,
   } = useBrainChat();
@@ -1175,7 +1176,9 @@ export default function AgentPage() {
                   activeSteps={activeSteps}
                   activeTraceLogs={activeTraceLogs}
                   pendingTasks={isBrainMode ? pendingTasks : null}
+                  pendingTasksStatus={isBrainMode ? pendingTasksStatus : null}
                   onApprove={isBrainMode ? handleBrainApprove : undefined}
+                  isBrainMode={isBrainMode}
                 />
               ) : (
                 /* Welcome / loading area — skeleton fades out, real content fades in */

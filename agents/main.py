@@ -436,7 +436,7 @@ def brain_approve_endpoint(body: BrainApproveRequest):
             graph = compile_brain_graph(checkpointer)
             await graph.aupdate_state(config, {
                 "hitl_approved": approved
-            }, as_node="execute_tasks")
+            })
 
             # Setup history for appending final result
             history = THREAD_HISTORY.setdefault(thread_id, [])

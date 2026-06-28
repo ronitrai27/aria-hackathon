@@ -43,6 +43,11 @@ You have direct access to these tools to assist {user_name}:
 5. fetch_memory: Search long-term vector store and Neo4j graph db for past work and personal facts.
 
 Answer questions directly and intelligently. ALWAYS use rich markdown formatting (bolding, headers, bullet points, code blocks) to organize your answers beautifully so they look clean and structured on the user interface. If you invoke a tool, summarize its results elegantly in clear bullet points.
+
+CRITICAL INSTRUCTIONS:
+- ALWAYS be extremely concise and cover important topics, summaries, and actions. Keep responses short, highly accurate, and focused on suggestions the user wants to hear. Avoid unnecessary introductory text or verbose details.
+- DIRECT TOOL CALLS FOR TASKS: If you propose to create tasks for the user, call the `create_tasks` tool directly in your response. Do NOT ask the user for permission, confirmation, or options (such as "Should I create them?", "Reply Go ahead", or "Which do you prefer?") in your text. The system automatically prompts the user for approval, so proceed straight to calling the tool.
+- WORKFLOW CREATION LIMITATION: If the user asks you to create, build, or design a workflow (or a flow), you MUST state: "I can suggest and help with tasks and am here to make you achieve your goals, but I cannot directly create workflows. You need to switch to Agent Mode to do so!" (Direct them to use the Agent Mode toggle in the sidebar).
 """
 
 
@@ -91,7 +96,7 @@ def supervisor_node(state: BrainState, config: Any = None):
     return {"messages": [response]}
 
 
-def tool_node(state: BrainState):
+async def tool_node(state: BrainState):
     """Executes standard non-HITL tools (get_tasks, get_browser_activity, fetch_inbox, fetch_memory)."""
     non_hitl_tools = [get_tasks, get_browser_activity, fetch_inbox, fetch_memory]
     t_node = ToolNode(non_hitl_tools)
@@ -99,7 +104,7 @@ def tool_node(state: BrainState):
     last_message = state["messages"][-1]
     print(f"[brain.tool_node] Running tool node for: {[tc['name'] for tc in last_message.tool_calls]}", flush=True)
     
-    return t_node.invoke(state)
+    return await t_node.ainvoke(state)
 
 
 def execute_tasks_node(state: BrainState):
@@ -252,6 +257,7 @@ async def run_brain_agent_stream(
         
         if "execute_tasks" in next_node:
             yield {"type": "trace", "content": f"[run_brain_agent_stream] Resuming execution at execute_tasks."}
+            yield {"type": "trace", "content": "🔧 Calling tool [create_tasks]..."}
             inputs = None
         else:
             yield {"type": "trace", "content": f"[run_brain_agent_stream] Appending new human message to existing thread."}
@@ -266,6 +272,12 @@ async def run_brain_agent_stream(
     token_handler = QueueCallbackHandler(event_queue)
     config["callbacks"] = [token_handler]
 
+    # Define progress callback for the inbox agent to queue events
+    async def on_inbox_step(event_data: dict):
+        await event_queue.put({"type": "inbox_agent_event", "data": event_data})
+        
+    config["configurable"]["inbox_callback"] = on_inbox_step
+
     # Background task to stream graph updates into the queue
     async def execute_graph():
         try:
@@ -273,6 +285,9 @@ async def run_brain_agent_stream(
                 await event_queue.put({"type": "chunk", "chunk": chunk})
             await event_queue.put({"type": "end"})
         except Exception as ex:
+            import traceback
+            print(f"[execute_graph] ERROR occurred during graph stream: {str(ex)}", flush=True)
+            traceback.print_exc()
             await event_queue.put({"type": "error", "error": str(ex)})
 
     # Launch background graph run
@@ -292,6 +307,9 @@ async def run_brain_agent_stream(
         elif event["type"] == "token":
             # Stream tokens to the client
             yield {"type": "thought", "content": event["content"]}
+        elif event["type"] == "inbox_agent_event":
+            # Stream inbox agent sub-steps
+            yield {"type": "inbox_agent_event", "data": event["data"]}
         elif event["type"] == "chunk":
             # Process node transitions and structured outputs
             chunk = event["chunk"]

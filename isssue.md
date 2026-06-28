@@ -67,3 +67,17 @@ INFO:     127.0.0.1:54365 - "POST /agent HTTP/1.1" 200 OK
 [agent_node] Running agent without validation errors.
 [should_continue] No tool calls. Routing to END.
 [run_workflow_agent_stream] Stream complete.
+
+
+<!-- MISTAKE-1 BRAIN  -->
+<!-- --------------------------------------- -->
+[brain.supervisor_node] Running supervisor for user: 'Ronit Rai' (user_3FYJ8kFMGmpFPmqhxbjPLCGn3bF)
+[brain.supervisor_node] Invoking LLM...
+[brain.supervisor_node] LLM generated tool calls: ['fetch_inbox']
+[brain.should_continue] Routing to standard tool node for: ['fetch_inbox']
+[brain.tool_node] Running tool node for: ['fetch_inbox']
+
+[fetch_inbox tool] Running inbox sub-agent for user_id=user_3FYJ8kFMGmpFPmqhxbjPLCGn3bF with instruction: Get my unread emails (last 7 days) and upcoming Google Calendar events (next 14 days). For each email include sender, subject, snippet, and unread status. For calendar events include title, start and end time with timezone, location, attendees, and description. Also flag any events that have 'meeting', 'call', 'review', 'demo', or 'deadline' in the title or description.
+
+We should also see what fetch inbox agent is doing ????
+after this we get no idea and blank for 2-3 min !!
