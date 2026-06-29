@@ -59,6 +59,8 @@ TOOLKIT_CATALOG = [
     {"slug": "googlecalendar", "name": "Google Calendar", "icon": "📅"},
     {"slug": "notion", "name": "Notion", "icon": "📝"},
     {"slug": "github", "name": "GitHub", "icon": "🐙"},
+    {"slug": "googledocs", "name": "Google Docs", "icon": "📄"},
+    {"slug": "googledrive", "name": "Google Drive", "icon": "📁"},
     {"slug": "typeform", "name": "Typeform", "icon": "📊"},
     {"slug": "apollo", "name": "Apollo", "icon": "🚀"},
     {"slug": "todoist", "name": "Todoist", "icon": "✅"},

@@ -7,13 +7,12 @@ to build a workflow structure. The verifier validates it, and on success the
 workflow is converted to React Flow {nodes, edges} via workflow_to_reactflow().
 """
 
-# COMPOSIO_MULTI_EXECUTE_TOOL", "COMPOSIO_MANAGE_CONNECTIONS",  COMPOSIO_SEARCH_TOOLS, COMPOSIO_GET_TOOL_SCHEMAS
-# /-------------------
 from __future__ import annotations
 
 import os
 import re
 import sys
+from typing import Any
 
 # Force stdout/stderr to use UTF-8 encoding on Windows
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
@@ -21,10 +20,8 @@ if sys.stdout and hasattr(sys.stdout, "reconfigure"):
 if sys.stderr and hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
-from typing import Any
-
 from dotenv import load_dotenv
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
@@ -40,70 +37,93 @@ _ROOT = Path(__file__).resolve().parent.parent.parent.parent  # agents/
 load_dotenv(_ROOT / ".env", override=True)
 
 
-SYSTEM_PROMPT = """
-You are a Workflow Designer Agent.
+# ─── System Prompts ───────────────────────────────────────────────────────────
 
-Your job is to:
-1. Help the user understand what workflow they want to build.
-2. Use COMPOSIO_SEARCH_TOOLS to find the right tool actions for each **integration step** (apps like Gmail, Slack, Drive, etc.).
-3. Use COMPOSIO_GET_TOOL_SCHEMAS to get the parameter names and types for those integration actions.
-4. Call set_workflow() with all the steps and their fields — so the user can fill in the form and click Run.
+DESIGNER_PROMPT = """You are a Workflow Designer Agent.
+
+Your job is to design a draft workflow based on the user's requirements.
 
 ## CRITICAL — CONNECTIONS ARE ALREADY ESTABLISHED:
 - NEVER use COMPOSIO_MANAGE_CONNECTIONS.
 - NEVER ask the user to connect, authenticate, or authorize any app.
-- ASSUME all required apps are connected. Just design the workflow.
+- ASSUME all required apps are connected. Just design the workflow immediately.
+- Do NOT ask for user confirmation or connections. Proceed directly to tool searching and calling `draft_workflow`.
+
+## CRITICAL — GENERAL RESEARCH / SEARCH:
+- For general information gathering, research, web search, or finding articles/news, you MUST use the built-in `AI_RESEARCH` node.
+- NEVER search for or use external apps (like Reddit, Google Search, Tavily, YouTube, etc.) for general research or searching, unless the user explicitly requested that app by name (e.g., "Search Reddit...").
+- Ignore any tool suggestions or plans from search tools that suggest using external search or social media apps for general research. Use `AI_RESEARCH` instead.
+
+## PROCESS:
+1. Select the necessary steps to achieve the goal (either integration actions or AI processing nodes).
+2. If you need to search for tool names or inspect schemas, you may use COMPOSIO_SEARCH_TOOLS and COMPOSIO_GET_TOOL_SCHEMAS.
+3. Once you have designed the sequence of steps, call the `draft_workflow` tool to stage your draft workflow.
 
 ## AI PROCESSING NODES:
-You have 4 AI node types. Use these only when the user asks for research, summarization, extraction, or classification.
-AI nodes are **direct prompt nodes**. They do NOT use Composio tools or integrations.
-
+Use these ONLY for text processing like research, summarization, extraction, or classification. Do NOT use them for integration steps (such as writing documents, sending emails, or messaging).
 - AI_SUMMARIZE → Summarizes text or prior step output
 - AI_EXTRACT   → Extracts structured data or entities
 - AI_CLASSIFY  → Classifies input into categories
 - AI_RESEARCH  → Researches a topic and returns findings
 
-## STEP 1: Use COMPOSIO_SEARCH_TOOLS only for integration actions
-  - Example: search "send email via gmail" → GMAIL_SEND_EMAIL
-  - Example: search "post message to slack channel" → SLACK_SEND_MESSAGE
-  - CRITICAL: Do NOT use COMPOSIO_SEARCH_TOOLS for research, summarization, extraction, or classification. Those are AI nodes.
+Each AI node must have exactly ONE field:
+- name: "prompt"
+- type: "string"
+- description: "Instructions for the AI"
+- value: Pre-filled instructions, referencing prior steps with {{step_N}} if needed.
 
-## STEP 2: Use COMPOSIO_GET_TOOL_SCHEMAS only for integration actions
-  - Pass the exact tool_slug you found in Step 1.
-  - This gives you the parameter list for Gmail, Slack, etc.
+## INTEGRATION ACTIONS:
+For apps like Gmail, Slack, Google Drive, Google Docs, Notion, Jira, GitHub, etc.
+- You can draft actions with their names (e.g. `GMAIL_SEND_EMAIL`, `SLACK_SEND_MESSAGE`).
+- For Google Docs, use `GOOGLEDOCS_CREATE_DOCUMENT_MARKDOWN` or `GOOGLEDOCS_CREATE_DOCUMENT` (do NOT use Google Drive tools to create docs).
+- Exclude unnecessary optional/technical parameters to keep it simple. Only include core inputs (e.g. recipient_email, subject, body).
 
-## STEP 3: Call set_workflow()
-  - Each step MUST include: tool_name, step_description, and fields.
-  - fields MUST list ONLY the essential parameters (e.g. recipient_email, subject, body for Gmail).
-  - Exclude optional/technical fields unless explicitly requested.
+## STEP CHAINING:
+- Pass outputs between steps using `{{step_N}}` (or `{{step_N.some_field}}` if applicable), where N is the 1-based step index.
+- Ensure that each step's value uses these placeholders to pass data downstream.
 
-
-### CRITICAL RULES FOR AI NODES:
-1. AI nodes are **direct prompt nodes**. They do NOT use Composio tools or integrations.
-2. Never search for Apollo, Google Search, or other external tools for research/summarization/extraction/classification.
-3. Each AI node has exactly one field:
-   - name: "prompt"
-   - type: "string"
-   - description: "Instructions for the AI"
-   - value: A clear instruction string, referencing prior steps with {{step_N}} if needed.
-4. Example:
-   - "Research the latest news about Claude AI and return key findings."
-   - "Summarize the following Slack messages: {{step_2}}"
-5. CONSOLIDATE AI NODES: Never generate multiple AI nodes of the same type/role in a single workflow. If you need to perform multiple research tasks (e.g., Hacker News startups and YC videos), specify all of them in a single AI_RESEARCH node's prompt. Do NOT create separate AI_RESEARCH steps; create exactly ONE AI_RESEARCH step that encompasses all research requirements. Similarly, use a single AI_SUMMARIZE node for all summarization needs.
-
-## Workflow Chaining:
-- Use {{step_N}} placeholders to pass outputs between steps.
-- Example: Gmail body = "Here is my LinkedIn info: {{step_1}}"
-
-## CRITICAL:
-- You are a designer only. Do not execute workflows. Tell the user to click "Run Workflow."
-- dont fill any params if you are not told , as user will fill those parameters value, only pre-fill values when possible (e.g. referencing prior steps
-- NEVER ask the user to connect or authenticate any app — they are all already connected.
-- while using 
-
-
+After you call `draft_workflow`, the Verifier Agent will audit your draft, check actual Composio APIs to verify the tool slugs and parameters, correct any errors, and produce the final workflow.
 """
 
+
+VERIFIER_PROMPT = """You are a Workflow Verifier and Corrector Agent.
+
+Your job is to audit and correct the draft workflow staged by the Designer Agent, and then finalize it.
+
+## CRITICAL — CONNECTIONS ARE ALREADY ESTABLISHED:
+- NEVER use COMPOSIO_MANAGE_CONNECTIONS.
+- NEVER ask the user to connect, authenticate, or authorize any app.
+- ASSUME all required apps are connected. Just audit and finalize the workflow.
+
+## CRITICAL — GENERAL RESEARCH / SEARCH:
+- General research, web searches, news finding, or general information gathering MUST use the built-in `AI_RESEARCH` node.
+- If the Designer used an external tool (like Reddit, Google Search, Tavily, YouTube, etc.) for generic research/search, you MUST replace it with `AI_RESEARCH` (unless the user explicitly asked for that specific app by name).
+- Ignore any tool recommendations from Composio search tools that advise using external apps for general research. Correct them to `AI_RESEARCH`.
+
+## DRAFT TO AUDIT:
+{proposed_draft}
+
+## AUDIT CHECKLIST:
+1. **Composio API Verification**:
+   - For every integration step (Gmail, Slack, Drive, Google Docs, etc.):
+     - You MUST call COMPOSIO_SEARCH_TOOLS to find the exact action slug.
+     - You MUST call COMPOSIO_GET_TOOL_SCHEMAS using the tool_slug to get the exact parameter names.
+     - Correct any hallucinated or wrong tool slugs (e.g., if the designer used `GOOGLEDRIVE_CREATE_GOOGLE_DOC`, correct it to `GOOGLEDOCS_CREATE_DOCUMENT_MARKDOWN`).
+     - Correct the parameter names in fields to match the real schema (e.g. 'recipient_email', 'subject', 'body').
+2. **AI Nodes Verification**:
+   - Ensure they are named `AI_RESEARCH`, `AI_SUMMARIZE`, `AI_EXTRACT`, or `AI_CLASSIFY`.
+   - AI nodes must have exactly ONE field: name="prompt", type="string", description="Instructions for the AI", value="...".
+   - If they have other fields, delete/merge them into the prompt.
+3. **Step Chaining Connection**:
+   - Ensure that steps are connected logically by referencing previous outputs using `{{step_N}}` (e.g., Step 2 references Step 1 as `{{step_1}}`).
+   - Double-check that Step N only references previous steps (index must be between 1 and N-1).
+4. **Finalize**:
+   - Once all steps are corrected and verified, call the `finalize_workflow` tool with the final workflow name, description, and steps.
+   - If `finalize_workflow` returns a validation error, read it, fix the problem, and call it again.
+
+## CRITICAL RULES:
+- Exclude optional, highly technical parameters to keep the user form simple. Include only important fields (e.g., recipient_email, subject, body for email).
+"""
 
 
 # ─── LLM config ──────────────────────────────────────────────────────────────
@@ -112,209 +132,227 @@ def get_llm() -> ChatOpenAI:
     api_key = os.getenv("OPENAI_API_KEY")
     return ChatOpenAI(model="gpt-5.1", temperature=0.1, api_key=api_key)
 
-# def get_llm() -> ChatAnthropic:
-#     api_key = os.getenv("ANTHROPIC_API_KEY")
-#     return ChatAnthropic(model="claude-sonnet-4-5", temperature=0.1, api_key=api_key)
 
+# ─── Programmatic Validation Helper ──────────────────────────────────────────
+
+def validate_and_commit_workflow(proposed: dict, workflow_holder: dict) -> tuple[bool, str]:
+    # Phase 1: Validate against Pydantic schema structure
+    try:
+        from src.app.schema.agent_schema import WorkflowStructure
+        struct = WorkflowStructure.model_validate(proposed)
+        print("[validate_and_commit_workflow] Pydantic schema structure check passed.", flush=True)
+    except Exception as e:
+        error_msg = f"[Verifier Warning] Structure validation failed: {str(e)}"
+        print(f"[validate_and_commit_workflow] Pydantic check FAILED: {error_msg}", flush=True)
+        return False, error_msg
+
+    # Phase 2: Validate step placeholder references (cannot reference current or future steps)
+    for idx, step in enumerate(struct.steps):
+        for field in step.fields:
+            if field.value is not None:
+                val_str = str(field.value)
+                # Find placeholders like {{step_N}} or {{step_N.nested_key}}
+                placeholders = re.findall(r"\{\{\s*step_(\d+)(?:\.[a-zA-Z0-9_\-\.]+)?\s*\}\}", val_str)
+                for p in placeholders:
+                    ref_idx = int(p)
+                    if ref_idx < 1:
+                        error_msg = f"[Verifier Warning] Step {idx+1} ({step.tool_name}), Field '{field.name}' references Step {ref_idx}, which is invalid (index must be >= 1)."
+                        print(f"[validate_and_commit_workflow] Placeholder check FAILED: {error_msg}", flush=True)
+                        return False, error_msg
+                    if ref_idx >= idx + 1:
+                        error_msg = (
+                            f"[Verifier Warning] Step {idx+1} ({step.tool_name}), Field '{field.name}' references Step {ref_idx}, "
+                            f"which is a future or current step. You can only reference completed steps prior to Step {idx+1} (i.e. Steps 1 to {idx})."
+                        )
+                        print(f"[validate_and_commit_workflow] Placeholder check FAILED: {error_msg}", flush=True)
+                        return False, error_msg
+
+    # Phase 3: Success — commit workflow and convert to React Flow format
+    print(f"[validate_and_commit_workflow] Validation SUCCESS. Committing workflow '{proposed['name']}' to active state.", flush=True)
+    workflow_holder["name"] = proposed["name"]
+    workflow_holder["description"] = proposed["description"]
+    workflow_holder["steps"] = proposed["steps"]
+
+    # Convert to React Flow nodes/edges for the frontend canvas
+    reactflow_data = workflow_to_reactflow(proposed)
+    workflow_holder["reactflow"] = reactflow_data
+    
+    return True, f"[Verifier Success] Workflow '{proposed['name']}' verified and registered successfully."
 
 
 # ─── Custom Agent compilation with custom StateGraph ────────────────────────
 
 def compile_workflow_agent(session, workflow_holder: dict):
     """
-    Build custom LangGraph StateGraph with Agent and Verifier nodes.
-    Checks the workflow generated by LLM for semantic and structural validity.
-
-    Args:
-        session: Composio session providing meta-tools via session.tools()
-        workflow_holder: Mutable dict to stage/commit the workflow into.
+    Build custom LangGraph StateGraph with Designer and Verifier/Corrector agents.
     """
     # Load all allowed Composio meta-tools
     composio_tools = list(session.tools())
     print(f"\n[compile_workflow_agent] Composio meta-tools loaded: {[t.name for t in composio_tools]}", flush=True)
 
-    # Filter out tools the designer LLM must never call:
-    # - COMPOSIO_MULTI_EXECUTE_TOOL: would execute actions directly
-    # - COMPOSIO_MANAGE_CONNECTIONS: would prompt user to connect apps (they're already connected)
+    # Filter out tools the designer LLM must never call
     BLOCKED_TOOLS = {"COMPOSIO_MULTI_EXECUTE_TOOL", "COMPOSIO_MANAGE_CONNECTIONS"}
     allowed_tools = [t for t in composio_tools if t.name not in BLOCKED_TOOLS]
 
-    # ── set_workflow tool ─────────────────────────────────────────────────
+    # ── draft_workflow tool ─────────────────────────────────────────────────
     @tool
-    def set_workflow(name: str, description: str, steps: list[dict]) -> str:
+    def draft_workflow(name: str, description: str, steps: list[dict]) -> str:
         """
-        Build or update the visual workflow on the right-side panel.
-        Call this AFTER using COMPOSIO_GET_TOOL_SCHEMAS to get exact param names.
+        Stage the proposed draft workflow. This will trigger the Verifier Agent to audit, verify, and finalize it.
 
         Args:
             name: Short workflow title shown to the user.
             description: One-sentence summary of what this workflow does.
-            steps: List of step dicts. Each must have:
-              - tool_name: Exact action slug (e.g. 'GMAIL_SEND_EMAIL', 'SLACK_SEND_MESSAGE')
-                           or AI operation (e.g. 'AI_SUMMARIZE', 'AI_RESEARCH')
+            steps: List of proposed step dicts. Each must have:
+              - tool_name: Proposed action slug or AI operation
               - step_description: Friendly explanation of this step
-              - fields: List of parameter dicts. Each must have:
-                  - name: Exact parameter name from COMPOSIO_GET_TOOL_SCHEMAS
-                  - type: 'string', 'boolean', 'integer', or 'number'
-                  - description: What this parameter does
-                  - value: Pre-filled value if known from user's message, else empty string ""
+              - fields: List of parameter dicts (name, type, description, value)
         """
         steps = consolidate_steps(steps)
-        field_count = sum(len(s.get("fields", [])) for s in steps)
-        print(f"\n[set_workflow called] name='{name}' steps={len(steps)} total_fields={field_count}", flush=True)
-
-        # ── Console the full structure so you can inspect params ──────────
-        import json
-        print("\n" + "=" * 60, flush=True)
-        print(f"  WORKFLOW: {name}", flush=True)
-        print(f"  DESC:     {description}", flush=True)
-        print("=" * 60, flush=True)
-        for i, step in enumerate(steps, 1):
-            print(f"  Step {i}: {step.get('tool_name')} — {step.get('step_description')}", flush=True)
-            for field in step.get("fields", []):
-                print(f"    • {field.get('name')} ({field.get('type')}) = {field.get('value')!r}  # {field.get('description')}", flush=True)
-        print("=" * 60 + "\n", flush=True)
-
-        # Stage the proposed workflow for the verifier to validate
         workflow_holder["proposed"] = {
             "name": name,
             "description": description,
             "steps": steps,
         }
-        return f"Workflow '{name}' submitted for validation with {len(steps)} steps."
+        return f"Workflow draft '{name}' staged with {len(steps)} steps. Triggering Verifier Agent to audit and verify details."
+
+    # ── finalize_workflow tool ──────────────────────────────────────────────
+    @tool
+    def finalize_workflow(name: str, description: str, steps: list[dict]) -> str:
+        """
+        Commit the audited and verified workflow. Call this ONLY after verifying all tool names, parameters, and step chaining.
+
+        Args:
+            name: Final workflow title.
+            description: One-sentence summary.
+            steps: List of audited and corrected step dicts. Each must have:
+              - tool_name: Exact action slug or AI operation
+              - step_description: Friendly explanation of this step
+              - fields: List of parameter dicts (name, type, description, value)
+        """
+        steps = consolidate_steps(steps)
+        proposed = {
+            "name": name,
+            "description": description,
+            "steps": steps,
+        }
+        
+        success, err_or_msg = validate_and_commit_workflow(proposed, workflow_holder)
+        if not success:
+            workflow_holder["is_valid"] = False
+            workflow_holder["validation_error"] = err_or_msg
+            return f"Validation failed: {err_or_msg}"
+            
+        workflow_holder["is_valid"] = True
+        workflow_holder["validation_error"] = ""
+        return err_or_msg
 
     # ── Tool list ─────────────────────────────────────────────────────────
-    tools = allowed_tools + [set_workflow]
+    tools = allowed_tools + [draft_workflow, finalize_workflow]
     tool_node = ToolNode(tools)
 
     llm = get_llm()
     llm_with_tools = llm.bind_tools(tools)
 
-    # ── Agent Node ────────────────────────────────────────────────────────
+    # ── Agent Node (Designer) ─────────────────────────────────────────────
     def agent_node(state: WorkflowState):
         messages = state["messages"]
-        system_msg = SystemMessage(content=SYSTEM_PROMPT)
+        system_msg = SystemMessage(content=DESIGNER_PROMPT)
         prompt_msgs = [system_msg] + messages
+
+        response = llm_with_tools.invoke(prompt_msgs)
+        return {"messages": [response]}
+
+    # ── Verifier Agent Node (Auditor/Corrector) ───────────────────────────
+    def verifier_agent_node(state: WorkflowState):
+        messages = state["messages"]
+        proposed = workflow_holder.get("proposed", {})
+        
+        # Format the draft nicely for the verifier
+        import json
+        draft_str = json.dumps(proposed, indent=2)
+        
+        sys_msg = SystemMessage(content=VERIFIER_PROMPT.format(proposed_draft=draft_str))
+        prompt_msgs = [sys_msg] + messages
 
         # Append validation error guidance if present
         err = state.get("validation_error")
         if err:
-            print(f"[agent_node] validation_error found in state: '{err}'", flush=True)
+            print(f"[verifier_agent_node] validation_error found in state: '{err}'", flush=True)
             prompt_msgs.append(
                 HumanMessage(
                     content=(
                         f"CRITICAL VERIFICATION ERROR: {err}\n"
                         "The workflow you submitted is invalid. You MUST fix the issues "
                         "(e.g., incorrect step placeholder indices, missing fields, or out-of-order steps) "
-                        "and call set_workflow again with the corrected steps."
+                        "and call finalize_workflow again with the corrected steps."
                     )
                 )
             )
-        else:
-            print("[agent_node] Running agent without validation errors.", flush=True)
 
         response = llm_with_tools.invoke(prompt_msgs)
         return {"messages": [response]}
 
-    # ── Verifier Node ─────────────────────────────────────────────────────
-    def verifier_node(state: WorkflowState):
-        proposed = workflow_holder.get("proposed")
-        if not proposed:
-            print("[verifier_node] No proposed workflow staged. Skipping validation.", flush=True)
-            return {"is_valid": True, "validation_error": ""}
-
-        print(f"[verifier_node] Validating proposed workflow '{proposed.get('name')}'...", flush=True)
-
-        # Phase 1: Validate against Pydantic schema structure
-        try:
-            struct = WorkflowStructure.model_validate(proposed)
-            print("[verifier_node] Pydantic schema structure check passed.", flush=True)
-        except Exception as e:
-            error_msg = f"Structure validation failed: {str(e)}"
-            print(f"[verifier_node] Pydantic check FAILED: {error_msg}", flush=True)
-            workflow_holder.pop("proposed", None)
-            feedback_msg = HumanMessage(
-                content=f"[Verifier Warning] Workflow structure validation failed: {error_msg}. Please fix schemas and try again."
-            )
-            return {
-                "is_valid": False,
-                "validation_error": error_msg,
-                "messages": [feedback_msg]
-            }
-
-        # Phase 2: Validate step placeholder references (cannot reference current or future steps)
-        for idx, step in enumerate(struct.steps):
-            for field in step.fields:
-                if field.value is not None:
-                    val_str = str(field.value)
-                    # Find placeholders like {{step_N}} or {{step_N.nested_key}}
-                    placeholders = re.findall(r"\{\{\s*step_(\d+)(?:\.[a-zA-Z0-9_\-\.]+)?\s*\}\}", val_str)
-                    for p in placeholders:
-                        ref_idx = int(p)
-                        if ref_idx < 1:
-                            error_msg = f"Step {idx+1} ({step.tool_name}), Field '{field.name}' references Step {ref_idx}, which is invalid (index must be >= 1)."
-                            print(f"[verifier_node] Placeholder check FAILED: {error_msg}", flush=True)
-                            workflow_holder.pop("proposed", None)
-                            return {
-                                "is_valid": False,
-                                "validation_error": error_msg,
-                                "messages": [HumanMessage(content=f"[Verifier Warning] {error_msg}")]
-                            }
-                        if ref_idx >= idx + 1:
-                            error_msg = (
-                                f"Step {idx+1} ({step.tool_name}), Field '{field.name}' references Step {ref_idx}, "
-                                f"which is a future or current step. You can only reference completed steps prior to Step {idx+1} (i.e. Steps 1 to {idx})."
-                            )
-                            print(f"[verifier_node] Placeholder check FAILED: {error_msg}", flush=True)
-                            workflow_holder.pop("proposed", None)
-                            return {
-                                "is_valid": False,
-                                "validation_error": error_msg,
-                                "messages": [HumanMessage(content=f"[Verifier Warning] {error_msg}")]
-                            }
-
-        # Phase 3: Success — commit workflow and convert to React Flow format
-        print(f"[verifier_node] Validation SUCCESS. Committing workflow '{proposed['name']}' to active state.", flush=True)
-        workflow_holder["name"] = proposed["name"]
-        workflow_holder["description"] = proposed["description"]
-        workflow_holder["steps"] = proposed["steps"]
-        workflow_holder.pop("proposed", None)
-
-        # Convert to React Flow nodes/edges for the frontend canvas
-        reactflow_data = workflow_to_reactflow(proposed)
-        workflow_holder["reactflow"] = reactflow_data
-
-        feedback_msg = HumanMessage(
-            content=f"[Verifier Success] Workflow '{proposed['name']}' verified and registered successfully."
-        )
-        return {
-            "is_valid": True,
-            "validation_error": "",
-            "workflow": {**proposed, **reactflow_data},
-            "messages": [feedback_msg]
-        }
-
-    # ── Conditional Routing from Agent ────────────────────────────────────
-    def should_continue(state: WorkflowState):
+    # ── Conditional Routing ────────────────────────────────────────────────
+    def should_continue_designer(state: WorkflowState):
         messages = state["messages"]
         last_message = messages[-1]
         if last_message.tool_calls:
-            print(f"[should_continue] Routing to tools. Calls: {[tc['name'] for tc in last_message.tool_calls]}", flush=True)
+            print(f"[should_continue_designer] Routing to tools. Calls: {[tc['name'] for tc in last_message.tool_calls]}", flush=True)
             return "tools"
-        print("[should_continue] No tool calls. Routing to END.", flush=True)
+        if workflow_holder.get("proposed"):
+            print("[should_continue_designer] Draft staged. Routing to verifier_agent.", flush=True)
+            return "verifier_agent"
+        print("[should_continue_designer] No tool calls or draft. Routing to END.", flush=True)
         return END
+
+    def should_continue_verifier(state: WorkflowState):
+        messages = state["messages"]
+        last_message = messages[-1]
+        if last_message.tool_calls:
+            print(f"[should_continue_verifier] Routing to tools. Calls: {[tc['name'] for tc in last_message.tool_calls]}", flush=True)
+            return "tools"
+        # If the verifier has run but didn't call tools, route to END
+        print("[should_continue_verifier] Routing to END.", flush=True)
+        return END
+
+    def should_continue_from_tools(state: WorkflowState):
+        messages = state["messages"]
+        # Traverse backward to find the last AIMessage with tool calls
+        for msg in reversed(messages):
+            if isinstance(msg, AIMessage) and msg.tool_calls:
+                for tc in msg.tool_calls:
+                    name = tc.get("name")
+                    if name == "draft_workflow":
+                        print("[should_continue_from_tools] draft_workflow called. Routing to verifier_agent.", flush=True)
+                        return "verifier_agent"
+                    elif name == "finalize_workflow":
+                        if workflow_holder.get("is_valid"):
+                            print("[should_continue_from_tools] finalize_workflow SUCCESS. Routing to END.", flush=True)
+                            return END
+                        else:
+                            print("[should_continue_from_tools] finalize_workflow FAILED. Routing to verifier_agent.", flush=True)
+                            return "verifier_agent"
+                break
+        
+        # Fallback for search / schema tools
+        if workflow_holder.get("proposed"):
+            print("[should_continue_from_tools] Staged workflow found. Routing back to verifier_agent.", flush=True)
+            return "verifier_agent"
+        print("[should_continue_from_tools] No staged workflow. Routing back to agent.", flush=True)
+        return "agent"
 
     # ── Graph Setup ───────────────────────────────────────────────────────
     wf = StateGraph(WorkflowState)
     wf.add_node("agent", agent_node)
+    wf.add_node("verifier_agent", verifier_agent_node)
     wf.add_node("tools", tool_node)
-    wf.add_node("verifier", verifier_node)
 
     wf.set_entry_point("agent")
 
-    wf.add_conditional_edges("agent", should_continue, ["tools", END])
-    wf.add_edge("tools", "verifier")
-    wf.add_edge("verifier", "agent")
+    wf.add_conditional_edges("agent", should_continue_designer, ["tools", "verifier_agent", END])
+    wf.add_conditional_edges("verifier_agent", should_continue_verifier, ["tools", END])
+    wf.add_conditional_edges("tools", should_continue_from_tools, ["agent", "verifier_agent", END])
 
     return wf.compile()
 
@@ -338,19 +376,13 @@ def run_workflow_agent_stream(
     thread_id: str,
     workflow_holder: dict,
 ):
-    """
-    Stream the agent execution, yielding SSE-compatible event dicts.
-
-    Yields dicts with "type" key:
-      - thought      → agent thinking / text content
-      - tool_call    → agent calling a tool
-      - tool_output  → tool returned a result
-      - workflow     → verifier approved, contains {nodes, edges} for React Flow
-      - final_answer → last text response from agent
-      - trace        → live backend execution log message
-    """
     yield {"type": "trace", "content": f"[run_workflow_agent_stream] Starting agent run for thread_id={thread_id}"}
     yield {"type": "trace", "content": "[compile_workflow_agent] Loading Composio meta-tools..."}
+    
+    # Initialize/reset active keys in workflow_holder
+    workflow_holder.clear()
+    workflow_holder["is_valid"] = False
+
     agent = compile_workflow_agent(session, workflow_holder)
     tool_names = [t.name for t in session.tools()]
     yield {"type": "trace", "content": f"[compile_workflow_agent] Composio meta-tools loaded: {tool_names}"}
@@ -362,7 +394,7 @@ def run_workflow_agent_stream(
     final_text = ""
     for chunk in agent.stream({"messages": lc_messages}, config=config, stream_mode="updates"):
         if "agent" in chunk:
-            yield {"type": "trace", "content": "[agent_node] Running agent without validation errors."}
+            yield {"type": "trace", "content": "[agent_node] Running Designer Agent..."}
             for msg in chunk["agent"].get("messages", []):
                 content = getattr(msg, "content", None)
                 if isinstance(content, str) and content.strip():
@@ -371,7 +403,23 @@ def run_workflow_agent_stream(
 
                 for tc in getattr(msg, "tool_calls", []):
                     tool_name = tc.get("name", "unknown")
-                    yield {"type": "trace", "content": f"[should_continue] Routing to tools. Calls: ['{tool_name}']"}
+                    yield {"type": "trace", "content": f"[agent_node] Designer called tool: '{tool_name}'"}
+                    yield {
+                        "type": "tool_call",
+                        "name": tool_name,
+                        "args": tc.get("args", {}),
+                    }
+
+        elif "verifier_agent" in chunk:
+            yield {"type": "trace", "content": "[verifier_agent_node] Running Verifier/Corrector Agent..."}
+            for msg in chunk["verifier_agent"].get("messages", []):
+                content = getattr(msg, "content", None)
+                if isinstance(content, str) and content.strip():
+                    yield {"type": "thought", "content": content.strip()}
+
+                for tc in getattr(msg, "tool_calls", []):
+                    tool_name = tc.get("name", "unknown")
+                    yield {"type": "trace", "content": f"[verifier_agent] Verifier called tool: '{tool_name}'"}
                     yield {
                         "type": "tool_call",
                         "name": tool_name,
@@ -383,12 +431,24 @@ def run_workflow_agent_stream(
                 tool_name = getattr(msg, "name", "unknown")
                 tool_content = str(getattr(msg, "content", "") or "")
                 
-                if tool_name == "set_workflow":
+                if tool_name == "draft_workflow":
                     proposed = workflow_holder.get("proposed", {})
                     name = proposed.get("name", "unknown")
                     steps_count = len(proposed.get("steps", []))
-                    field_count = sum(len(s.get("fields", [])) for s in proposed.get("steps", []))
-                    yield {"type": "trace", "content": f"[set_workflow called] name='{name}' steps={steps_count} total_fields={field_count}"}
+                    yield {"type": "trace", "content": f"[draft_workflow] Staged draft workflow '{name}' ({steps_count} steps)."}
+                elif tool_name == "finalize_workflow":
+                    if workflow_holder.get("is_valid"):
+                        reactflow_data = workflow_holder.get("reactflow", {})
+                        yield {"type": "trace", "content": f"[finalize_workflow] Validation SUCCESS. Committing workflow to active state."}
+                        if "nodes" in reactflow_data and "edges" in reactflow_data:
+                            yield {
+                                "type": "workflow",
+                                "nodes": reactflow_data["nodes"],
+                                "edges": reactflow_data["edges"],
+                            }
+                    else:
+                        err_msg = workflow_holder.get("validation_error", "Unknown validation error.")
+                        yield {"type": "trace", "content": f"[finalize_workflow] Validation FAILED: {err_msg}"}
                 else:
                     yield {"type": "trace", "content": f"[tools_node] Tool '{tool_name}' executed successfully."}
 
@@ -397,34 +457,6 @@ def run_workflow_agent_stream(
                     "name": tool_name,
                     "content": tool_content,
                 }
-
-        elif "verifier" in chunk:
-            node_data = chunk["verifier"]
-            
-            proposed = workflow_holder.get("proposed")
-            if proposed:
-                yield {"type": "trace", "content": f"[verifier_node] Validating proposed workflow '{proposed.get('name')}'..."}
-            else:
-                yield {"type": "trace", "content": "[verifier_node] No proposed workflow staged. Skipping validation."}
-
-            # Yield verifier thoughts/warnings to the chat
-            for msg in node_data.get("messages", []):
-                content = getattr(msg, "content", None)
-                if isinstance(content, str) and content.strip():
-                    yield {"type": "thought", "content": content}
-
-            # If verifier approved, yield the React Flow data for the canvas
-            if node_data.get("is_valid") and node_data.get("workflow"):
-                wf = node_data["workflow"]
-                yield {"type": "trace", "content": f"[verifier_node] Validation SUCCESS. Committing workflow '{wf.get('name')}' to active state."}
-                if "nodes" in wf and "edges" in wf:
-                    yield {
-                        "type": "workflow",
-                        "nodes": wf["nodes"],
-                        "edges": wf["edges"],
-                    }
-            elif not node_data.get("is_valid") and node_data.get("validation_error"):
-                yield {"type": "trace", "content": f"[verifier_node] Validation FAILED: {node_data.get('validation_error')}"}
 
     print("[run_workflow_agent_stream] Stream complete.", flush=True)
     yield {"type": "final_answer", "content": final_text or "Done."}
