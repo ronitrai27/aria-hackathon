@@ -71,11 +71,11 @@ const AI_MODELS = [
 
 const recipes = [
   {
-    title: "AI Model Research & Email",
+    title: " Research & Automation",
     description:
-      "Research OpenAI's latest models, create DOCX report, send to email",
+      "Research OpenAI's latest models, create google doc report, send to email",
     prompt:
-      "research about open ai latest models , create docx , send to email",
+      "Create a flow to research about open ai latest models using ai and then create googledoc and send email to me",
     icon: FileText,
     colorClass: "text-indigo-500",
     bgClass:
@@ -85,16 +85,19 @@ const recipes = [
   {
     title: "Carbon Footprint Syndication",
     description: "Research about carbon footprints -> post to slack and reddit",
-    prompt: "research about carbon footprints -> post to slack and reddit.",
+    prompt:
+      "Create a flow to research about carbon footprints using ai and then create google doc and post in slack channel , where channel name i will add myself.",
     icon: Share2,
     colorClass: "text-rose-500",
     bgClass: "bg-rose-500/10 group-hover:bg-rose-500/20 border-rose-500/20",
     apps: ["Slack", "Reddit"],
   },
   {
-    title: "Asana & Slack Sync",
-    description: "When task is done -> update in asana -> message in slack",
-    prompt: "when task is done -> update in asana -> message in slack.",
+    title: "Todoist",
+    description:
+      "Create some random tasks in Todoist and message me same in slack",
+    prompt:
+      "Create a flow to create some random tasks in Todoist and then message me same in slack channel.",
     icon: Workflow,
     colorClass: "text-emerald-500",
     bgClass:
@@ -121,11 +124,11 @@ const recipes = [
     apps: ["Linear", "Gmail", "Slack"],
   },
   {
-    title: "Monthly Activity Summary",
+    title: "AI at its Peak",
     description:
-      "Summarize about my last 1 month activity -> create doc -> email.",
+      "Fetch my latest upcoming calendar events and then emails , extract important data using ai and send to slack channel.",
     prompt:
-      "summarize about my last 1 month activity - create doc -> google doc - email.",
+      "create a flow to Fetch my latest upcoming calendar events and then emails , extract important data using ai and send to slack channel.",
     icon: FileText,
     colorClass: "text-purple-500",
     bgClass:

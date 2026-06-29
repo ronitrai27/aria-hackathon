@@ -4,8 +4,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Play } from "lucide-react";
 import { Meteors } from "@/components/ui/meteors";
+import { useUser } from "@clerk/nextjs";
 
 export default function Hero() {
+  const { isLoaded, isSignedIn } = useUser();
+  
   return (
     <section className="relative min-h-screen flex flex-col bg-white">
       {/* Micro-animations stylesheet */}
@@ -65,27 +68,40 @@ export default function Hero() {
 
           {/* Heading */}
           <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold capitalize tracking-tight text-white max-w-4xl leading-[1.08] mb-10">
-            Agent that knows you <br className="hidden sm:inline" />
-            better than your EX !!
+            The AI That Gets You <br className="hidden sm:inline" />
+            Across The Finish Line.
           </h1>
 
           {/* Subheading */}
           <p className="text-slate-200 text-sm sm:text-base md:text-lg max-w-xl leading-relaxed mb-16 md:mb-20">
-            Trained on your life, not the internet.
+            It prioritizes, schedules, reminds, follows up, and adapts
+            automatically as your day changes.
           </p>
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto">
             {/* Primary CTA */}
-            <Link
-              href="#book"
-              className="group flex items-center justify-between w-full sm:w-auto gap-4 pl-6 pr-2 py-2 rounded-full text-[13px] font-semibold text-black bg-white hover:bg-neutral-100 transition-all duration-300 shadow-[0_0_30px_rgba(255,255,255,0.1)]"
-            >
-              <span>Book a strategy call</span>
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-neutral-900 text-white group-hover:bg-black transition-colors duration-200">
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform duration-200" />
-              </div>
-            </Link>
+            {isLoaded && isSignedIn ? (
+              <Link
+                href="/home"
+                className="group flex items-center justify-between w-full sm:w-auto gap-4 pl-6 pr-2 py-2 rounded-full text-[13px] font-semibold text-black bg-white hover:bg-neutral-100 transition-all duration-300 shadow-[0_0_30px_rgba(255,255,255,0.1)]"
+              >
+                <span>Visit dashboard</span>
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-neutral-900 text-white group-hover:bg-black transition-colors duration-200">
+                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform duration-200" />
+                </div>
+              </Link>
+            ) : (
+              <Link
+                href="/sign-up"
+                className="group flex items-center justify-between w-full sm:w-auto gap-4 pl-6 pr-2 py-2 rounded-full text-[13px] font-semibold text-black bg-white hover:bg-neutral-100 transition-all duration-300 shadow-[0_0_30px_rgba(255,255,255,0.1)]"
+              >
+                <span>Sign up now</span>
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-neutral-900 text-white group-hover:bg-black transition-colors duration-200">
+                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform duration-200" />
+                </div>
+              </Link>
+            )}
 
             {/* Secondary CTA */}
             <Link
