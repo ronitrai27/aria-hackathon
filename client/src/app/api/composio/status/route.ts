@@ -12,6 +12,9 @@ const SLUG_MAP: Record<string, string> = {
   linkedin: "linkedin",
   typeform: "typeform",
   youtube: "youtube",
+  calendly: "calendly",
+  airtable: "airtable",
+  discord: "discord",
 };
 
 function toComposioSlug(appName: string): string {
@@ -39,7 +42,9 @@ const DISPLAY_NAME_MAP: Record<string, string> = {
   notion: "Notion",
   outlook: "Outlook",
   typeform: "Typeform",
-  ashby: "Ashby",
+  calendly: "Calendly",
+  airtable: "Airtable",
+  discord: "Discord",
   youtube: "YouTube",
 };
 

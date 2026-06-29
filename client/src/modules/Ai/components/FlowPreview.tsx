@@ -71,11 +71,11 @@ const AI_MODELS = [
 
 const recipes = [
   {
-    title: " Research & Automation",
+    title: "AI Research & Email",
     description:
-      "Research OpenAI's latest models, create google doc report, send to email",
+      "Research OpenAI's latest models using AI, create a Google Doc report, and send it to email",
     prompt:
-      "Create a flow to research about open ai latest models using ai and then create googledoc and send email to me",
+      "Create a flow to research about open ai latest models using ai node and then create google doc and send email to me",
     icon: FileText,
     colorClass: "text-indigo-500",
     bgClass:
@@ -83,57 +83,61 @@ const recipes = [
     apps: ["Google Docs", "Gmail"],
   },
   {
-    title: "Carbon Footprint Syndication",
-    description: "Research about carbon footprints -> post to slack and reddit",
-    prompt:
-      "Create a flow to research about carbon footprints using ai and then create google doc and post in slack channel , where channel name i will add myself.",
-    icon: Share2,
-    colorClass: "text-rose-500",
-    bgClass: "bg-rose-500/10 group-hover:bg-rose-500/20 border-rose-500/20",
-    apps: ["Slack", "Reddit"],
-  },
-  {
-    title: "Todoist",
+    title: "Meeting Sync & Slack Alert",
     description:
-      "Create some random tasks in Todoist and message me same in slack",
+      "Create a Google Meet link in Google Calendar and post details to Slack",
     prompt:
-      "Create a flow to create some random tasks in Todoist and then message me same in slack channel.",
+      "Create a flow to schedule a meeting using google calendar and google meet, then send the meeting details to a slack channel",
     icon: Workflow,
     colorClass: "text-emerald-500",
     bgClass:
       "bg-emerald-500/10 group-hover:bg-emerald-500/20 border-emerald-500/20",
-    apps: ["Asana", "Slack"],
+    apps: ["Calendar", "Google Meet", "Slack"],
   },
   {
-    title: "Slack & Todoist Sync",
-    description: "When task completes -> update in slack -> update in todoist",
-    prompt: "Task x completes, update in slack, update in todoist",
-    icon: CheckCircle,
-    colorClass: "text-amber-500",
-    bgClass: "bg-amber-500/10 group-hover:bg-amber-500/20 border-amber-500/20",
-    apps: ["Slack", "Todoist"],
-  },
-  {
-    title: "Linear & Email Automation",
+    title: "Summarize Email with AI",
     description:
-      "Task x in-progress -> Linear update -> Email -> Message in Slack",
-    prompt: "task x in-progress -> linear update - email - message in slack",
-    icon: Sparkles,
-    colorClass: "text-blue-500",
-    bgClass: "bg-blue-500/10 group-hover:bg-blue-500/20 border-blue-500/20",
-    apps: ["Linear", "Gmail", "Slack"],
-  },
-  {
-    title: "AI at its Peak",
-    description:
-      "Fetch my latest upcoming calendar events and then emails , extract important data using ai and send to slack channel.",
+      "Fetch recent Gmail emails, summarize them using AI, and send to Slack",
     prompt:
-      "create a flow to Fetch my latest upcoming calendar events and then emails , extract important data using ai and send to slack channel.",
-    icon: FileText,
+      "Create a flow to get recent emails from gmail, use AI node to summarize them, and send the summary to my slack channel",
+    icon: Bot,
     colorClass: "text-purple-500",
     bgClass:
       "bg-purple-500/10 group-hover:bg-purple-500/20 border-purple-500/20",
-    apps: ["Google Docs", "Gmail"],
+    apps: ["Gmail", "Slack"],
+  },
+  {
+    title: "Linear Task to Discord",
+    description:
+      "Post a Discord notification whenever a new task is created in Linear",
+    prompt:
+      "Create a flow to check for new linear tasks and post a notification in discord channel",
+    icon: Sparkles,
+    colorClass: "text-blue-500",
+    bgClass: "bg-blue-500/10 group-hover:bg-blue-500/20 border-blue-500/20",
+    apps: ["Linear", "Discord"],
+  },
+  {
+    title: "Daily Agenda Digest",
+    description:
+      "Get today's Calendar events, use AI to create a summary, and email it",
+    prompt:
+      "Create a flow to fetch today's calendar events, summarize the agenda using AI node, and send an email update via gmail",
+    icon: CheckCircle,
+    colorClass: "text-amber-500",
+    bgClass: "bg-amber-500/10 group-hover:bg-amber-500/20 border-amber-500/20",
+    apps: ["Calendar", "Gmail"],
+  },
+  {
+    title: "Slack Q&A Logger",
+    description:
+      "Monitor questions in Slack, draft answers using AI, and append to Google Docs",
+    prompt:
+      "Create a flow to monitor slack messages, use AI node to write answers, and append them to a google doc",
+    icon: FileText,
+    colorClass: "text-rose-500",
+    bgClass: "bg-rose-500/10 group-hover:bg-rose-500/20 border-rose-500/20",
+    apps: ["Slack", "Google Docs"],
   },
 ];
 
@@ -165,7 +169,12 @@ const getAppIcon = (slug: string): string => {
     return connectorIcons["Outlook"] || "/logo.svg";
   if (lower.includes("typeform"))
     return connectorIcons["Typeform"] || "/logo.svg";
-  if (lower.includes("ashby")) return connectorIcons["Ashby"] || "/logo.svg";
+  if (lower.includes("calendly"))
+    return connectorIcons["Calendly"] || "/logo.svg";
+  if (lower.includes("airtable"))
+    return connectorIcons["Airtable"] || "/logo.svg";
+  if (lower.includes("discord"))
+    return connectorIcons["Discord"] || "/logo.svg";
   if (lower.includes("youtube"))
     return connectorIcons["YouTube"] || "/logo.svg";
   if (lower.includes("docs") || lower.includes("google_doc"))
@@ -233,7 +242,7 @@ function AINodePopover({
   const aiConfig = data.ai_config || {};
   const [prompt, setPrompt] = useState<string>(aiConfig.prompt || "");
   const [provider, setProvider] = useState<"claude" | "openai" | "gemini">(
-    "openai",
+    "gemini",
   );
   const [citations, setCitations] = useState<boolean>(
     aiConfig.citations !== undefined ? aiConfig.citations : false,
@@ -378,9 +387,7 @@ function AINodePopover({
                         <span className="text-xs font-bold text-neutral-800">
                           Claude
                         </span>
-                        <p className="text-[9px] text-neutral-400">
-                          Sonnet 4.5
-                        </p>
+                        <p className="text-[10px] ">Sonnet 4.5</p>
                       </div>
                     </div>
                     <div className="text-neutral-400">
@@ -409,7 +416,7 @@ function AINodePopover({
                         <span className="text-xs font-bold text-neutral-800">
                           OpenAI
                         </span>
-                        <p className="text-[9px] text-neutral-400">GPT-4o</p>
+                        <p className="text-[10px]">GPT-4o</p>
                       </div>
                     </div>
                     <div
@@ -425,10 +432,14 @@ function AINodePopover({
                     </div>
                   </div>
 
-                  {/* Gemini 3 Pro (Locked) */}
+                  {/* Gemini (Active) */}
                   <div
-                    className="border border-neutral-200 bg-neutral-50 rounded-sm p-3 flex items-center justify-between cursor-not-allowed select-none transition-all"
-                    title="Gemini 3 Pro is locked"
+                    onClick={() => setProvider("gemini")}
+                    className={`border rounded-sm p-3 flex items-center justify-between cursor-pointer transition-all ${
+                      provider === "gemini"
+                        ? "border-blue-500 bg-blue-50/30 ring-2 ring-blue-500/10"
+                        : "border-neutral-200 hover:bg-neutral-50 bg-white"
+                    }`}
                   >
                     <div className="flex items-center gap-2.5">
                       <Image
@@ -442,11 +453,19 @@ function AINodePopover({
                         <span className="text-xs font-bold text-neutral-800">
                           Gemini
                         </span>
-                        <p className="text-[9px] text-neutral-400">3-Pro</p>
+                        <p className="text-[10px] ">3-Pro</p>
                       </div>
                     </div>
-                    <div className="text-neutral-400">
-                      <Lock className="h-3.5 w-3.5" />
+                    <div
+                      className={`h-4 w-4 rounded-full border flex items-center justify-center ${
+                        provider === "gemini"
+                          ? "border-blue-500 bg-blue-500"
+                          : "border-neutral-300"
+                      }`}
+                    >
+                      {provider === "gemini" && (
+                        <Check className="h-2.5 w-2.5 text-white stroke-[3px]" />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2072,10 +2091,24 @@ export default function FlowPreview({
                 onClick={() => onSelectSuggestion?.(recipe.prompt, recipe.apps)}
                 className="flex items-center text-left p-3 rounded-md border border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-sm transition-all duration-200 group cursor-pointer w-full"
               >
-                <div
-                  className={`p-2 rounded-lg border ${recipe.bgClass} mr-3 transition-colors duration-200 shrink-0`}
-                >
-                  <recipe.icon className={`h-4 w-4 ${recipe.colorClass}`} />
+                <div className="flex items-center -space-x-2 mr-3 shrink-0">
+                  {recipe.apps.map((app) => {
+                    const iconUrl = connectorIcons[app] || "/logo.svg";
+                    return (
+                      <div
+                        key={app}
+                        className="h-8 w-8 rounded-lg border border-neutral-200 bg-white p-1.5 flex items-center justify-center shadow-xs"
+                      >
+                        <Image
+                          src={iconUrl}
+                          alt={app}
+                          width={20}
+                          height={20}
+                          className="object-contain"
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
                 <div className="flex-1 min-w-0 pr-2">
                   <h4 className="font-semibold text-xs text-neutral-800 group-hover:text-neutral-900 truncate">

@@ -13,6 +13,9 @@ const SLUG_MAP: Record<string, string> = {
   linkedin: "linkedin",
   typeform: "typeform",
   youtube: "youtube",
+  calendly: "calendly",
+  airtable: "airtable",
+  discord: "discord",
 };
 
 export function toComposioSlug(appName: string): string {
