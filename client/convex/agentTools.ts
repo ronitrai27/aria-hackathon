@@ -142,9 +142,9 @@ export const createTasks = mutation({
         priority: v.optional(
           v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
         ),
-        // Unix timestamps in milliseconds
-        startDate: v.number(),
-        endDate: v.number(),
+        // Unix timestamps in milliseconds (optional, falls back if missing)
+        startDate: v.optional(v.number()),
+        endDate: v.optional(v.number()),
       }),
     ),
   },
@@ -177,6 +177,10 @@ export const createTasks = mutation({
     }[] = [];
 
     for (const task of batch) {
+      const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+      const sDate = task.startDate !== undefined ? task.startDate : (task.endDate !== undefined ? task.endDate - 2 * ONE_DAY_MS : now);
+      const eDate = task.endDate !== undefined ? task.endDate : (task.startDate !== undefined ? task.startDate + 2 * ONE_DAY_MS : now + 2 * ONE_DAY_MS);
+
       // Check duplicate using both IDs
       const existingConvex = await ctx.db
         .query("tasks")
@@ -206,8 +210,8 @@ export const createTasks = mutation({
         status: "not-started",
         priority: task.priority ?? "medium",
         estimation: {
-          startDate: task.startDate,
-          endDate: task.endDate,
+          startDate: sDate,
+          endDate: eDate,
         },
         aiGenerated: true,
         createdAt: now,

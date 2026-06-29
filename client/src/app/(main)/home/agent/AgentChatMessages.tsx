@@ -312,6 +312,15 @@ export default function AgentChatMessages({
   const [isOpen, setIsOpen] = useState(true);
 
   const steps = parseBrainLogs(activeTraceLogs);
+  const uploadStep = activeSteps?.find((s) => s.worker === "upload_worker");
+  if (uploadStep) {
+    steps.unshift({
+      id: "upload_worker",
+      label: "Document Processing",
+      status: uploadStep.status as any,
+      details: uploadStep.message,
+    });
+  }
 
   useEffect(() => {
     if (!isGenerating) {
@@ -376,7 +385,7 @@ export default function AgentChatMessages({
 
 
       {/* HITL Task Confirmation Panel */}
-      {pendingTasks && pendingTasks.length > 0 && pendingTasksStatus === "pending" && (
+      {pendingTasks && pendingTasks.length > 0 && pendingTasksStatus && (
         <div className="flex gap-3.5 w-full justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="h-8 w-8 rounded-lg bg-linear-to-tr from-blue-600 via-purple-500 to-red-500 p-0.5 shadow-md flex items-center justify-center shrink-0">
             <svg
