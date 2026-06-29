@@ -396,27 +396,70 @@ export default function AgentPage() {
   }
 
   function resolvePromptTemplate(prompt: string, allNodes: any[]): string {
-    return prompt.replace(/\{\{step[_\s](\d+)\}\}/g, (match, stepNumStr) => {
-      const stepIdx = parseInt(stepNumStr, 10) - 1;
-      if (stepIdx >= 0 && stepIdx < allNodes.length) {
-        const targetNode = allNodes[stepIdx];
-        const trace = targetNode.data?.traceResult;
-        if (trace) {
-          if (typeof trace === "string") return trace;
-          if (trace.result)
-            return typeof trace.result === "string"
-              ? trace.result
-              : JSON.stringify(trace.result);
-          if (trace.data)
-            return typeof trace.data === "string"
-              ? trace.data
-              : JSON.stringify(trace.data);
-          return JSON.stringify(trace);
+    const hasTrigger = allNodes[0]?.type === "task_trigger";
+    return prompt.replace(
+      /\{{1,2}step[_\s](\d+)(?:\.([a-zA-Z0-9_\.]+))?\}{1,2}/g,
+      (match, stepNumStr, path) => {
+        const stepNum = parseInt(stepNumStr, 10);
+        const stepIdx = hasTrigger ? stepNum : stepNum - 1;
+        if (stepIdx >= 0 && stepIdx < allNodes.length) {
+          const targetNode = allNodes[stepIdx];
+          const trace = targetNode.data?.traceResult;
+          if (trace) {
+            if (path) {
+              const parts = path.split(".");
+              const checkObjects = [trace, trace.data, trace.result].filter(
+                Boolean,
+              );
+              for (const obj of checkObjects) {
+                let current = obj;
+                let found = true;
+                for (const part of parts) {
+                  if (
+                    current &&
+                    typeof current === "object" &&
+                    part in current
+                  ) {
+                    current = current[part];
+                  } else {
+                    found = false;
+                    break;
+                  }
+                }
+                if (found && current !== undefined) {
+                  return typeof current === "string"
+                    ? current
+                    : JSON.stringify(current);
+                }
+              }
+              // Fallback for document_url/url -> display_url/url
+              if (path.includes("document_url") || path.includes("url")) {
+                for (const obj of checkObjects) {
+                  if (obj && typeof obj === "object") {
+                    if (obj.display_url) return String(obj.display_url);
+                    if (obj.url) return String(obj.url);
+                  }
+                }
+              }
+              return `[Path ${path} not found in Step ${stepNumStr}]`;
+            }
+
+            if (typeof trace === "string") return trace;
+            if (trace.result)
+              return typeof trace.result === "string"
+                ? trace.result
+                : JSON.stringify(trace.result);
+            if (trace.data)
+              return typeof trace.data === "string"
+                ? trace.data
+                : JSON.stringify(trace.data);
+            return JSON.stringify(trace);
+          }
+          return `[Step ${stepNumStr} output not available]`;
         }
-        return `[Step ${stepNumStr} output not available]`;
-      }
-      return match;
-    });
+        return match;
+      },
+    );
   }
 
   // Auto-save debounced effect

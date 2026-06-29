@@ -19,6 +19,7 @@ import {
   Eye,
   FileText,
   Loader2,
+  Lock,
   RefreshCw,
   Settings,
   Settings2,
@@ -228,9 +229,8 @@ function AINodePopover({
 }) {
   const aiConfig = data.ai_config || {};
   const [prompt, setPrompt] = useState<string>(aiConfig.prompt || "");
-  const [provider, setProvider] = useState<"claude" | "openai">(
-    aiConfig.provider ||
-      (aiConfig.model?.includes("gpt") ? "openai" : "claude"),
+  const [provider, setProvider] = useState<"claude" | "openai" | "gemini">(
+    "openai",
   );
   const [citations, setCitations] = useState<boolean>(
     aiConfig.citations !== undefined ? aiConfig.citations : false,
@@ -249,7 +249,12 @@ function AINodePopover({
           ...aiConfig,
           prompt,
           provider,
-          model: provider === "claude" ? "claude-sonnet-4-5" : "gpt-4o",
+          model:
+            provider === "claude"
+              ? "claude-sonnet-4-5"
+              : provider === "gemini"
+                ? "gemini-2.0-flash"
+                : "gpt-4o",
           citations,
           format,
           extra_instructions: extra,
@@ -260,10 +265,10 @@ function AINodePopover({
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/45 backdrop-blur-[4px]">
-      <div className="bg-white border border-neutral-200 rounded-3xl shadow-xl w-[920px] max-w-[95vw] h-[600px] max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50! flex items-center justify-center bg-black/40 backdrop-blur-[4px]">
+      <div className="bg-white border border-neutral-200 rounded-xl shadow-xl w-[920px] max-w-[95vw] h-[600px] max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
+        <div className="flex items-center justify-between px-6 py-3 border-b border-neutral-400 bg-neutral-100">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center">
               <Image
@@ -278,7 +283,7 @@ function AINodePopover({
               <h3 className="font-semibold text-sm text-neutral-900">
                 Write with AI
               </h3>
-              <p className="text-[11px] text-neutral-400 mt-0.5">
+              <p className="text-[11px] text-neutral-800 mt-0.5">
                 AI Node Configuration
               </p>
             </div>
@@ -299,7 +304,7 @@ function AINodePopover({
             <div className="space-y-4">
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="block text-xs font-bold text-neutral-800">
+                  <label className="block text-sm font-semibold text-neutral-800">
                     Prompt
                   </label>
                   {!prompt.trim() && (
@@ -308,15 +313,9 @@ function AINodePopover({
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-neutral-500 mb-2 leading-normal font-medium">
-                  Give the model detailed instructions. Insert relevant data for
-                  context.{" "}
-                  <span className="text-blue-600 hover:underline cursor-pointer">
-                    See examples
-                  </span>
-                </p>
+
                 <div
-                  className={`border rounded-xl bg-neutral-50/50 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all ${
+                  className={`border border-neutral-400 rounded-lg bg-white focus-within:ring-2 focus-within:ring-blue-500/20 transition-all ${
                     !prompt.trim()
                       ? "border-red-300 focus-within:border-red-400"
                       : "border-neutral-200 focus-within:border-blue-400"
@@ -327,10 +326,10 @@ function AINodePopover({
                     onChange={(e) => setPrompt(e.target.value)}
                     rows={8}
                     placeholder="Write about that mail..."
-                    className="w-full bg-transparent px-4 py-3 text-sm text-neutral-800 placeholder:text-neutral-400 resize-none outline-none leading-relaxed"
+                    className="w-full bg-transparent px-4 py-3 text-sm text-neutral-800 placeholder:text-neutral-400  resize-none outline-none leading-relaxed"
                   />
                   {/* Pills under textarea */}
-                  <div className="px-3 pb-2.5 flex items-center gap-1.5 border-t border-neutral-400 pt-2 bg-neutral-100 rounded-b-xl">
+                  <div className="px-3 pb-2.5 flex items-center gap-1.5 border-t border-neutral-400 pt-2 bg-neutral-200 rounded-b-lg">
                     <button
                       type="button"
                       className="px-2 py-1 text-[10px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 rounded-md flex items-center gap-1 cursor-pointer transition-colors"
@@ -358,14 +357,11 @@ function AINodePopover({
                 <label className="block text-xs font-bold text-neutral-800 mb-2">
                   Choose Provider
                 </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
+                  {/* Claude (Locked) */}
                   <div
-                    onClick={() => setProvider("claude")}
-                    className={`border rounded-xl p-3 flex items-center justify-between cursor-pointer transition-all ${
-                      provider === "claude"
-                        ? "border-blue-500 bg-blue-50/30 ring-2 ring-blue-500/10"
-                        : "border-neutral-200 hover:bg-neutral-50 bg-white"
-                    }`}
+                    className="border border-neutral-200 bg-neutral-50 rounded-sm p-3 flex items-center justify-between cursor-not-allowed select-none transition-all"
+                    title="Claude is locked"
                   >
                     <div className="flex items-center gap-2.5">
                       <Image
@@ -373,7 +369,7 @@ function AINodePopover({
                         alt="Claude"
                         width={20}
                         height={20}
-                        className="object-contain rounded"
+                        className="object-contain"
                       />
                       <div>
                         <span className="text-xs font-bold text-neutral-800">
@@ -384,22 +380,15 @@ function AINodePopover({
                         </p>
                       </div>
                     </div>
-                    <div
-                      className={`h-4 w-4 rounded-full border flex items-center justify-center ${
-                        provider === "claude"
-                          ? "border-blue-500 bg-blue-500"
-                          : "border-neutral-300"
-                      }`}
-                    >
-                      {provider === "claude" && (
-                        <Check className="h-2.5 w-2.5 text-white stroke-[3px]" />
-                      )}
+                    <div className="text-neutral-400">
+                      <Lock className="h-3.5 w-3.5" />
                     </div>
                   </div>
 
+                  {/* OpenAI (Active, selected by default) */}
                   <div
                     onClick={() => setProvider("openai")}
-                    className={`border rounded-xl p-3 flex items-center justify-between cursor-pointer transition-all ${
+                    className={`border rounded-sm p-3 flex items-center justify-between cursor-pointer transition-all ${
                       provider === "openai"
                         ? "border-blue-500 bg-blue-50/30 ring-2 ring-blue-500/10"
                         : "border-neutral-200 hover:bg-neutral-50 bg-white"
@@ -430,6 +419,31 @@ function AINodePopover({
                       {provider === "openai" && (
                         <Check className="h-2.5 w-2.5 text-white stroke-[3px]" />
                       )}
+                    </div>
+                  </div>
+
+                  {/* Gemini 3 Pro (Locked) */}
+                  <div
+                    className="border border-neutral-200 bg-neutral-50 rounded-sm p-3 flex items-center justify-between cursor-not-allowed select-none transition-all"
+                    title="Gemini 3 Pro is locked"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Image
+                        src="/gemini-color.svg"
+                        alt="Gemini 3 Pro"
+                        width={20}
+                        height={20}
+                        className="object-contain"
+                      />
+                      <div>
+                        <span className="text-xs font-bold text-neutral-800">
+                          Gemini
+                        </span>
+                        <p className="text-[9px] text-neutral-400">3-Pro</p>
+                      </div>
+                    </div>
+                    <div className="text-neutral-400">
+                      <Lock className="h-3.5 w-3.5" />
                     </div>
                   </div>
                 </div>

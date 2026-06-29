@@ -3,8 +3,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 
 const customOpenai = createOpenAI({
-  // apiKey: process.env.OPENAI_API_KEY,
-  apiKey: "sk",
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 const model = customOpenai("gpt-4.1-nano");

@@ -1,9 +1,36 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, RefreshCw, AlertCircle } from "lucide-react";
 import ChatMessageItem, {
   StatusStepper,
   TraceLogsViewer,
 } from "../../../../modules/Ai/components/ChatMessage";
+
+const priorityBars: Record<string, React.ReactNode> = {
+  low: (
+    <div className="flex items-end gap-px h-3 mb-0.5">
+      <div className="w-[4px] h-5 bg-yellow-500 rounded-[1px]" />
+      <div className="w-[4px] h-4 bg-neutral-400 rounded-[1px]" />
+      <div className="w-[4px] h-3 bg-neutral-400 rounded-[1px]" />
+      <div className="w-[4px] h-[8px] bg-neutral-400 rounded-[1px]" />
+    </div>
+  ),
+  medium: (
+    <div className="flex items-end gap-px h-3 mb-0.5">
+      <div className="w-[4px] h-5 bg-green-500 rounded-[1px]" />
+      <div className="w-[4px] h-4 bg-green-500 rounded-[1px]" />
+      <div className="w-[4px] h-3 bg-neutral-400 rounded-[1px]" />
+      <div className="w-[4px] h-[8px] bg-neutral-400 rounded-[1px]" />
+    </div>
+  ),
+  high: (
+    <div className="flex items-end gap-px h-3 mb-0.5">
+      <div className="w-[4px] h-5 bg-red-500 rounded-[1px]" />
+      <div className="w-[4px] h-4 bg-red-500 rounded-[1px]" />
+      <div className="w-[4px] h-3 bg-red-500 rounded-[1px]" />
+      <div className="w-[4px] h-[8px] bg-neutral-400 rounded-[1px]" />
+    </div>
+  ),
+};
 
 interface AgentChatMessagesProps {
   messages: any[];
@@ -74,7 +101,10 @@ function parseBrainLogs(traceLogs: string[]) {
       log.includes("supervisor' started execution")
     ) {
       if (hasToolsRun) {
-        const finalSupervisor = getStep("supervisor_final", "Aria Brain Supervisor (Analyzing Results)");
+        const finalSupervisor = getStep(
+          "supervisor_final",
+          "Aria Brain Supervisor (Analyzing Results)",
+        );
         finalSupervisor.status = "running";
         finalSupervisor.details = "Reasoning...";
       } else {
@@ -337,15 +367,25 @@ export default function AgentChatMessages({
     if (
       messages.length > 0 ||
       isGenerating ||
-      (pendingTasks && pendingTasks.length > 0 && pendingTasksStatus === "pending")
+      (pendingTasks &&
+        pendingTasks.length > 0 &&
+        pendingTasksStatus === "pending")
     ) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, isGenerating, activeSteps, activeTraceLogs, pendingTasks, pendingTasksStatus]);
+  }, [
+    messages,
+    isGenerating,
+    activeSteps,
+    activeTraceLogs,
+    pendingTasks,
+    pendingTasksStatus,
+  ]);
 
   useEffect(() => {
     if (stepsContainerRef.current) {
-      stepsContainerRef.current.scrollTop = stepsContainerRef.current.scrollHeight;
+      stepsContainerRef.current.scrollTop =
+        stepsContainerRef.current.scrollHeight;
     }
   }, [steps.length, isOpen]);
 
@@ -382,24 +422,11 @@ export default function AgentChatMessages({
         <ChatMessageItem key={idx} message={msg} />
       ))}
 
-
-
       {/* HITL Task Confirmation Panel */}
       {pendingTasks && pendingTasks.length > 0 && pendingTasksStatus && (
-        <div className="flex gap-3.5 w-full justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <div className="h-8 w-8 rounded-lg bg-linear-to-tr from-blue-600 via-purple-500 to-red-500 p-0.5 shadow-md flex items-center justify-center shrink-0">
-            <svg
-              fill="currentColor"
-              viewBox="0 0 36 48"
-              className="w-4 h-5 text-white"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <title>Aria Avatar</title>
-              <path d="m0 6c10.1433 9.4404 25.8567 9.4404 36 0-9.4404 10.1433-9.4404 25.8567 0 36-10.1433-9.4404-25.8567-9.4404-36 0 9.44041-10.1433 9.44041-25.8567 0-36z" />
-            </svg>
-          </div>
-          <div className="flex flex-col gap-1 w-full max-w-[82%]">
-            <div className="p-5 bg-neutral-50 dark:bg-zinc-950 rounded-sm border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-4 w-full">
+        <div className="flex w-full justify-center animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="flex flex-col gap-1 w-full max-w-lg">
+            <div className="p-4 bg-neutral-50 dark:bg-zinc-950 rounded-sm border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3.5 w-full">
               {pendingTasksStatus === "approved" ? (
                 <div className="flex items-center gap-2 pb-2 border-b border-zinc-200 dark:border-zinc-800">
                   <div className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -423,29 +450,17 @@ export default function AgentChatMessages({
                 </div>
               )}
 
-              <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
                 {pendingTasks.map((t: any, idx: number) => (
                   <div
                     key={idx}
-                    className="p-3 bg-white dark:bg-zinc-900 rounded-sm border border-zinc-200 dark:border-zinc-800 flex flex-col gap-1 shadow-xs"
+                    className="p-2.5 bg-white dark:bg-zinc-900 rounded-sm border border-zinc-200 dark:border-zinc-800 flex flex-col gap-1 shadow-xs"
                   >
                     <div className="flex justify-between items-center">
                       <span className="text-[12px] font-semibold text-zinc-800 dark:text-zinc-200">
                         {t.title}
                       </span>
-                      {t.priority && (
-                        <span
-                          className={`text-[8px] px-1.5 py-0.5 rounded font-bold tracking-wider uppercase ${
-                            t.priority === "high"
-                              ? "bg-red-500/10 text-red-500 border border-red-500/20"
-                              : t.priority === "medium"
-                                ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
-                                : "bg-zinc-500/10 text-zinc-500 border border-zinc-500/20"
-                          }`}
-                        >
-                          {t.priority}
-                        </span>
-                      )}
+                      {t.priority && priorityBars[t.priority.toLowerCase()]}
                     </div>
                     {t.description && (
                       <span className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
@@ -493,7 +508,8 @@ export default function AgentChatMessages({
           (s: any) => s.status === "running" && s.worker !== "brain_supervisor",
         );
 
-        const showLoader = isGenerating && activeSteps.length > 0 && !isStreamingResponse;
+        const showLoader =
+          isGenerating && activeSteps.length > 0 && !isStreamingResponse;
         if (showLoader) {
           // Conditional styling for Brain Mode Loader
           if (isBrainMode) {
@@ -541,7 +557,7 @@ export default function AgentChatMessages({
 
                     {/* Inline sub-agent steps */}
                     {isOpen && (
-                      <div 
+                      <div
                         ref={stepsContainerRef}
                         className="mt-4 space-y-4 border-l border-zinc-200 dark:border-zinc-800 pl-4 py-1 max-h-60 overflow-y-auto pr-1 animate-in slide-in-from-top-2 duration-200"
                       >

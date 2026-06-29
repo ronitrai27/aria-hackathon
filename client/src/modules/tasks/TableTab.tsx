@@ -85,17 +85,17 @@ const priorityBars: Record<string, React.ReactNode> = {
   low: (
     <div className="flex items-end gap-px h-3 mb-0.5">
       <div className="w-[4px] h-5 bg-yellow-500 rounded-[1px]" />
-      <div className="w-[4px] h-4 dark:bg-neutral-400 bg-accent rounded-[1px]" />
-      <div className="w-[4px] h-3 dark:bg-neutral-400 bg-accent rounded-[1px]" />
-      <div className="w-[4px] h-[8px] dark:bg-neutral-400 bg-accent rounded-[1px]" />
+      <div className="w-[4px] h-4 bg-neutral-400  rounded-[1px]" />
+      <div className="w-[4px] h-3 bg-neutral-400 rounded-[1px]" />
+      <div className="w-[4px] h-[8px] bg-neutral-400 rounded-[1px]" />
     </div>
   ),
   medium: (
     <div className="flex items-end gap-px h-3 mb-0.5">
       <div className="w-[4px] h-5 bg-green-500 rounded-[1px]" />
       <div className="w-[4px] h-4 bg-green-500 rounded-[1px]" />
-      <div className="w-[4px] h-3 dark:bg-neutral-400 bg-accent rounded-[1px]" />
-      <div className="w-[4px] h-[8px] dark:bg-neutral-400 bg-accent rounded-[1px]" />
+      <div className="w-[4px] h-3 bg-neutral-400  rounded-[1px]" />
+      <div className="w-[4px] h-[8px] bg-neutral-400 rounded-[1px]" />
     </div>
   ),
   high: (
@@ -103,7 +103,7 @@ const priorityBars: Record<string, React.ReactNode> = {
       <div className="w-[4px] h-5 bg-red-500 rounded-[1px]" />
       <div className="w-[4px] h-4 bg-red-500 rounded-[1px]" />
       <div className="w-[4px] h-3 bg-red-500 rounded-[1px]" />
-      <div className="w-[4px] h-[8px] dark:bg-neutral-400 bg-accent rounded-[1px]" />
+      <div className="w-[4px] h-[8px] bg-neutral-400  rounded-[1px]" />
     </div>
   ),
 };
