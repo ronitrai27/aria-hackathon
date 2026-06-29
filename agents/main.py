@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -90,6 +90,11 @@ def create_user_session(user_id: str):
     )
 
 
+class Attachment(BaseModel):
+    filename: str
+    content: str
+
+
 class ChatRequest(BaseModel):
     message: str
     thread_id: Optional[str] = None
@@ -98,6 +103,7 @@ class ChatRequest(BaseModel):
     user_id: Optional[str] = None
     userName: Optional[str] = None
     user_name: Optional[str] = None
+    attachment: Optional[Attachment] = None
 
 
 
@@ -321,6 +327,65 @@ def agent_chat_endpoint(body: ChatRequest, request: Request):
 BRAIN_STOP_FLAGS: Dict[str, threading.Event] = {}
 
 
+@app.post("/extract")
+def extract_document_content(file: UploadFile = File(...)):
+    """
+    In-flight document parsing using LlamaParse.
+    No permanent storage is used. Files are processed via /tmp and deleted immediately.
+    """
+    import tempfile
+    import os
+    from llama_parse import LlamaParse
+
+    api_key = os.getenv("LLAMA_CLOUD_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="LLAMA_CLOUD_API_KEY is not set in the environment variables."
+        )
+
+    # Enforce 2MB limit
+    MAX_SIZE = 2 * 1024 * 1024  # 2MB
+    try:
+        content = file.file.read()
+        if len(content) > MAX_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File exceeds maximum size limit of 2MB (got {len(content) / 1024 / 1024:.2f}MB)."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read file contents: {str(e)}")
+
+    suffix = Path(file.filename or "doc.pdf").suffix
+    tmp_path = None
+
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        print(f"[extract] Starting LlamaParse parsing for {file.filename} (size: {len(content)} bytes)...", flush=True)
+        parser = LlamaParse(api_key=api_key, result_type="markdown")
+        documents = parser.load_data(tmp_path)
+        extracted_text = "\n\n".join([doc.text for doc in documents])
+        print(f"[extract] Successfully parsed {file.filename}. Extracted {len(extracted_text)} chars.", flush=True)
+        
+        return {"text": extracted_text}
+
+    except Exception as e:
+        print(f"[extract] Error parsing file {file.filename}: {str(e)}", flush=True)
+        raise HTTPException(status_code=500, detail=f"LlamaParse extraction failed: {str(e)}")
+
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception as e:
+                print(f"[extract] Warning: failed to delete temp file {tmp_path}: {str(e)}", flush=True)
+
+
 class BrainApproveRequest(BaseModel):
     thread_id: str
     approved: bool
@@ -328,6 +393,7 @@ class BrainApproveRequest(BaseModel):
     user_id: Optional[str] = "default_user"
     userName: Optional[str] = "User"
     user_name: Optional[str] = "User"
+
 
 
 @app.post("/brain")
@@ -356,7 +422,16 @@ def brain_chat_endpoint(body: ChatRequest, request: Request):
             # Setup/retrieve chat history for this brain thread
             history = THREAD_HISTORY.setdefault(thread_id, [])
             if message:
-                history.append({"role": "user", "content": message})
+                if body.attachment:
+                    combined_message = (
+                        f"{message}\n\n"
+                        f"--- ATTACHED FILE CONTENT ({body.attachment.filename}) ---\n"
+                        f"{body.attachment.content}\n"
+                        f"--------------------------------------------------"
+                    )
+                else:
+                    combined_message = message
+                history.append({"role": "user", "content": combined_message})
 
             # 1. Initialize Redis checkpointer
             print(f"[brain_chat] Getting checkpointer for redis: {settings.redis_url}", flush=True)
@@ -365,8 +440,18 @@ def brain_chat_endpoint(body: ChatRequest, request: Request):
             # 2. Run graph stream generator
             async def run_generator():
                 final_answer = ""
+                if body.attachment:
+                    graph_message = (
+                        f"{message}\n\n"
+                        f"--- ATTACHED FILE CONTENT ({body.attachment.filename}) ---\n"
+                        f"{body.attachment.content}\n"
+                        f"--------------------------------------------------"
+                    )
+                else:
+                    graph_message = message
+
                 async for event in run_brain_agent_stream(
-                    message=message,
+                    message=graph_message,
                     user_id=uid,
                     user_name=uname,
                     thread_id=thread_id,

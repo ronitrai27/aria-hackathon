@@ -20,6 +20,8 @@ import {
   UserPlus,
   Workflow,
   X,
+  FileText,
+  Loader2,
 } from "lucide-react";
 import Image from "next/image";
 import type React from "react";
@@ -180,6 +182,8 @@ export default function AgentPage() {
   } = useBrainChat();
 
   const isBrainMode = activeMode === "brain";
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messages = isBrainMode ? brainMessages : agentMessages;
   const isGenerating = isBrainMode ? isBrainGenerating : isAgentGenerating;
   const activeTraceLogs = isBrainMode ? brainTraceLogs : agentTraceLogs;
@@ -1014,12 +1018,41 @@ export default function AgentPage() {
   const hasUnconnectedApps = unconnectedApps.length > 0;
   const hasNoAppsSelected = isAgentMode && selectedSuggestionApps.length === 0;
 
+  const handlePaperclipClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const MAX_SIZE = 2 * 1024 * 1024; // 2MB
+    if (file.size > MAX_SIZE) {
+      toast.error("File size exceeds the 2MB limit! Please upload a smaller document.", {
+        position: "top-center",
+      });
+      e.target.value = "";
+      return;
+    }
+
+    setSelectedFile(file);
+    e.target.value = "";
+  };
+
   const handleSend = async (
     overrideText?: string,
     skipWorkflowCheck = false,
   ) => {
     const textToSend = overrideText || inputVal;
-    if (!textToSend.trim()) return;
+    
+    if (!textToSend.trim()) {
+      if (isBrainMode && selectedFile) {
+        toast.error("Please add a description of what you want to do with the document!", {
+          position: "top-center",
+        });
+      }
+      return;
+    }
 
     if (isAgentMode) {
       if (selectedSuggestionApps.length === 0) {
@@ -1071,7 +1104,8 @@ export default function AgentPage() {
       sendAgentMessage(enriched, textToSend);
     } else {
       if (isBrainMode) {
-        sendBrainMessage(textToSend);
+        sendBrainMessage(textToSend, selectedFile);
+        setSelectedFile(null);
       } else {
         sendAgentMessage(textToSend);
       }
@@ -1379,7 +1413,15 @@ export default function AgentPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveMode("agent")}
+                    onClick={() => {
+                      if (selectedFile) {
+                        toast.error("Please remove or submit the attached document before switching to Agent mode!", {
+                          position: "top-center",
+                        });
+                        return;
+                      }
+                      setActiveMode("agent");
+                    }}
                     className={`px-4 py-1.5 text-xs font-semibold rounded-t-xl flex items-center gap-1.5 transition-all cursor-pointer select-none ${
                       activeMode === "agent"
                         ? "bg-linear-to-tr from-blue-600 via-purple-500 to-red-500 text-white shadow-sm"
@@ -1396,6 +1438,29 @@ export default function AgentPage() {
                     isNarrow ? "p-2.5" : "p-3"
                   }`}
                 >
+                  {isBrainMode && selectedFile && (
+                    <div className="flex items-center gap-2 bg-background/80 backdrop-blur-xs border border-border rounded-lg p-2 mb-2 w-fit max-w-full">
+                      <FileText className="h-4 w-4 text-blue-500 shrink-0" />
+                      <div className="flex min-w-0 flex-col">
+                        <span className="max-w-[200px] truncate text-xs font-medium text-foreground">
+                          {selectedFile.name}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {(selectedFile.size / 1024).toFixed(1)} KB
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setSelectedFile(null)}
+                        className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground shrink-0 cursor-pointer"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
+
                   <Textarea
                     ref={textareaRef}
                     placeholder={
@@ -1426,14 +1491,24 @@ export default function AgentPage() {
                     {/* Left attachment button */}
                     <div className="flex items-center gap-2">
                       {activeMode === "brain" && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg"
-                        >
-                          <Paperclip className="h-4 w-4" />
-                        </Button>
+                        <>
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            className="hidden"
+                            onChange={handleFileChange}
+                            accept=".pdf,.docx,.doc,.xls,.xlsx,.csv,.pptx,.ppt,.txt"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={handlePaperclipClick}
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg cursor-pointer"
+                          >
+                            <Paperclip className="h-4 w-4" />
+                          </Button>
+                        </>
                       )}
 
                       {activeMode === "agent" ? (

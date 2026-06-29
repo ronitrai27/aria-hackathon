@@ -478,7 +478,7 @@ export default function ChatMessageItem({ message }: ChatMessageItemProps) {
           }`}
         >
           {isUser ? (
-            <p className="text-[12.5px] leading-relaxed">{message.content}</p>
+            <p className="text-[12.5px] leading-relaxed whitespace-pre-wrap">{message.content}</p>
           ) : isMemoryUpdate ? (
             <MemoryUpdateCard content={message.content} />
           ) : (

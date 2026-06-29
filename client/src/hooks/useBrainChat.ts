@@ -371,17 +371,30 @@ export function useBrainChat() {
 
   // ── Send Message ────────────────────────────────────────────────────────────
   const sendMessage = useCallback(
-    async (textToSend: string) => {
+    async (textToSend: string, file: File | null = null) => {
       if (!textToSend.trim()) return;
 
       const startTime = Date.now();
-      const initialSteps = [
-        {
-          worker: "brain_supervisor",
-          status: "running",
-          message: "Aria is reasoning...",
-        },
-      ];
+      const initialSteps: Array<{ worker: string; status: string; message: string }> = file
+        ? [
+            {
+              worker: "upload_worker",
+              status: "running",
+              message: "Extracting from file...",
+            },
+            {
+              worker: "brain_supervisor",
+              status: "pending",
+              message: "Aria is reasoning...",
+            },
+          ]
+        : [
+            {
+              worker: "brain_supervisor",
+              status: "running",
+              message: "Aria is reasoning...",
+            },
+          ];
 
       // Add user message to state
       setMessages((prev) => [...prev, { role: "user", content: textToSend }]);
@@ -394,11 +407,54 @@ export function useBrainChat() {
       const convexUserId = user?._id || "";
       const clerkUserName = user?.name || "User";
 
-      console.log(
-        `[useBrainChat] Send message: "${textToSend}", Convex ID: "${convexUserId}", Username: "${clerkUserName}"`,
-      );
+      let attachment = undefined;
+      let updatedSteps: Array<{ worker: string; status: string; message: string }> = [...initialSteps];
 
       try {
+        if (file) {
+          // 1. Send file for extraction
+          const formData = new FormData();
+          formData.append("file", file);
+
+          const extractRes = await fetch("/api/extract", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!extractRes.ok) {
+            const errText = await extractRes.text();
+            let parsedError = "";
+            try {
+              parsedError = JSON.parse(errText).error;
+            } catch {
+              parsedError = errText;
+            }
+            throw new Error(parsedError || `Failed to extract file: HTTP ${extractRes.status}`);
+          }
+
+          const extractData = await extractRes.json();
+          attachment = {
+            filename: file.name,
+            content: extractData.text,
+          };
+
+          // Mark upload completed and supervisor running
+          updatedSteps = [
+            {
+              worker: "upload_worker",
+              status: "completed",
+              message: `Extracted text from ${file.name}`,
+            },
+            {
+              worker: "brain_supervisor",
+              status: "running",
+              message: "Aria is reasoning...",
+            },
+          ];
+          setActiveSteps(updatedSteps);
+        }
+
+        // 2. Standard chat request
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: {
@@ -412,6 +468,7 @@ export function useBrainChat() {
             user_id: convexUserId,
             userName: clerkUserName,
             user_name: clerkUserName,
+            attachment,
           }),
         });
 
@@ -431,9 +488,26 @@ export function useBrainChat() {
         }
 
         const reader = response.body.getReader();
-        await consumeStream(reader, startTime, initialSteps);
+        await consumeStream(reader, startTime, updatedSteps);
       } catch (error: any) {
         console.error("Brain chat fetch failed:", error);
+
+        // If file extraction failed, update steps to show it failed
+        if (file && !attachment) {
+          setActiveSteps([
+            {
+              worker: "upload_worker",
+              status: "failed",
+              message: `Failed to extract: ${error.message || error}`,
+            },
+            {
+              worker: "brain_supervisor",
+              status: "failed",
+              message: "Aria execution aborted.",
+            },
+          ]);
+        }
+
         setMessages((prev) => [
           ...prev,
           {
