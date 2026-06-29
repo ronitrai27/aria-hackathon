@@ -12,6 +12,7 @@ import type * as activities from "../activities.js";
 import type * as agentTools from "../agentTools.js";
 import type * as brain from "../brain.js";
 import type * as crons from "../crons.js";
+import type * as dailyDigest from "../dailyDigest.js";
 import type * as http from "../http.js";
 import type * as importantActions from "../importantActions.js";
 import type * as tasks from "../tasks.js";
@@ -29,6 +30,7 @@ declare const fullApi: ApiFromModules<{
   agentTools: typeof agentTools;
   brain: typeof brain;
   crons: typeof crons;
+  dailyDigest: typeof dailyDigest;
   http: typeof http;
   importantActions: typeof importantActions;
   tasks: typeof tasks;

@@ -141,7 +141,7 @@ const agentSuggestions: SuggestionItem[] = [
 export default function AgentPage() {
   const [inputVal, setInputVal] = useState("");
   const [isPageReady, setIsPageReady] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("claude-sonnet-3.5");
+  const [selectedModel, setSelectedModel] = useState("gemini-3-flash");
   const [activeTab, setActiveTab] = useState<"editor" | "runs">("editor");
   const [isReadWriteActive, setIsReadWriteActive] = useState(true);
   const [isNarrow, setIsNarrow] = useState(false);
@@ -1928,7 +1928,7 @@ export default function AgentPage() {
           cursor-pointer
         "
                             >
-                              <div className="flex w-full items-center justify-between">
+                              <div className="flex w-full items-center">
                                 <div className="flex items-center gap-3">
                                   <Image
                                     src={model.logo}
@@ -1948,13 +1948,9 @@ export default function AgentPage() {
                                   </span>
                                 </div>
 
-                                <div className="flex items-center">
-                                  {model.disabled ? (
+                                <div className="ml-auto flex items-center">
+                                  {model.disabled && (
                                     <Lock className="h-3.5 w-3.5 text-muted-foreground/60" />
-                                  ) : (
-                                    selectedModel === model.value && (
-                                      <Check className="h-4 w-4" />
-                                    )
                                   )}
                                 </div>
                               </div>

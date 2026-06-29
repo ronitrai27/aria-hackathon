@@ -142,4 +142,14 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_thread", ["threadId"])
     .index("by_user_updated", ["userId", "updatedAt"]),
+
+  dailyDigest: defineTable({
+    userId: v.string(),
+    lastRun: v.optional(v.number()),
+    nextRun: v.optional(v.number()),
+    status: v.optional(v.union(v.literal("idle"), v.literal("running"), v.literal("success"), v.literal("failed"))),
+    error: v.optional(v.string()),
+    lastReportText: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"]),
 });

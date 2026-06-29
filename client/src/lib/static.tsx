@@ -27,7 +27,7 @@ export const models = [
     label: "Claude Sonnet 3.5",
     short: "Sonnet 3.5",
     logo: "/claude.png",
-    disabled: false,
+    disabled: true,
   },
   {
     value: "claude-opus-4.5",
@@ -44,17 +44,24 @@ export const models = [
     disabled: false,
   },
   {
-    value: "gpt-4.1",
-    label: "GPT-4.1",
-    short: "4.1",
-    logo: "/chatgpt.png",
-    disabled: true,
-  },
-  {
     value: "gpt-5.1",
     label: "GPT-5.1",
     short: "5.1",
     logo: "/chatgpt.png",
+    disabled: false,
+  },
+  {
+    value: "gemini-3-pro",
+    label: "Gemini 3 Pro",
+    short: "3 Pro",
+    logo: "/gemini-color.svg",
     disabled: true,
+  },
+  {
+    value: "gemini-3-flash",
+    label: "Gemini 3 Flash",
+    short: "3 Flash",
+    logo: "/gemini-color.svg",
+    disabled: false,
   },
 ];
