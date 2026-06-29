@@ -49,6 +49,16 @@ import { connectorIcons } from "@/lib/static";
 import { cn } from "@/lib/utils";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const mainMenuItems = [
   { name: "Home", url: "/home", icon: Home },
@@ -75,6 +85,9 @@ export function AppSidebar() {
 
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [deleteSessionConfirmOpen, setDeleteSessionConfirmOpen] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<{ id: any; threadId: string } | null>(null);
+  const [clearHistoryConfirmOpen, setClearHistoryConfirmOpen] = useState(false);
 
   const searchParams = useSearchParams();
   const currentThreadId = searchParams?.get("threadId");
@@ -98,15 +111,17 @@ export function AppSidebar() {
     }
   };
 
-  const handleDeleteSession = async (
+  const handleDeleteSession = (
     sessionId: any,
     threadIdToDelete: string,
   ) => {
-    const ok = window.confirm(
-      "Are you sure you want to delete this conversation?",
-    );
-    if (!ok) return;
+    setSessionToDelete({ id: sessionId, threadId: threadIdToDelete });
+    setDeleteSessionConfirmOpen(true);
+  };
 
+  const confirmDeleteSession = async () => {
+    if (!sessionToDelete) return;
+    const { id: sessionId, threadId: threadIdToDelete } = sessionToDelete;
     try {
       await deleteSession({ sessionId });
       toast.success("Conversation deleted");
@@ -116,6 +131,9 @@ export function AppSidebar() {
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to delete conversation");
+    } finally {
+      setSessionToDelete(null);
+      setDeleteSessionConfirmOpen(false);
     }
   };
 
@@ -138,14 +156,14 @@ export function AppSidebar() {
     router.push(`/home/agent?threadId=${newId}`);
   };
 
-  const handleClearHistory = async (e: React.MouseEvent) => {
+  const handleClearHistory = (e: React.MouseEvent) => {
     e.preventDefault();
     if (!user?._id) return;
-    const ok = window.confirm(
-      "Are you sure you want to clear all chat sessions? This cannot be undone.",
-    );
-    if (!ok) return;
+    setClearHistoryConfirmOpen(true);
+  };
 
+  const confirmClearHistory = async () => {
+    if (!user?._id) return;
     const toastId = toast.loading("Clearing chat history...", {
       position: "top-center",
     });
@@ -158,6 +176,8 @@ export function AppSidebar() {
       toast.error(err.message || "Failed to clear chat history", {
         id: toastId,
       });
+    } finally {
+      setClearHistoryConfirmOpen(false);
     }
   };
 
@@ -546,6 +566,42 @@ export function AppSidebar() {
           </div>
         )}
       </SidebarFooter>
+
+      {/* Delete Chat Confirmation Dialog */}
+      <AlertDialog open={deleteSessionConfirmOpen} onOpenChange={setDeleteSessionConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Conversation</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this conversation? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={confirmDeleteSession}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Clear Chat History Confirmation Dialog */}
+      <AlertDialog open={clearHistoryConfirmOpen} onOpenChange={setClearHistoryConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear Chat History</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to clear all chat sessions? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={confirmClearHistory}>
+              Clear All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sidebar>
   );
 }

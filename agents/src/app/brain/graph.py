@@ -48,9 +48,9 @@ You have direct access to these tools to assist {user_name}:
 Answer questions directly and intelligently. ALWAYS use rich markdown formatting (bolding, headers, bullet points, code blocks) to organize your answers beautifully so they look clean and structured on the user interface. If you invoke a tool, summarize its results elegantly in clear bullet points.
 
 CRITICAL INSTRUCTIONS:
-- ALWAYS be extremely concise and cover important topics, summaries, and actions. Keep responses short, highly accurate, and focused on suggestions the user wants to hear. Avoid unnecessary introductory text or verbose details.
+-Be playful , try to suggest or reflect back user his work , tasks or browser activities. Make user feel you are perosnal companion help to create tasks , suggest , help him improve and never let him feel over wrok loaded or down.
 - SAVE USER MEMORIES: Whenever the user shares new, valuable, long-term workspace context (such as technology preferences, project descriptions, specific task details, or important contacts), call `save_to_memory` with a list of concise, declarative sentences summarizing the facts (e.g., `["User prefers Vanilla CSS over TailwindCSS", "User is working on Project Orion"]`). Only call this when new information is shared. Do not call this for trivial chat turns, greetings, or questions.
-- DIRECT TOOL CALLS FOR TASKS: If you propose to create tasks for the user, call the `create_tasks` tool directly in your response. Do NOT ask the user for permission, confirmation, or options (such as "Should I create them?", "Reply Go ahead", or "Which do you prefer?") in your text. The system automatically prompts the user for approval, so proceed straight to calling the tool.
+- DIRECT TOOL CALLS FOR TASKS: If you propose to create tasks for the user, call the `create_tasks` tool directly after asking for any chnages if users wants. Do NOT ask the user for permission, confirmation more than 1 time. The system automatically prompts the user for approval, so proceed straight to calling the tool.
 - WORKFLOW CREATION LIMITATION: If the user asks you to create, build, or design a workflow (or a flow), you MUST state: "I can suggest and help with tasks and am here to make you achieve your goals, but I cannot directly create workflows. You need to switch to Agent Mode to do so!" (Direct them to use the Agent Mode toggle in the sidebar).
 """
 
@@ -70,6 +70,14 @@ def supervisor_node(state: BrainState, config: Any = None):
     sys_prompt = SYSTEM_PROMPT.format(user_name=user_name, user_id=user_id, current_date=current_date)
     messages = [SystemMessage(content=sys_prompt)] + state["messages"]
    
+    print(f"[brain.supervisor_node] Running supervisor. Messages trace:", flush=True)
+    for idx, msg in enumerate(messages):
+        msg_type = type(msg).__name__
+        content_snippet = str(msg.content)[:60].replace("\n", " ")
+        t_calls = getattr(msg, "tool_calls", None)
+        t_call_id = getattr(msg, "tool_call_id", None)
+        print(f"  [{idx}] Type={msg_type}, Content={content_snippet!r}, tool_calls={t_calls}, tool_call_id={t_call_id}", flush=True)
+   
     api_key = settings.openai_api_key or os.getenv("OPENAI_API_KEY")
     
     # Extract callbacks from config if present
@@ -78,7 +86,7 @@ def supervisor_node(state: BrainState, config: Any = None):
         callbacks = config["callbacks"]
         
     llm = ChatOpenAI(
-        model="gpt-4.1-nano", 
+        model="gpt-4.1-mini", 
         temperature=0.1, 
         api_key=api_key,
         streaming=True,

@@ -242,7 +242,7 @@ export const getBrowserActivity = query({
   },
   handler: async (ctx, args) => {
     const fortyEightHoursAgo = args.now - 48 * 60 * 60 * 1000;
-    const tenMinutesMs = 10 * 60 * 1000;
+    const twoMinutesMs = 2 * 60 * 1000;
 
     // Resolve Convex ID to Clerk ID if needed
     let user = null;
@@ -263,62 +263,76 @@ export const getBrowserActivity = query({
       console.log("[getBrowserActivity Query] First row openedAt:", rows[0].openedAt, "duration:", rows[0].duration, "url:", rows[0].url);
     }
 
-    // Self-healing time filter: if no data matches the last 48 hours, relax the filter
-    const hasRecentData = rows.some((r) => r.openedAt >= fortyEightHoursAgo);
-    const timeFilter = hasRecentData ? fortyEightHoursAgo : 0;
-    console.log("[getBrowserActivity Query] hasRecentData in last 48h:", hasRecentData, "timeFilter:", timeFilter);
+    // Helper function to group rows by domain given a time filter
+    const getGrouped = (tFilter: number) => {
+      const groups: Record<
+        string,
+        {
+          domain: string;
+          totalDurationMs: number;
+          visitCount: number;
+          lastVisitedAt: number;
+        }
+      > = {};
 
-    // Grouping structure: domain -> aggregated data
-    const groups: Record<
-      string,
-      {
-        domain: string;
-        totalDurationMs: number;
-        visitCount: number;
-        lastVisitedAt: number;
+      for (const r of rows) {
+        if (r.openedAt < tFilter) continue;
+
+        let domain = "";
+        try {
+          const urlWithProto = r.url.startsWith("http") ? r.url : `https://${r.url}`;
+          const parsed = new URL(urlWithProto);
+          domain = parsed.hostname.replace("www.", "");
+        } catch (e) {
+          try {
+            domain = r.url.split("/")[0] || r.url;
+          } catch (e) {
+            domain = r.url;
+          }
+        }
+
+        if (!domain) continue;
+
+        if (!groups[domain]) {
+          groups[domain] = {
+            domain,
+            totalDurationMs: 0,
+            visitCount: 0,
+            lastVisitedAt: r.openedAt,
+          };
+        }
+
+        groups[domain].totalDurationMs += r.duration ?? 0;
+        groups[domain].visitCount += 1;
+        if (r.openedAt > groups[domain].lastVisitedAt) {
+          groups[domain].lastVisitedAt = r.openedAt;
+        }
       }
-    > = {};
+      return Object.values(groups);
+    };
 
-    for (const r of rows) {
-      if (r.openedAt < timeFilter) continue;
+    // 1. Try grouping for last 48 hours
+    let grouped = getGrouped(fortyEightHoursAgo);
+    let filtered = grouped.filter((g) => g.totalDurationMs >= twoMinutesMs);
 
-      let domain = "";
-      try {
-        const urlWithProto = r.url.startsWith("http") ? r.url : `https://${r.url}`;
-        const parsed = new URL(urlWithProto);
-        domain = parsed.hostname.replace("www.", "");
-      } catch (e) {
-        domain = r.url.split("/")[0] || r.url;
-      }
-
-      if (!domain) continue;
-
-      if (!groups[domain]) {
-        groups[domain] = {
-          domain,
-          totalDurationMs: 0,
-          visitCount: 0,
-          lastVisitedAt: r.openedAt,
-        };
-      }
-
-      groups[domain].totalDurationMs += r.duration ?? 0;
-      groups[domain].visitCount += 1;
-      if (r.openedAt > groups[domain].lastVisitedAt) {
-        groups[domain].lastVisitedAt = r.openedAt;
-      }
+    // 2. Fallback: if < 10 unique domains match the 48-hour range, include older browser activity too
+    if (filtered.length < 10 && rows.length > 0) {
+      console.log("[getBrowserActivity Query] Less than 10 items in last 48h. Falling back to use older database data.");
+      grouped = getGrouped(0);
+      filtered = grouped.filter((g) => g.totalDurationMs >= twoMinutesMs);
     }
 
-    // Dynamic duration thresholding fallback chain
-    let filtered = Object.values(groups).filter((g) => g.totalDurationMs >= tenMinutesMs);
-    if (filtered.length === 0) {
-      filtered = Object.values(groups).filter((g) => g.totalDurationMs >= 1 * 60 * 1000); // 1 minute
-    }
-    if (filtered.length === 0) {
-      filtered = Object.values(groups); // no floor fallback
+    // 3. Fallback: if still < 10 domains, lower duration threshold to 1 minute
+    if (filtered.length < 10) {
+      filtered = grouped.filter((g) => g.totalDurationMs >= 1 * 60 * 1000);
     }
 
-    // Sort descending by duration, limit 30
+    // 4. Fallback: if still < 10 domains, return everything grouped without any threshold floor
+    if (filtered.length < 10) {
+      filtered = grouped;
+    }
+
+    // Sort descending by duration, limit to max 30 items
     const result = filtered
       .sort((a, b) => b.totalDurationMs - a.totalDurationMs)
       .slice(0, 30);
