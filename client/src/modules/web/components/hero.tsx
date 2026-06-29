@@ -8,7 +8,7 @@ import { useUser } from "@clerk/nextjs";
 
 export default function Hero() {
   const { isLoaded, isSignedIn } = useUser();
-  
+
   return (
     <section className="relative min-h-screen flex flex-col bg-white">
       {/* Micro-animations stylesheet */}
@@ -182,17 +182,17 @@ export default function Hero() {
 
       {/* Video Container */}
       <div className="relative z-30 w-full max-w-6xl mx-auto px-6 -mt-24 sm:-mt-36 md:-mt-56 lg:-mt-84 pb-24">
-        <div className="relative group-video rounded-2xl overflow-hidden border border-white/20 bg-black/40 shadow-[0_0_50px_rgba(99,102,241,0.25)] hover:border-white/30 transition-all duration-500">
+        <div className="relative group-video rounded-2xl overflow-hidden border">
           {/* Image Thumbnail */}
           <div className="relative aspect-[16/8] w-full overflow-hidden">
             <Image
-              src="/back1.png"
+              src="/hero.png"
               alt="AgentOS Platform Demo"
               fill
               priority
               className="object-cover transition-transform duration-700 group-hover/video:scale-102"
             />
-            <div className="absolute inset-0 bg-black/10 group-hover/video:bg-black/5 transition-colors duration-300" />
+            <div className="absolute inset-0 bg-linear-to-b from-transparent via-indigo-50/10 to-indigo-500/60 transition-colors duration-300" />
           </div>
 
           <div className="absolute inset-0 flex items-center justify-center">
