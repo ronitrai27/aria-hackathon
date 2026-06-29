@@ -141,7 +141,7 @@ const agentSuggestions: SuggestionItem[] = [
 export default function AgentPage() {
   const [inputVal, setInputVal] = useState("");
   const [isPageReady, setIsPageReady] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("gemini-3-flash");
+  const [selectedModel, setSelectedModel] = useState("gemini-2.5-flash");
   const [activeTab, setActiveTab] = useState<"editor" | "runs">("editor");
   const [isReadWriteActive, setIsReadWriteActive] = useState(true);
   const [isNarrow, setIsNarrow] = useState(false);
@@ -961,7 +961,7 @@ export default function AgentPage() {
             `[${new Date().toLocaleTimeString()}] âœ… Step ${currentStepIndex + 1}: ${currentNode.data?.label || currentNode.id} executed successfully.`,
             `[${new Date().toLocaleTimeString()}] âš¡ Invoking Step ${nextIndex + 1} (${appName}): ${nextNode.data?.label || nextNode.id}...`,
             nextNode.type?.startsWith("ai_")
-              ? `[${new Date().toLocaleTimeString()}] ðŸ¤– model: ${nextNode.data?.ai_config?.model || "gemini-2.0-flash"} | prompt: "${nextNode.data?.ai_config?.prompt?.substring(0, 45)}..."`
+              ? `[${new Date().toLocaleTimeString()}] ðŸ¤– model: ${nextNode.data?.ai_config?.model || "gemini-2.5-flash"} | prompt: "${nextNode.data?.ai_config?.prompt?.substring(0, 45)}..."`
               : `[${new Date().toLocaleTimeString()}] ðŸ”Œ action: ${nextNode.data?.composio_config?.action_slug || "integration"}`,
           ];
         });

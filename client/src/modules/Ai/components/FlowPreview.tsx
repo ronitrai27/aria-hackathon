@@ -61,7 +61,7 @@ interface FlowPreviewProps {
 }
 
 const AI_MODELS = [
-  { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
   { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" },
   { value: "gpt-4o", label: "GPT-4o" },
   { value: "gpt-4o-mini", label: "GPT-4o Mini" },
@@ -265,7 +265,7 @@ function AINodePopover({
             provider === "claude"
               ? "claude-sonnet-4-5"
               : provider === "gemini"
-                ? "gemini-2.0-flash"
+                ? "gemini-2.5-flash"
                 : "gpt-4o",
           citations,
           format,

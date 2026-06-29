@@ -237,7 +237,7 @@ def workflow_to_reactflow(workflow: dict) -> dict:
                 "ai_config": {
                     # The agent always sets a single 'prompt' field for AI nodes.
                     "prompt": params_mapping.get("prompt", ""),
-                    "model": "gemini-2.0-flash",
+                    "model": "gemini-2.5-flash",
                     "extra_instructions": ""
                 }
             }

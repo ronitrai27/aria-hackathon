@@ -60,9 +60,9 @@ export const models = [
     disabled: true,
   },
   {
-    value: "gemini-3-flash",
-    label: "Gemini 3 Flash",
-    short: "3 Flash",
+    value: "gemini-2.5-flash",
+    label: "Gemini 2.5 Flash",
+    short: "2.5 Flash",
     logo: "/gemini-color.svg",
     disabled: false,
   },
