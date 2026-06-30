@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # ─── Convex HTTP API ──────────────────────────────────────────────────
     convex_site_url: str = "https://wandering-antelope-3.convex.site"
 
+    # ─── Frontend Client ──────────────────────────────────────────────────
+    frontend_url: str = "http://localhost:3000"
+
     # ─── Redis (checkpointer for HITL) ────────────────────────────────────
     redis_url: str = "redis://localhost:6379"
 

@@ -9,12 +9,12 @@ export async function POST(req: NextRequest) {
     }
 
     const backendUrl = process.env.AGENT_BACKEND_URL || "http://localhost:8000";
-    
+
     console.log(`[API /api/graph/clear] Clearing graph for user: ${userId}`);
     const response = await fetch(`${backendUrl}/graph/${userId}/clear`, {
       method: "POST",
     });
-    
+
     if (!response.ok) {
       const errText = await response.text();
       return NextResponse.json({ error: errText }, { status: response.status });

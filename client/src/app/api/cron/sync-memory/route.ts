@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 export async function POST() {
   try {
     const backendUrl = process.env.AGENT_BACKEND_URL || "http://localhost:8000";
-    console.log(`[NextJS Cron Proxy] Triggering nightly memory sync at: ${backendUrl}/cron/sync-memory`);
+    console.log(
+      `[NextJS Cron Proxy] Triggering nightly memory sync at: ${backendUrl}/cron/sync-memory`,
+    );
 
     const response = await fetch(`${backendUrl}/cron/sync-memory`, {
       method: "POST",
@@ -14,10 +16,12 @@ export async function POST() {
 
     if (!response.ok) {
       const text = await response.text();
-      console.error(`[NextJS Cron Proxy] Sync request failed: ${response.status} - ${text}`);
+      console.error(
+        `[NextJS Cron Proxy] Sync request failed: ${response.status} - ${text}`,
+      );
       return NextResponse.json(
         { error: `Backend sync failed: ${text}` },
-        { status: response.status }
+        { status: response.status },
       );
     }
 
@@ -28,7 +32,7 @@ export async function POST() {
     console.error("[NextJS Cron Proxy] Fatal error:", error);
     return NextResponse.json(
       { error: error.message || "Failed to trigger backend sync cron" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

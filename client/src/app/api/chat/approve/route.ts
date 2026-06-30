@@ -9,7 +9,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const backendUrl = process.env.AGENT_BACKEND_URL || "http://localhost:8000";
 
-    console.log(`[API /api/chat/approve] Forwarding request to: ${backendUrl}/brain/approve`);
+    console.log(
+      `[API /api/chat/approve] Forwarding request to: ${backendUrl}/brain/approve`,
+    );
     console.log(`[API /api/chat/approve] Body:`, JSON.stringify(body));
 
     const response = await fetch(`${backendUrl}/brain/approve`, {
@@ -25,7 +27,7 @@ export async function POST(req: NextRequest) {
       const errText = await response.text();
       console.error(
         `[API /api/chat/approve] Backend error ${response.status}:`,
-        errText
+        errText,
       );
       return new Response(JSON.stringify({ error: errText }), {
         status: response.status,
@@ -51,7 +53,7 @@ export async function POST(req: NextRequest) {
           const { done, value } = await reader.read();
           if (done) {
             console.log(
-              `[API /api/chat/approve] Resume SSE stream ended. Total chunks: ${chunkCount}`
+              `[API /api/chat/approve] Resume SSE stream ended. Total chunks: ${chunkCount}`,
             );
             await writer.close();
             break;

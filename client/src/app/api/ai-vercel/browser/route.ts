@@ -8,9 +8,7 @@ import { redis } from "@/lib/redis";
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 const customOpenai = createOpenAI({
-  // apiKey: process.env.OPENAI_API_KEY,
-  // apiKey:
-  //   "sk-proj-ZfcteT-6xfwz9qUoNuGAq7AAabVleRm2Om",
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 const model = customOpenai("gpt-4.1-nano");

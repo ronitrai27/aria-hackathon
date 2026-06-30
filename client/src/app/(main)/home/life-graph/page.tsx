@@ -57,7 +57,12 @@ export default function LifeGraphPage() {
   };
 
   useEffect(() => {
-    if (typeof window === "undefined" || !containerRef.current || graphData.nodes.length === 0) return;
+    if (
+      typeof window === "undefined" ||
+      !containerRef.current ||
+      graphData.nodes.length === 0
+    )
+      return;
 
     let networkInstance: any = null;
 
@@ -102,7 +107,7 @@ export default function LifeGraphPage() {
             hover: {
               background: color,
               border: "#27272a",
-            }
+            },
           },
           font: {
             color: "#262626", // Neutral-800
@@ -116,7 +121,7 @@ export default function LifeGraphPage() {
             size: 5,
             x: 2,
             y: 2,
-          }
+          },
         };
       });
 
@@ -146,7 +151,7 @@ export default function LifeGraphPage() {
         width: 1.5,
         smooth: {
           type: "continuous",
-        }
+        },
       }));
 
       const data = {
@@ -237,12 +242,18 @@ export default function LifeGraphPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This action will permanently delete all nodes and relationships from your personalized knowledge graph. The system will rebuild it automatically via chat memory and nightly sync tasks.
+                  This action will permanently delete all nodes and
+                  relationships from your personalized knowledge graph. The
+                  system will rebuild it automatically via chat memory and
+                  nightly sync tasks.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleClearGraph} className="bg-destructive hover:bg-destructive/95 text-destructive-foreground">
+                <AlertDialogAction
+                  onClick={handleClearGraph}
+                  className="bg-destructive hover:bg-destructive/95 text-destructive-foreground"
+                >
                   Clear Graph
                 </AlertDialogAction>
               </AlertDialogFooter>

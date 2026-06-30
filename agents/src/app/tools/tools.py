@@ -262,31 +262,13 @@ def fetch_memory(user_id: str, query_text: str, source: str = "all") -> dict:
 
 # ─── Tool: save_to_memory ───────────────────────────────────────────────────────
 
-@tool
-async def save_to_memory(user_id: str, facts: list[str], user_name: Optional[str] = None) -> str:
-    """
-    Save key workspace facts, technology preferences, task constraints, 
-    or client contacts about the user to their long-term memory graph and vector DB.
-    Only invoke this when the user shares new, valuable, long-term information.
-
-    Args:
-        user_id: The Clerk user ID (e.g. "").
-        facts:   A list of concise fact/preference sentences to commit to memory (e.g., ["User prefers Vanilla CSS over TailwindCSS", "User is working on Project Orion"]).
-        user_name: Optional name of the user to resolve personal pronouns to central USER node.
-
-    Returns:
-        A JSON string containing the status, facts, or error.
-    """
-    import json
-    print(f"\n[save_to_memory tool] Invoked for user_id={user_id} (name={user_name}) with facts: {facts}", flush=True)
-    if not facts:
-        return json.dumps({"status": "failed", "error": "No facts provided."})
-
+def _bg_save_to_memory(user_id: str, facts: list[str], user_name: Optional[str] = None):
     from src.utils.vector_store import upsert_vector_store
     from src.utils.graph_db import upsert_knowledge_graph
     from src.utils.entity_extractor import extract_knowledge_graph_elements
 
     try:
+        print(f"\n[save_to_memory tool background] Starting updates for user_id={user_id} with facts: {facts}", flush=True)
         # 1. Update Pinecone
         upsert_vector_store(user_id, facts)
 
@@ -305,12 +287,38 @@ async def save_to_memory(user_id: str, facts: list[str], user_name: Optional[str
 
         # 3. Update Neo4j Graph
         upsert_knowledge_graph(user_id, combined_elements)
-        print("[save_to_memory tool] Completed DB updates successfully.", flush=True)
-        return json.dumps({"status": "success", "facts": facts})
+        print("[save_to_memory tool background] Completed DB updates successfully.", flush=True)
     except Exception as e:
-        err_msg = str(e)
-        print(f"[save_to_memory tool error] {err_msg}", flush=True)
-        return json.dumps({"status": "failed", "error": err_msg})
+        print(f"[save_to_memory tool background error] {str(e)}", flush=True)
+
+
+@tool
+async def save_to_memory(user_id: str, facts: list[str], user_name: Optional[str] = None) -> str:
+    """
+    Save key workspace facts, technology preferences, task constraints, 
+    or client contacts about the user to their long-term memory graph and vector DB.
+    Only invoke this when the user shares new, valuable, long-term information.
+
+    Args:
+        user_id: The Clerk user ID (e.g. "").
+        facts:   A list of concise fact/preference sentences to commit to memory (e.g., ["User prefers Vanilla CSS over TailwindCSS", "User is working on Project Orion"]).
+        user_name: Optional name of the user to resolve personal pronouns to central USER node.
+
+    Returns:
+        A JSON string containing the status, facts, or error.
+    """
+    import json
+    import asyncio
+    print(f"\n[save_to_memory tool] Invoked for user_id={user_id} (name={user_name}) with facts: {facts}", flush=True)
+    if not facts:
+        return json.dumps({"status": "failed", "error": "No facts provided."})
+
+    # Run the blocking updates in a background thread to prevent blocking the agent response stream
+    asyncio.create_task(asyncio.to_thread(_bg_save_to_memory, user_id, facts, user_name))
+
+    print("[save_to_memory tool] Database updates spawned in background. Returning success immediately.", flush=True)
+    return json.dumps({"status": "success", "facts": facts})
+
 
 
 # ─── Exported tool list (register all agent tools here) ──────────────────────

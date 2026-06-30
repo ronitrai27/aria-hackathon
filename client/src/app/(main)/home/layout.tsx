@@ -1,7 +1,10 @@
-import { Cable, Mail } from "lucide-react";
-import type React from "react";
+"use client";
+
+import { Cable, Mail, HelpCircle } from "lucide-react";
+import { useState } from "react";
 import { ConnectionDialog } from "@/components/ConnectionDialog";
 import { OnboardingDialog } from "@/components/OnboardingDialog";
+import { HelpDialog } from "@/components/HelpDialog";
 import { UserMenu } from "@/components/UserMenu";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -14,6 +17,8 @@ export default function HomeLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -33,12 +38,15 @@ export default function HomeLayout({
             >
               <Cable />
             </Button>
+
             <Button
               variant={"outline"}
-              className="rounded-md bg-neutral-100"
+              className="rounded-md bg-neutral-100 hover:text-blue-600 transition-all cursor-pointer"
               size={"icon-sm"}
+              onClick={() => setIsHelpOpen(true)}
+              title="Help & Guides"
             >
-              <Mail />
+              <HelpCircle className="h-4.5 w-4.5" />
             </Button>
             <UserMenu />
           </div>
@@ -47,6 +55,7 @@ export default function HomeLayout({
       </div>
       <ConnectionDialog />
       <OnboardingDialog />
+      <HelpDialog isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
     </SidebarProvider>
   );
 }

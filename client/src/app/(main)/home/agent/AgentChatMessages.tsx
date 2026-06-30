@@ -325,6 +325,214 @@ function parseBrainLogs(traceLogs: string[]) {
   return ordered;
 }
 
+function parseAgentLogs(traceLogs: string[]) {
+  const steps: {
+    id: string;
+    label: string;
+    status: "pending" | "running" | "completed" | "failed";
+    details?: string;
+    substeps?: {
+      label: string;
+      status: "pending" | "running" | "completed" | "failed";
+    }[];
+  }[] = [];
+
+  const getStep = (id: string, defaultLabel: string) => {
+    let step = steps.find((s) => s.id === id);
+    if (!step) {
+      step = { id, label: defaultLabel, status: "pending" };
+      steps.push(step);
+    }
+    return step;
+  };
+
+  // 1. Setup Step
+  const setupStep = getStep("setup", "Agent Session");
+  setupStep.status = "running";
+  setupStep.details = "Initializing...";
+
+  // 2. Supervisor Step
+  const supervisor = getStep("supervisor", "Aria Agent Supervisor");
+  supervisor.status = "pending";
+  supervisor.details = "Waiting for agent activation...";
+
+  let hasToolsRun = false;
+
+  for (const log of traceLogs) {
+    // Session Setup transitions
+    if (
+      log.includes("Initializing Composio session") ||
+      log.includes("Loading Composio")
+    ) {
+      setupStep.status = "running";
+      setupStep.details = "Session initialized.";
+    }
+    if (log.includes("Starting agent run")) {
+      setupStep.status = "completed";
+      setupStep.details = "Agent session active.";
+      supervisor.status = "running";
+      supervisor.details = "Reasoning...";
+    }
+
+    // Supervisor transitions
+    if (
+      log.includes("Running Designer") ||
+      log.includes("Designer called tool") ||
+      log.includes("Running Verifier/Corrector Agent") ||
+      log.includes("Verifier called tool")
+    ) {
+      if (hasToolsRun) {
+        const finalSupervisor = getStep(
+          "supervisor_final",
+          "Aria Agent Supervisor (Finalizing Workflow)",
+        );
+        finalSupervisor.status = "running";
+        finalSupervisor.details = "Reasoning...";
+      } else {
+        supervisor.status = "running";
+        supervisor.details = "Reasoning...";
+      }
+    }
+    if (log.includes("Validation SUCCESS") || log.includes("Stream complete")) {
+      const finalSupervisor = steps.find((s) => s.id === "supervisor_final");
+      if (finalSupervisor) {
+        finalSupervisor.status = "completed";
+        finalSupervisor.details = "Reasoning finished.";
+      } else {
+        supervisor.status = "completed";
+        supervisor.details = "Reasoning finished.";
+      }
+    }
+
+    // Tool calls (Sub-agent triggers)
+    if (log.includes("called tool:") || log.includes("Tool '")) {
+      hasToolsRun = true;
+      const toolNames = [
+        "COMPOSIO_SEARCH_TOOLS",
+        "COMPOSIO_GET_TOOL_SCHEMAS",
+        "draft_workflow",
+        "finalize_workflow",
+      ];
+      for (const tName of toolNames) {
+        if (log.includes(tName)) {
+          const stepId =
+            tName === "COMPOSIO_SEARCH_TOOLS"
+              ? "search_tools"
+              : tName === "COMPOSIO_GET_TOOL_SCHEMAS"
+                ? "get_schemas"
+                : tName === "draft_workflow"
+                  ? "draft"
+                  : "finalize";
+
+          const stepLabel =
+            tName === "COMPOSIO_SEARCH_TOOLS"
+              ? "Tool Search Sub-Agent"
+              : tName === "COMPOSIO_GET_TOOL_SCHEMAS"
+                ? "Schema Explorer Sub-Agent"
+                : tName === "draft_workflow"
+                  ? "Workflow Architect Sub-Agent"
+                  : "Workflow Verifier Sub-Agent";
+
+          const stepDetails =
+            tName === "COMPOSIO_SEARCH_TOOLS"
+              ? "Searching Composio integrations..."
+              : tName === "COMPOSIO_GET_TOOL_SCHEMAS"
+                ? "Inspecting tool schemas & parameters..."
+                : tName === "draft_workflow"
+                  ? "Drafting and staging workflow structure..."
+                  : "Auditing, correcting and finalizing workflow...";
+
+          const step = getStep(stepId, stepLabel);
+          step.status = "running";
+          step.details = stepDetails;
+        }
+      }
+    }
+
+    // Tool outputs (Sub-agent success)
+    if (
+      log.includes("executed successfully") ||
+      log.includes("Staged draft workflow") ||
+      log.includes("Validation SUCCESS")
+    ) {
+      const toolNames = [
+        "COMPOSIO_SEARCH_TOOLS",
+        "COMPOSIO_GET_TOOL_SCHEMAS",
+        "draft_workflow",
+        "finalize_workflow",
+      ];
+      for (const tName of toolNames) {
+        if (log.includes(tName)) {
+          const stepId =
+            tName === "COMPOSIO_SEARCH_TOOLS"
+              ? "search_tools"
+              : tName === "COMPOSIO_GET_TOOL_SCHEMAS"
+                ? "get_schemas"
+                : tName === "draft_workflow"
+                  ? "draft"
+                  : "finalize";
+
+          const step = getStep(stepId, "");
+          step.status = "completed";
+          step.details =
+            tName === "COMPOSIO_SEARCH_TOOLS"
+              ? "Tool search completed."
+              : tName === "COMPOSIO_GET_TOOL_SCHEMAS"
+                ? "Tool schema details retrieved."
+                : tName === "draft_workflow"
+                  ? "Draft workflow staged."
+                  : "Workflow finalized and committed.";
+        }
+      }
+    }
+
+    // Tool error/failure (Sub-agent error)
+    if (log.includes("failed:") || log.includes("Validation FAILED")) {
+      const toolNames = [
+        "COMPOSIO_SEARCH_TOOLS",
+        "COMPOSIO_GET_TOOL_SCHEMAS",
+        "draft_workflow",
+        "finalize_workflow",
+      ];
+      for (const tName of toolNames) {
+        if (log.includes(tName)) {
+          const stepId =
+            tName === "COMPOSIO_SEARCH_TOOLS"
+              ? "search_tools"
+              : tName === "COMPOSIO_GET_TOOL_SCHEMAS"
+                ? "get_schemas"
+                : tName === "draft_workflow"
+                  ? "draft"
+                  : "finalize";
+
+          const step = steps.find((s) => s.id === stepId);
+          if (step) {
+            step.status = "failed";
+            step.details = log.includes("Validation FAILED")
+              ? "Workflow validation failed."
+              : "Failed to execute sub-agent.";
+          }
+        }
+      }
+    }
+  }
+
+  // Ensure steps are ordered logically: Setup -> Supervisor -> Sub-Agents
+  const ordered: typeof steps = [];
+  const setup = steps.find((s) => s.id === "setup");
+  if (setup) ordered.push(setup);
+  const sv = steps.find((s) => s.id === "supervisor");
+  if (sv) ordered.push(sv);
+
+  steps.forEach((s) => {
+    if (s.id !== "setup" && s.id !== "supervisor") {
+      ordered.push(s);
+    }
+  });
+
+  return ordered;
+}
+
 export default function AgentChatMessages({
   messages,
   isGenerating,
@@ -666,9 +874,17 @@ export default function AgentChatMessages({
             );
           }
 
-          // Fallback Standard mode Loader (Unchanged)
+          // Fallback Standard mode Loader (Modified to match Brain stepper loader)
+          const agentStepsData = parseAgentLogs(activeTraceLogs);
+          const formatTime = (sec: number) => {
+            const m = Math.floor(sec / 60);
+            const s = sec % 60;
+            return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+          };
+
           return (
-            <div className="flex gap-3.5 w-full justify-start mt-4">
+            <div className="flex gap-3.5 w-full justify-start animate-in fade-in duration-300 mt-4">
+              {/* Aria Avatar */}
               <div className="h-8 w-8 bg-linear-to-tr from-blue-600 via-purple-500 to-red-500 p-0.5 shadow-md flex items-center justify-center shrink-0 aria-morph-loading mt-1">
                 <svg
                   fill="currentColor"
@@ -681,16 +897,87 @@ export default function AgentChatMessages({
                 </svg>
               </div>
               <div className="flex flex-col gap-1 w-full max-w-[82%]">
-                <div className="rounded-2xl py-2 px-1 text-sm leading-relaxed text-foreground dark:text-neutral-200 rounded-tl-sm">
-                  <p className="text-[13px] text-muted-foreground dark:text-neutral-200 leading-relaxed font-medium mb-3">
-                    {isExecuting
-                      ? "Executing..."
-                      : "Processing your request..."}
-                  </p>
-                  <TraceLogsViewer
-                    traceLogs={activeTraceLogs}
-                    isGenerating={true}
-                  />
+                <div className="py-2 px-1 text-sm leading-relaxed text-foreground dark:text-neutral-200">
+                  {/* Header Line */}
+                  <div
+                    className="flex items-center justify-between cursor-pointer hover:opacity-90 select-none pb-2"
+                    onClick={() => setIsOpen(!isOpen)}
+                  >
+                    <span className="text-[13px] text-muted-foreground dark:text-neutral-300 leading-relaxed font-semibold flex items-center gap-2">
+                      Aria is processing your request...
+                    </span>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-[10px] font-mono text-muted-foreground dark:text-zinc-400 font-semibold bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-700/50">
+                        {formatTime(elapsed)}
+                      </span>
+                      {isOpen ? (
+                        <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Inline sub-agent steps */}
+                  {isOpen && (
+                    <div
+                      ref={stepsContainerRef}
+                      className="mt-4 space-y-4 border-l border-zinc-200 dark:border-zinc-800 pl-4 py-1 max-h-60 overflow-y-auto pr-1 animate-in slide-in-from-top-2 duration-200"
+                    >
+                      {agentStepsData.map((step) => {
+                        const isDone = step.status === "completed";
+                        const isRunning = step.status === "running";
+                        const isFailed = step.status === "failed";
+
+                        return (
+                          <div key={step.id} className="space-y-2">
+                            <div className="flex items-start gap-3 text-xs">
+                              {isDone ? (
+                                <div className="h-4 w-4 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5">
+                                  <svg
+                                    className="h-2.5 w-2.5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={3}
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M5 13l4 4L19 7"
+                                    />
+                                  </svg>
+                                </div>
+                              ) : isRunning ? (
+                                <div className="h-4 w-4 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5">
+                                  <RefreshCw className="h-2.5 w-2.5 animate-spin" />
+                                </div>
+                              ) : isFailed ? (
+                                <div className="h-4 w-4 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0 mt-0.5">
+                                  <AlertCircle className="h-2.5 w-2.5" />
+                                </div>
+                              ) : (
+                                <div className="h-4 w-4 rounded-full bg-zinc-100 dark:bg-zinc-850/80 border border-zinc-250 dark:border-zinc-750 flex items-center justify-center shrink-0 mt-0.5" />
+                              )}
+
+                              <div className="flex flex-col">
+                                <span
+                                  className={`text-[12px] font-semibold ${isRunning ? "text-indigo-600 dark:text-indigo-400" : isDone ? "text-zinc-700 dark:text-zinc-300" : "text-zinc-500"}`}
+                                >
+                                  {step.label}
+                                </span>
+                                {step.details && (
+                                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                                    {step.details}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

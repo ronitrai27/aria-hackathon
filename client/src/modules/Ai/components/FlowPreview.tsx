@@ -27,6 +27,7 @@ import {
   Sparkles,
   Workflow,
   X,
+  Trash2,
 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -681,6 +682,9 @@ function AppNodePopover({
       Object.entries(initialParams).map(([k, v]) => [k, String(v)]),
     ),
   );
+  const [hiddenParams, setHiddenParams] = useState<string[]>(
+    composioConfig.hidden_params || [],
+  );
 
   const handleSave = () => {
     onSave({
@@ -688,6 +692,7 @@ function AppNodePopover({
       composio_config: {
         ...composioConfig,
         params_mapping: params,
+        hidden_params: hiddenParams,
       },
     });
   };
@@ -731,35 +736,77 @@ function AppNodePopover({
             <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-3">
               Parameters Mapping
             </label>
-            <div className="space-y-3">
-              {Object.entries(params).map(([key, val]) => {
-                const isEmpty = !val || !val.trim();
-                return (
-                  <div key={key}>
-                    <label className="block text-[11px] text-neutral-500 mb-1 font-medium capitalize flex justify-between">
-                      <span>{key.replace(/_/g, " ")}</span>
-                      {isEmpty && (
-                        <span className="text-[10px] text-red-500 font-semibold lowercase">
-                          Required field
-                        </span>
-                      )}
-                    </label>
-                    <input
-                      type="text"
-                      value={val}
-                      onChange={(e) =>
-                        setParams((p) => ({ ...p, [key]: e.target.value }))
-                      }
-                      className={`w-full rounded-xl border bg-neutral-50 px-4 py-2.5 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-mono ${
-                        isEmpty
-                          ? "border-red-300 focus:border-red-400"
-                          : "border-neutral-200 focus:border-blue-400"
-                      }`}
-                    />
-                  </div>
-                );
-              })}
+            <div className="space-y-4">
+              {Object.entries(params)
+                .filter(([key]) => !hiddenParams.includes(key))
+                .map(([key, val]) => {
+                  const isEmpty = !val || !val.trim();
+                  return (
+                    <div key={key} className="space-y-1">
+                      <div className="flex justify-between items-center">
+                        <label className="block text-[11px] text-neutral-500 font-medium capitalize">
+                          {key.replace(/_/g, " ")}
+                        </label>
+                        <div className="flex items-center gap-2">
+                          {isEmpty && (
+                            <span className="text-[10px] text-red-500 font-semibold lowercase">
+                              Required field
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setHiddenParams((hp) => [...hp, key])}
+                            className="p-1 rounded text-neutral-400 hover:text-red-500 hover:bg-neutral-100 transition-colors cursor-pointer"
+                            title="Remove field"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        value={val}
+                        onChange={(e) =>
+                          setParams((p) => ({ ...p, [key]: e.target.value }))
+                        }
+                        className={`w-full rounded-xl border bg-neutral-50 px-4 py-2.5 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-mono ${
+                          isEmpty
+                            ? "border-red-300 focus:border-red-400"
+                            : "border-neutral-200 focus:border-blue-400"
+                        }`}
+                      />
+                    </div>
+                  );
+                })}
             </div>
+
+            {/* Hidden Fields section */}
+            {hiddenParams.length > 0 && (
+              <div className="mt-6 pt-4 border-t border-neutral-100">
+                <label className="block text-[11px] font-semibold text-neutral-500 uppercase tracking-wider mb-2.5">
+                  Removed/Hidden Fields
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {hiddenParams.map((key) => (
+                    <div
+                      key={key}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 dark:bg-zinc-800 rounded-lg border border-neutral-200 dark:border-zinc-700 text-xs text-neutral-600 dark:text-neutral-350"
+                    >
+                      <span className="font-medium capitalize">{key.replace(/_/g, " ")}</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setHiddenParams((hp) => hp.filter((k) => k !== key))
+                        }
+                        className="text-blue-600 hover:text-blue-700 dark:text-blue-450 dark:hover:text-blue-300 font-semibold cursor-pointer text-[10.5px] uppercase tracking-wide ml-1.5"
+                      >
+                        Undo
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="py-6 text-center text-sm text-neutral-400">
@@ -1164,7 +1211,9 @@ function AppNode({ data }: { data: any }) {
     .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
 
-  const paramCount = Object.keys(composioConfig.params_mapping || {}).length;
+  const paramsMapping = composioConfig.params_mapping || {};
+  const hiddenParams = composioConfig.hidden_params || [];
+  const paramCount = Object.keys(paramsMapping).filter((k) => !hiddenParams.includes(k)).length;
   const isFirst = data._isFirst === true;
 
   if (isFirst) {
@@ -1685,7 +1734,8 @@ export default function FlowPreview({
         }
       } else if (nodeType === "composio_app") {
         const params = node.data?.composio_config?.params_mapping || {};
-        const keys = Object.keys(params);
+        const hiddenParams = node.data?.composio_config?.hidden_params || [];
+        const keys = Object.keys(params).filter((k) => !hiddenParams.includes(k));
         keys.forEach((k) => {
           const val = params[k];
           const valStr = val === null || val === undefined ? "" : String(val);

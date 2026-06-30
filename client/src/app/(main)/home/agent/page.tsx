@@ -398,7 +398,7 @@ export default function AgentPage() {
   function resolvePromptTemplate(prompt: string, allNodes: any[]): string {
     const hasTrigger = allNodes[0]?.type === "task_trigger";
     return prompt.replace(
-      /\{{1,2}step[_\s](\d+)(?:\.([a-zA-Z0-9_\.]+))?\}{1,2}/g,
+      /\{{1,2}step[_\s](\d+)(?:\.([a-zA-Z0-9_\.\[\]]+))?\}{1,2}/g,
       (match, stepNumStr, path) => {
         const stepNum = parseInt(stepNumStr, 10);
         const stepIdx = hasTrigger ? stepNum : stepNum - 1;
@@ -408,14 +408,51 @@ export default function AgentPage() {
           if (trace) {
             if (path) {
               const parts = path.split(".");
-              const checkObjects = [trace, trace.data, trace.result].filter(
-                Boolean,
-              );
+              const checkObjects = [trace, trace.data, trace.result]
+                .filter(Boolean)
+                .map((obj) => {
+                  if (typeof obj === "string") {
+                    const trimmed = obj.trim();
+                    if (
+                      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+                      (trimmed.startsWith("[") && trimmed.endsWith("]"))
+                    ) {
+                      try {
+                        return JSON.parse(trimmed);
+                      } catch {
+                        return obj;
+                      }
+                    }
+                  }
+                  return obj;
+                });
+
               for (const obj of checkObjects) {
                 let current = obj;
                 let found = true;
                 for (const part of parts) {
-                  if (
+                  // Support array indexing like channels[0]
+                  const arrayMatch = part.match(/^([a-zA-Z0-9_]+)\[(\d+)\]$/);
+                  if (arrayMatch) {
+                    const baseKey = arrayMatch[1];
+                    const index = parseInt(arrayMatch[2], 10);
+                    if (
+                      current &&
+                      typeof current === "object" &&
+                      baseKey in current
+                    ) {
+                      const arr = (current as any)[baseKey];
+                      if (Array.isArray(arr) && index < arr.length) {
+                        current = arr[index];
+                      } else {
+                        found = false;
+                        break;
+                      }
+                    } else {
+                      found = false;
+                      break;
+                    }
+                  } else if (
                     current &&
                     typeof current === "object" &&
                     part in current
@@ -549,7 +586,8 @@ export default function AgentPage() {
       }
       if (type === "composio_app") {
         const params = node.data?.composio_config?.params_mapping || {};
-        const keys = Object.keys(params);
+        const hiddenParams = node.data?.composio_config?.hidden_params || [];
+        const keys = Object.keys(params).filter((k) => !hiddenParams.includes(k));
         if (keys.length === 0) return true;
         return keys.every((k) => {
           const val = params[k];
@@ -571,7 +609,8 @@ export default function AgentPage() {
       }
     } else if (type === "composio_app") {
       const params = node.data?.composio_config?.params_mapping || {};
-      const keys = Object.keys(params);
+      const hiddenParams = node.data?.composio_config?.hidden_params || [];
+      const keys = Object.keys(params).filter((k) => !hiddenParams.includes(k));
       keys.forEach((k) => {
         const val = params[k];
         const valStr = val === null || val === undefined ? "" : String(val);
@@ -692,7 +731,9 @@ export default function AgentPage() {
         try {
           // Resolve prompt templates inside params
           const resolvedParams: Record<string, any> = {};
+          const hiddenParams = currentNode.data?.composio_config?.hidden_params || [];
           for (const key in params) {
+            if (hiddenParams.includes(key)) continue;
             const value = params[key];
             if (typeof value === "string") {
               resolvedParams[key] = resolvePromptTemplate(value, nodes);
@@ -1071,9 +1112,12 @@ export default function AgentPage() {
 
     const MAX_SIZE = 2 * 1024 * 1024; // 2MB
     if (file.size > MAX_SIZE) {
-      toast.error("File size exceeds the 2MB limit! Please upload a smaller document.", {
-        position: "top-center",
-      });
+      toast.error(
+        "File size exceeds the 2MB limit! Please upload a smaller document.",
+        {
+          position: "top-center",
+        },
+      );
       e.target.value = "";
       return;
     }
@@ -1087,12 +1131,15 @@ export default function AgentPage() {
     skipWorkflowCheck = false,
   ) => {
     const textToSend = overrideText || inputVal;
-    
+
     if (!textToSend.trim()) {
       if (isBrainMode && selectedFile) {
-        toast.error("Please add a description of what you want to do with the document!", {
-          position: "top-center",
-        });
+        toast.error(
+          "Please add a description of what you want to do with the document!",
+          {
+            position: "top-center",
+          },
+        );
       }
       return;
     }
@@ -1251,10 +1298,19 @@ export default function AgentPage() {
               {/* Scrolling chat messages history list */}
               {isLoadingSession ? (
                 <div className="flex-1 flex flex-col items-center justify-center w-full my-auto opacity-70">
-                   <div className="h-12 w-12 bg-linear-to-tr from-blue-600 via-purple-500 to-red-500 p-0.5 shadow-md flex items-center justify-center shrink-0 aria-morph-loading mb-4 animate-spin rounded-xl">
-                      <svg fill="currentColor" viewBox="0 0 36 48" className="w-6 h-7 text-white" xmlns="http://www.w3.org/2000/svg"><path d="m0 6c10.1433 9.4404 25.8567 9.4404 36 0-9.4404 10.1433-9.4404 25.8567 0 36-10.1433-9.4404-25.8567-9.4404-36 0 9.44041-10.1433 9.44041-25.8567 0-36z" /></svg>
-                   </div>
-                   <p className="text-sm font-medium text-muted-foreground animate-pulse">Loading chat...</p>
+                  <div className="h-12 w-12 bg-linear-to-tr from-blue-600 via-purple-500 to-red-500 p-0.5 shadow-md flex items-center justify-center shrink-0 aria-morph-loading mb-4 animate-spin rounded-xl">
+                    <svg
+                      fill="currentColor"
+                      viewBox="0 0 36 48"
+                      className="w-6 h-7 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path d="m0 6c10.1433 9.4404 25.8567 9.4404 36 0-9.4404 10.1433-9.4404 25.8567 0 36-10.1433-9.4404-25.8567-9.4404-36 0 9.44041-10.1433 9.44041-25.8567 0-36z" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-medium text-muted-foreground animate-pulse">
+                    Loading chat...
+                  </p>
                 </div>
               ) : messages.length > 0 ? (
                 <AgentChatMessages
@@ -1458,9 +1514,12 @@ export default function AgentPage() {
                     type="button"
                     onClick={() => {
                       if (selectedFile) {
-                        toast.error("Please remove or submit the attached document before switching to Agent mode!", {
-                          position: "top-center",
-                        });
+                        toast.error(
+                          "Please remove or submit the attached document before switching to Agent mode!",
+                          {
+                            position: "top-center",
+                          },
+                        );
                         return;
                       }
                       setActiveMode("agent");

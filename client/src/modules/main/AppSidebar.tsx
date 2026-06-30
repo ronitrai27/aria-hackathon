@@ -85,8 +85,12 @@ export function AppSidebar() {
 
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
-  const [deleteSessionConfirmOpen, setDeleteSessionConfirmOpen] = useState(false);
-  const [sessionToDelete, setSessionToDelete] = useState<{ id: any; threadId: string } | null>(null);
+  const [deleteSessionConfirmOpen, setDeleteSessionConfirmOpen] =
+    useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<{
+    id: any;
+    threadId: string;
+  } | null>(null);
   const [clearHistoryConfirmOpen, setClearHistoryConfirmOpen] = useState(false);
 
   const searchParams = useSearchParams();
@@ -111,10 +115,7 @@ export function AppSidebar() {
     }
   };
 
-  const handleDeleteSession = (
-    sessionId: any,
-    threadIdToDelete: string,
-  ) => {
+  const handleDeleteSession = (sessionId: any, threadIdToDelete: string) => {
     setSessionToDelete({ id: sessionId, threadId: threadIdToDelete });
     setDeleteSessionConfirmOpen(true);
   };
@@ -396,7 +397,7 @@ export function AppSidebar() {
                             className="flex-1 flex items-center gap-2 min-w-0 pr-16"
                           >
                             <MessageSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                            <span className="truncate">
+                            <span className="truncate text-xs capitalize">
                               {session.title || "New Conversation"}
                             </span>
                           </Link>
@@ -405,7 +406,6 @@ export function AppSidebar() {
                           <div
                             className={cn(
                               "absolute right-2 flex items-center gap-1 pl-4 py-0.5 group-hover:flex hidden",
-                              isCurrent ? "bg-sidebar-accent" : "bg-sidebar",
                             )}
                           >
                             <button
@@ -568,17 +568,24 @@ export function AppSidebar() {
       </SidebarFooter>
 
       {/* Delete Chat Confirmation Dialog */}
-      <AlertDialog open={deleteSessionConfirmOpen} onOpenChange={setDeleteSessionConfirmOpen}>
+      <AlertDialog
+        open={deleteSessionConfirmOpen}
+        onOpenChange={setDeleteSessionConfirmOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Conversation</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this conversation? This action cannot be undone.
+              Are you sure you want to delete this conversation? This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={confirmDeleteSession}>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={confirmDeleteSession}
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -586,17 +593,24 @@ export function AppSidebar() {
       </AlertDialog>
 
       {/* Clear Chat History Confirmation Dialog */}
-      <AlertDialog open={clearHistoryConfirmOpen} onOpenChange={setClearHistoryConfirmOpen}>
+      <AlertDialog
+        open={clearHistoryConfirmOpen}
+        onOpenChange={setClearHistoryConfirmOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Clear Chat History</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to clear all chat sessions? This action cannot be undone.
+              Are you sure you want to clear all chat sessions? This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={confirmClearHistory}>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={confirmClearHistory}
+            >
               Clear All
             </AlertDialogAction>
           </AlertDialogFooter>

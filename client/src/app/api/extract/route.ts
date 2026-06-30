@@ -4,7 +4,7 @@ export async function POST(req: NextRequest) {
   try {
     const backendUrl = process.env.AGENT_BACKEND_URL || "http://localhost:8000";
     const formData = await req.formData();
-    
+
     console.log(`[API /api/extract] Proxying upload to: ${backendUrl}/extract`);
 
     const response = await fetch(`${backendUrl}/extract`, {
@@ -14,7 +14,9 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error(`[API /api/extract] Backend returned error: ${response.status} - ${errText}`);
+      console.error(
+        `[API /api/extract] Backend returned error: ${response.status} - ${errText}`,
+      );
       return NextResponse.json({ error: errText }, { status: response.status });
     }
 

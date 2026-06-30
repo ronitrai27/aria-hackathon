@@ -243,8 +243,6 @@ export function useAgentChat() {
           {
             role: "assistant",
             content: cleanTextResponse,
-            steps: finalSteps,
-            traceLogs: [...accumulatedTraceLogs],
             executionTime: Math.round((Date.now() - startTime) / 1000),
           },
         ]);
@@ -262,7 +260,6 @@ export function useAgentChat() {
                 message: "Failed to establish connection.",
               },
             ],
-            traceLogs: [...accumulatedTraceLogs],
             executionTime: Math.round((Date.now() - startTime) / 1000),
           },
         ]);

@@ -9,11 +9,15 @@ export async function POST(req: NextRequest) {
     }
 
     const user = await currentUser();
-    const userName = user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() : "User";
+    const userName = user
+      ? `${user.firstName || ""} ${user.lastName || ""}`.trim()
+      : "User";
 
     const backendUrl = process.env.AGENT_BACKEND_URL || "http://localhost:8000";
-    
-    console.log(`[API /api/graph/rebuild] Rebuilding graph for user: ${userId} (${userName})`);
+
+    console.log(
+      `[API /api/graph/rebuild] Rebuilding graph for user: ${userId} (${userName})`,
+    );
     const response = await fetch(`${backendUrl}/graph/${userId}/rebuild`, {
       method: "POST",
       headers: {
@@ -21,7 +25,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({ user_name: userName }),
     });
-    
+
     if (!response.ok) {
       const errText = await response.text();
       return NextResponse.json({ error: errText }, { status: response.status });

@@ -14,7 +14,9 @@ import {
   Play,
   Star,
   X,
+  HelpCircle,
 } from "lucide-react";
+import { HelpDialog } from "@/components/HelpDialog";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -117,6 +119,7 @@ export default function WorkflowPanel({
   const [scheduleFrequency, setScheduleFrequency] = useState("once");
 
   const currentWorkflow = savedWorkflows?.find((w) => w._id === savedWorkflowId);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   useEffect(() => {
     if (currentWorkflow?.scheduled) {
@@ -618,6 +621,18 @@ export default function WorkflowPanel({
                   </Button>
                 </div>
               ))}
+            {activeTab === "editor" && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsHelpOpen(true)}
+                className="h-9 w-9 rounded-lg bg-muted/30 hover:text-blue-600 transition-all cursor-pointer"
+                title="Help & Guides"
+              >
+                <HelpCircle className="h-4.5 w-4.5" />
+              </Button>
+            )}
 
             <Button
               type="button"
@@ -630,7 +645,7 @@ export default function WorkflowPanel({
             </Button>
           </div>
         </div>
-
+ 
         {/* Canvas */}
         <div className="flex-1 relative flex flex-col bg-muted/5 min-h-0">
           <div className="w-full h-full flex-1 min-h-0">
@@ -649,6 +664,7 @@ export default function WorkflowPanel({
           </div>
         </div>
       </div>
+      <HelpDialog isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
     </div>
-  );
+  );;
 }
