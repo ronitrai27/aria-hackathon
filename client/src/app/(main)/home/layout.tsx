@@ -11,6 +11,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/modules/main/AppSidebar";
 import { BreadCrumbs } from "@/modules/main/BreadCrumbs";
 import { ConnectorDropdown } from "./ConnectorDropdown";
+import { NavigationGuide } from "@/components/NavigationGuide";
 
 export default function HomeLayout({
   children,
@@ -25,7 +26,7 @@ export default function HomeLayout({
       <div className="flex flex-col flex-1 min-w-0">
         <header className="flex h-16 shrink-0 items-center justify-between px-4 border-b border-border">
           <div className="flex items-center gap-2">
-            <SidebarTrigger className="-ml-1" />
+            <SidebarTrigger id="tour-sidebar-trigger" className="-ml-1" />
             <div className="h-4 w-px bg-neutral-800 mx-2" />
             <BreadCrumbs />
           </div>
@@ -40,6 +41,7 @@ export default function HomeLayout({
             </Button>
 
             <Button
+              id="tour-help-btn"
               variant={"outline"}
               className="rounded-md bg-neutral-100 hover:text-blue-600 transition-all cursor-pointer"
               size={"icon-sm"}
@@ -56,6 +58,7 @@ export default function HomeLayout({
       <ConnectionDialog />
       <OnboardingDialog />
       <HelpDialog isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+      <NavigationGuide />
     </SidebarProvider>
   );
 }

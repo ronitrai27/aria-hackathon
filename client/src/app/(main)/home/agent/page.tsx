@@ -1511,6 +1511,7 @@ export default function AgentPage() {
                     Ask Brain
                   </button>
                   <button
+                    id="tour-chat-agent-toggle"
                     type="button"
                     onClick={() => {
                       if (selectedFile) {

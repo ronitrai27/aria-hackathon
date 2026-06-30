@@ -92,6 +92,7 @@ export function ConnectorDropdown() {
       onMouseLeave={() => setIsOpen(false)}
     >
       <Button
+        id="tour-connectors-btn"
         type="button"
         variant="outline"
         size="icon"

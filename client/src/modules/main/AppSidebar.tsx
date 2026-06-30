@@ -211,6 +211,7 @@ export function AppSidebar() {
                 return (
                   <SidebarMenuItem key={item.name}>
                     <SidebarMenuButton
+                      id={`tour-sidebar-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
                       asChild
                       isActive={isActive}
                       tooltip={item.name}

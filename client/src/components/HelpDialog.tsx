@@ -303,7 +303,17 @@ export function HelpDialog({ isOpen, onClose }: HelpDialogProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end px-6 py-4 border-t border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+          <Button
+            variant="outline"
+            onClick={() => {
+              onClose();
+              window.dispatchEvent(new CustomEvent("start-quick-tour"));
+            }}
+            className="rounded-lg px-4 py-2 text-xs font-bold border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900 cursor-pointer"
+          >
+            Start Tour
+          </Button>
           <Button
             onClick={onClose}
             className="rounded-lg px-5 py-2 text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
