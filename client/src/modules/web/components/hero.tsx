@@ -105,7 +105,7 @@ export default function Hero() {
 
             {/* Secondary CTA */}
             <Link
-              href="#cases"
+              href="#use-cases"
               className="group flex items-center justify-between w-full sm:w-auto gap-4 pl-6 pr-2 py-2 rounded-full text-[13px] font-semibold text-white bg-indigo-950/45 border border-indigo-500/20 hover:bg-indigo-900/50 hover:border-indigo-400/35 transition-all duration-300 backdrop-blur-md"
             >
               <span>See use cases</span>

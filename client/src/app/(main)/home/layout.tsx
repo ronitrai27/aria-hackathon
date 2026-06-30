@@ -1,17 +1,18 @@
 "use client";
 
-import { Cable, Mail, HelpCircle } from "lucide-react";
-import { useState, Suspense } from "react";
+import { HelpCircle } from "lucide-react";
+import { Suspense, useState } from "react";
 import { ConnectionDialog } from "@/components/ConnectionDialog";
-import { OnboardingDialog } from "@/components/OnboardingDialog";
 import { HelpDialog } from "@/components/HelpDialog";
+import { NavigationGuide } from "@/components/NavigationGuide";
+import { OnboardingDialog } from "@/components/OnboardingDialog";
 import { UserMenu } from "@/components/UserMenu";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/modules/main/AppSidebar";
 import { BreadCrumbs } from "@/modules/main/BreadCrumbs";
 import { ConnectorDropdown } from "./ConnectorDropdown";
-import { NavigationGuide } from "@/components/NavigationGuide";
+import { ExtensionDropdown } from "./ExtensionDropdown";
 
 export default function HomeLayout({
   children,
@@ -22,7 +23,11 @@ export default function HomeLayout({
 
   return (
     <SidebarProvider>
-      <Suspense fallback={<div className="w-64 bg-zinc-950 border-r border-zinc-800 animate-pulse h-full" />}>
+      <Suspense
+        fallback={
+          <div className="w-64 bg-zinc-950 border-r border-zinc-800 animate-pulse h-full" />
+        }
+      >
         <AppSidebar />
       </Suspense>
       <div className="flex flex-col flex-1 min-w-0">
@@ -34,13 +39,7 @@ export default function HomeLayout({
           </div>
           <div className="flex items-center gap-4">
             <ConnectorDropdown />
-            <Button
-              variant={"outline"}
-              className="rounded-md bg-neutral-100"
-              size={"icon-sm"}
-            >
-              <Cable />
-            </Button>
+            <ExtensionDropdown />
 
             <Button
               id="tour-help-btn"

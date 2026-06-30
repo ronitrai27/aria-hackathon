@@ -1,25 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
 import { useUser } from "@clerk/nextjs";
-import { api } from "../../convex/_generated/api";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useMutation, useQuery } from "convex/react";
+import {
+  ArrowRight,
+  Brain,
+  ChevronRight,
+  Globe,
+  Shield,
+  Sparkles,
+  Zap,
+} from "lucide-react";
+import Image from "next/image";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import Image from "next/image";
-import {
-  ChevronRight,
-  Sparkles,
-  ArrowRight,
-  Zap,
-  Brain,
-  Shield,
-  AppWindow,
-  Globe,
-} from "lucide-react";
-import { toast } from "sonner";
+import { api } from "../../convex/_generated/api";
 
 const appsToShow = [
   { name: "Gmail", src: "/gmail.png" },
@@ -79,6 +78,7 @@ export function OnboardingDialog() {
         occupation: occupation.trim() || undefined,
         age: parsedAge,
       });
+      localStorage.removeItem("aria_tour_seen");
       toast.success("Welcome aboard! Your setup is complete.");
       setIsOpen(false);
     } catch (error: any) {
@@ -252,24 +252,32 @@ export function OnboardingDialog() {
                   </div>
                 </div>
 
-                <div className="bg-[#fcfcfa] border border-zinc-200/80 rounded-xl p-3 flex justify-between items-center mt-1 shadow-xs">
-                  <div className="flex items-center gap-2">
-                    <Globe className="h-4 w-4 text-zinc-500" />
-                    <span className="text-xs text-zinc-600 font-medium truncate max-w-[200px]">
-                      chrome.google.com/webstore
-                    </span>
+                <a
+                  href="https://github.com/ronitrai27/aria-hackathon"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-[#fcfcfa] border border-zinc-200 hover:border-zinc-300 dark:bg-zinc-900/10 dark:border-zinc-800 rounded-xl p-3 flex justify-between items-center mt-1 shadow-xs hover:bg-zinc-50/50 transition-all duration-200 w-full cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Globe className="h-4 w-4 " />
+                    <div className="flex flex-col text-left">
+                      <span className="text-xs text-zinc-700  flex items-center gap-1.5">
+                        <span>Microsoft Edge Extension</span>
+                        <span className="text-[9px]  bg-amber-50 border border-amber-200/40 px-1.5 py-0.5 rounded-sm uppercase tracking-wider scale-95">
+                          Under Review
+                        </span>
+                      </span>
+                      <span className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 leading-normal">
+                        To start using it right now, you can install the
+                        extension directly from{" "}
+                        <span className=" font-semibold group-hover:underline">
+                          GitHub
+                        </span>
+                        .
+                      </span>
+                    </div>
                   </div>
-                  {/* <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() =>
-                      toast.success("Redirecting to Chrome Web Store (Demo)...")
-                    }
-                    className="text-xs font-semibold bg-zinc-950 hover:bg-zinc-900 text-white rounded-lg h-7 px-3 py-0 border-0 cursor-pointer"
-                  >
-                    Install
-                  </Button> */}
-                </div>
+                </a>
               </div>
 
               {/* Footer navigation */}

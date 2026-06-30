@@ -167,7 +167,7 @@ export function NavigationGuide() {
     if (currentUser?.onbording_dialog === true) {
       const tourSeen = localStorage.getItem("aria_tour_seen");
       if (!tourSeen) {
-        setTourStep(1);
+        setTourStep(0);
         setShow(true);
       }
     }

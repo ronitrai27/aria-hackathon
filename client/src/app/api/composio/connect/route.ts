@@ -80,7 +80,9 @@ export async function POST(request: Request) {
     }
 
     // 3. Generate redirect link (allowMultiple prevents "multiple accounts" error)
-    const origin = new URL(request.url).origin;
+    const origin =
+      process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+
     const callbackUrl = `${origin}/home/agent`;
     const linkRes = await client.connectedAccounts.link(userId, configId, {
       callbackUrl,

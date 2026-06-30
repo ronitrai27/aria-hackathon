@@ -191,6 +191,7 @@ export default function WorkflowPanel({
         }`}
       >
         <Button
+          id="tour-open-preview-btn"
           type="button"
           variant="ghost"
           size="icon"
