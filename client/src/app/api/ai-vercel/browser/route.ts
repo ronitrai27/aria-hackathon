@@ -5,7 +5,10 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../../../convex/_generated/api";
 import { redis } from "@/lib/redis";
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+const convex = new ConvexHttpClient(
+  process.env.NEXT_PUBLIC_CONVEX_URL ||
+    "https://wandering-antelope-3.convex.cloud",
+);
 
 const customOpenai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,

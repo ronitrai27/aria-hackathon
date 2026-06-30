@@ -157,6 +157,8 @@ docker build -t aria-client:latest \
   --build-arg NEXT_PUBLIC_CLERK_SIGN_UP_URL="/sign-up" \
   --build-arg NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL="/auth/callback" \
   --build-arg NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL="/auth/callback" \
+  --build-arg UPSTASH_REDIS_REST_URL="https://..." \
+  --build-arg UPSTASH_REDIS_REST_TOKEN="..." \
   ./client
 
 # Run locally

@@ -78,6 +78,8 @@ We do this using Docker **Build Arguments** (`ARG`):
     ```bash
     docker build -t aria-client:latest \
       --build-arg NEXT_PUBLIC_CONVEX_SITE_URL="https://wandering-antelope-3.convex.site" \
+      --build-arg UPSTASH_REDIS_REST_URL="https://..." \
+      --build-arg UPSTASH_REDIS_REST_TOKEN="..." \
       .
     ```
 

@@ -8,7 +8,10 @@ import * as fs from "fs";
 import * as path from "path";
 import { api } from "../../../../convex/_generated/api";
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+const convex = new ConvexHttpClient(
+  process.env.NEXT_PUBLIC_CONVEX_URL ||
+    "https://wandering-antelope-3.convex.cloud",
+);
 
 const customOpenai = createOpenAI({
   // apiKey: process.env.OPENAI_API_KEY,
