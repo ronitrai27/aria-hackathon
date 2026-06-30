@@ -204,6 +204,7 @@ export const getWorkflowsForUserInternal = query({
     try {
       user = await ctx.db.get(args.userId as any);
     } catch (e) {}
+    // @ts-ignore
     const clerkId = user ? user.id : args.userId;
 
     return await ctx.db

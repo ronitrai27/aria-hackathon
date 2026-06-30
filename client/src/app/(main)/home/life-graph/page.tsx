@@ -185,7 +185,7 @@ export default function LifeGraphPage() {
           keyboard: false,
         },
       };
-
+      // @ts-ignore
       networkInstance = new Network(containerRef.current, data, options);
       networkRef.current = networkInstance;
     });

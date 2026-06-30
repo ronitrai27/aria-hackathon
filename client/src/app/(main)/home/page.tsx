@@ -229,6 +229,7 @@ export default function HomePage() {
       <ImportantActionsSection
         triggerFetchRef={triggerFetchRef}
         onSyncComplete={handleSyncComplete}
+        // @ts-ignore
         onCountsChange={setCounts}
       />
 

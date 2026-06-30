@@ -1,7 +1,7 @@
 "use client";
 
 import { Cable, Mail, HelpCircle } from "lucide-react";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { ConnectionDialog } from "@/components/ConnectionDialog";
 import { OnboardingDialog } from "@/components/OnboardingDialog";
 import { HelpDialog } from "@/components/HelpDialog";
@@ -22,7 +22,9 @@ export default function HomeLayout({
 
   return (
     <SidebarProvider>
-      <AppSidebar />
+      <Suspense fallback={<div className="w-64 bg-zinc-950 border-r border-zinc-800 animate-pulse h-full" />}>
+        <AppSidebar />
+      </Suspense>
       <div className="flex flex-col flex-1 min-w-0">
         <header className="flex h-16 shrink-0 items-center justify-between px-4 border-b border-border">
           <div className="flex items-center gap-2">

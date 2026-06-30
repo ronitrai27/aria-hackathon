@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, Suspense } from "react";
 import { toast } from "sonner";
 import Typewriter from "typewriter-effect";
 import { Button } from "@/components/ui/button";
@@ -138,7 +138,7 @@ const agentSuggestions: SuggestionItem[] = [
   },
 ];
 
-export default function AgentPage() {
+function AgentPageContent() {
   const [inputVal, setInputVal] = useState("");
   const [isPageReady, setIsPageReady] = useState(false);
   const [selectedModel, setSelectedModel] = useState("gemini-2.5-flash");
@@ -2202,5 +2202,19 @@ export default function AgentPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AgentPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen w-full items-center justify-center bg-zinc-950">
+          <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+        </div>
+      }
+    >
+      <AgentPageContent />
+    </Suspense>
   );
 }
