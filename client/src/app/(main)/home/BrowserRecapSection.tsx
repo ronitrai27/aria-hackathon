@@ -9,6 +9,8 @@ import {
   Globe,
   Layout,
   RefreshCw,
+  Puzzle,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -122,6 +124,23 @@ const priorityBars: Record<string, React.ReactNode> = {
     </div>
   ),
 };
+
+function EmptyExtensionState() {
+  return (
+    <div className="flex flex-col items-center justify-center text-center p-6 border border-dashed border-border rounded-xl bg-neutral-50/50 flex-1 min-h-[220px] animate-in fade-in duration-300">
+      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-100 text-purple-600 mb-3 shadow-xs border border-purple-200/50">
+        <Puzzle size={18} />
+      </div>
+
+      <h4 className="text-sm font-semibold text-foreground tracking-tight max-w-[280px] leading-snug">
+        Looks like u havent downlaoded extension yet !!
+      </h4>
+      <p className="text-xs text-muted-foreground mt-1 max-w-[280px] leading-normal">
+        Get aria web tracker from microsoft edge / add-ons Now !!
+      </p>
+    </div>
+  );
+}
 
 export function BrowserRecapSection() {
   const { user } = useUser();
@@ -319,15 +338,12 @@ export function BrowserRecapSection() {
                 ))}
               </div>
             </div>
-          ) : recapError ? (
-            <div className="p-6 text-center border border-dashed border-border rounded-lg bg-neutral-50/50 flex-1 flex flex-col items-center justify-center">
-              <span className="text-sm text-muted-foreground">
-                Unable to map top sites.
-              </span>
-            </div>
-          ) : recapData &&
-            recapData.topSites &&
-            recapData.topSites.length > 0 ? (
+          ) : recapError ||
+            !recapData ||
+            !recapData.topSites ||
+            recapData.topSites.length === 0 ? (
+            <EmptyExtensionState />
+          ) : (
             <div className="flex flex-col gap-4">
               <div className="space-y-3.5">
                 {recapData.topSites.map((site) => {
@@ -369,12 +385,6 @@ export function BrowserRecapSection() {
                   );
                 })}
               </div>
-            </div>
-          ) : (
-            <div className="p-6 text-center border border-dashed border-border rounded-lg bg-neutral-50/50 flex-1 flex flex-col items-center justify-center">
-              <p className="text-sm text-muted-foreground">
-                No active domains recorded.
-              </p>
             </div>
           )}
         </div>
@@ -542,20 +552,12 @@ export function BrowserRecapSection() {
               <div className="h-4 bg-muted rounded-sm w-[88%]" />
             </div>
           </div>
-        ) : recapError ? (
-          <div className="p-6 text-center border border-dashed border-border rounded-lg bg-neutral-50/55">
-            <span className="text-sm text-red-500 font-medium">
-              ⚠ {recapError}
-            </span>
-            <Button
-              type="button"
-              onClick={handleRecapRefresh}
-              className="mt-3 block mx-auto text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-md"
-            >
-              Retry Fetching
-            </Button>
-          </div>
-        ) : recapData ? (
+        ) : recapError ||
+          !recapData ||
+          !recapData.topSites ||
+          recapData.topSites.length === 0 ? (
+          <EmptyExtensionState />
+        ) : (
           <div className="flex flex-col gap-4 max-h-[380px] overflow-y-auto pr-1">
             {/* Standup Summary Paragraph */}
             <div className="text-sm font-medium text-foreground bg-purple-500/5 border border-purple-500/10 p-4 rounded-lg leading-relaxed shadow-xs">
@@ -583,19 +585,6 @@ export function BrowserRecapSection() {
                 ))}
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="p-6 text-center border border-dashed border-border rounded-lg bg-neutral-50/50">
-            <p className="text-sm text-muted-foreground">
-              No recap data loaded yet.
-            </p>
-            <Button
-              type="button"
-              onClick={handleRecapRefresh}
-              className="mt-3 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-md"
-            >
-              Fetch Analytics
-            </Button>
           </div>
         )}
       </div>
