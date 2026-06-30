@@ -755,7 +755,9 @@ function AppNodePopover({
                           )}
                           <button
                             type="button"
-                            onClick={() => setHiddenParams((hp) => [...hp, key])}
+                            onClick={() =>
+                              setHiddenParams((hp) => [...hp, key])
+                            }
                             className="p-1 rounded text-neutral-400 hover:text-red-500 hover:bg-neutral-100 transition-colors cursor-pointer"
                             title="Remove field"
                           >
@@ -792,7 +794,9 @@ function AppNodePopover({
                       key={key}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 dark:bg-zinc-800 rounded-lg border border-neutral-200 dark:border-zinc-700 text-xs text-neutral-600 dark:text-neutral-350"
                     >
-                      <span className="font-medium capitalize">{key.replace(/_/g, " ")}</span>
+                      <span className="font-medium capitalize">
+                        {key.replace(/_/g, " ")}
+                      </span>
                       <button
                         type="button"
                         onClick={() =>
@@ -1213,7 +1217,9 @@ function AppNode({ data }: { data: any }) {
 
   const paramsMapping = composioConfig.params_mapping || {};
   const hiddenParams = composioConfig.hidden_params || [];
-  const paramCount = Object.keys(paramsMapping).filter((k) => !hiddenParams.includes(k)).length;
+  const paramCount = Object.keys(paramsMapping).filter(
+    (k) => !hiddenParams.includes(k),
+  ).length;
   const isFirst = data._isFirst === true;
 
   if (isFirst) {
@@ -1291,10 +1297,18 @@ function AppNode({ data }: { data: any }) {
               </div>
             ) : data.isRunsTab ? (
               <div className="flex items-center gap-2 node-meta-text">
-                <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-medium node-meta-text">
-                  <Check className="size-3.5 text-emerald-600 node-meta-icon" />
-                  <span>All params configured</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    data.onOpenSettings?.();
+                    data.setActiveTab?.("editor");
+                  }}
+                  className="flex items-center gap-1 text-[10px] cursor-pointer bg-white border px-2 py-0.5 rounded-sm active:scale-95 shadow-xs"
+                >
+                  <Settings className="size-3 " />
+                  <span>Edit your params</span>
+                </button>
                 {data.traceResult && (
                   <Popover>
                     <PopoverTrigger asChild>
@@ -1419,10 +1433,18 @@ function AppNode({ data }: { data: any }) {
             </div>
           ) : data.isRunsTab ? (
             <div className="flex items-center gap-2 node-meta-text">
-              <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-semibold node-meta-text">
-                <Check className="size-3.5 text-emerald-500 node-meta-icon" />
-                <span>All params configured</span>
-              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onOpenSettings?.();
+                  data.setActiveTab?.("editor");
+                }}
+                className="flex items-center gap-1 text-[10px] cursor-pointer bg-white border px-2 py-0.5 rounded-sm active:scale-95 shadow-xs"
+              >
+                <Settings className="size-3 " />
+                <span>Edit your params</span>
+              </button>
               {data.traceResult && (
                 <Popover>
                   <PopoverTrigger asChild>
@@ -1735,7 +1757,9 @@ export default function FlowPreview({
       } else if (nodeType === "composio_app") {
         const params = node.data?.composio_config?.params_mapping || {};
         const hiddenParams = node.data?.composio_config?.hidden_params || [];
-        const keys = Object.keys(params).filter((k) => !hiddenParams.includes(k));
+        const keys = Object.keys(params).filter(
+          (k) => !hiddenParams.includes(k),
+        );
         keys.forEach((k) => {
           const val = params[k];
           const valStr = val === null || val === undefined ? "" : String(val);
@@ -1808,6 +1832,7 @@ export default function FlowPreview({
           ...item.node.data,
           _isFirst: index === 0,
           onOpenSettings: () => setActivePopoverNodeId(item.node.id),
+          setActiveTab: (tab: "editor" | "runs") => setActiveTab?.(tab),
           isRunsTab: activeTab === "runs",
           isSimulationActive: isRunning,
           status: nodeStatuses?.[item.node.id] || "pending",

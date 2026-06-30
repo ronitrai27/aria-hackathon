@@ -18,6 +18,7 @@ export function useBrainChat() {
   >([]);
   const [pendingTasks, setPendingTasks] = useState<any[] | null>(null);
   const [pendingTasksStatus, setPendingTasksStatus] = useState<"pending" | "approved" | "rejected" | null>(null);
+  const [hasShownColdStartToast, setHasShownColdStartToast] = useState(false);
   
   const searchParams = useSearchParams();
   const [threadId, setThreadId] = useState(
@@ -81,7 +82,7 @@ export function useBrainChat() {
     const accumulatedSteps = [...initialSteps];
 
     // Helper to safely update or append the current turn's assistant message
-    const updateOrAddAssistantMessage = (content: string, overwrite = false) => {
+    const updateOrAddAssistantMessage = (content: string, overwrite = false, isError = false) => {
       setMessages((prev) => {
         const list = [...prev];
         
@@ -109,12 +110,14 @@ export function useBrainChat() {
           list[assistantIdx] = {
             ...list[assistantIdx],
             content: overwrite ? content : (list[assistantIdx].content + content),
+            isError: isError ? true : (list[assistantIdx] as any).isError,
           };
         } else {
           list.push({
             role: "assistant",
             content: content,
-          });
+            isError: isError,
+          } as any);
         }
         return list;
       });
@@ -306,7 +309,7 @@ export function useBrainChat() {
                 console.error("Brain SSE error payload:", payload.error);
                 accumulatedTraceLogs.push(`❌ Error: ${payload.error}`);
                 setActiveTraceLogs([...accumulatedTraceLogs]);
-                updateOrAddAssistantMessage(`An error occurred during execution: ${payload.error || "Unknown error"}`, true);
+                updateOrAddAssistantMessage("Agent can make mistakes sometimes or due to network latency streaming can be distrubed . sorry you can try again.", true, true);
               }
             } catch (err) {
               console.error(
@@ -325,7 +328,7 @@ export function useBrainChat() {
         `❌ Network stream error: ${err.message || err}`,
       );
       setActiveTraceLogs([...accumulatedTraceLogs]);
-      updateOrAddAssistantMessage(`An error occurred during execution: ${err.message || err}`, true);
+      updateOrAddAssistantMessage("Agent can make mistakes sometimes or due to network latency streaming can be distrubed . sorry you can try again.", true, true);
     } finally {
       // Finalize the last assistant message with execution time
       const finalTime = Math.round((Date.now() - startTime) / 1000);
@@ -373,6 +376,14 @@ export function useBrainChat() {
   const sendMessage = useCallback(
     async (textToSend: string, file: File | null = null) => {
       if (!textToSend.trim()) return;
+
+      if (!hasShownColdStartToast) {
+        toast.info("Note: The first response from the agent typically takes 15-20s due to a serverless cold start.", {
+          position: "bottom-right",
+          duration: 7000,
+        });
+        setHasShownColdStartToast(true);
+      }
 
       const startTime = Date.now();
       const initialSteps: Array<{ worker: string; status: string; message: string }> = file
@@ -512,8 +523,9 @@ export function useBrainChat() {
           ...prev,
           {
             role: "assistant",
-            content: `An error occurred: ${error.message || error}`,
-          },
+            content: "Agent can make mistakes sometimes or due to network latency streaming can be distrubed . sorry you can try again.",
+            isError: true,
+          } as any,
         ]);
       } finally {
         setIsGenerating(false);
@@ -522,7 +534,7 @@ export function useBrainChat() {
         setActiveTraceLogs([]);
       }
     },
-    [user?._id, user?.name, threadId],
+    [user?._id, user?.name, threadId, hasShownColdStartToast],
   );
 
   // ── Approve/Reject Tasks ───────────────────────────────────────────────────
@@ -587,8 +599,9 @@ export function useBrainChat() {
           ...prev,
           {
             role: "assistant",
-            content: `Failed to confirm tasks: ${error.message || error}`,
-          },
+            content: "Agent can make mistakes sometimes or due to network latency streaming can be distrubed . sorry you can try again.",
+            isError: true,
+          } as any,
         ]);
       } finally {
         setIsGenerating(false);

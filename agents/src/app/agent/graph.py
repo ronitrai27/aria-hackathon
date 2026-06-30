@@ -75,8 +75,10 @@ Each AI node must have exactly ONE field:
 ## INTEGRATION ACTIONS:
 For apps like Gmail, Slack, Google Drive, Google Docs, Notion, Jira, GitHub, etc.
 - You can draft actions with their names (e.g. `GMAIL_SEND_EMAIL`, `SLACK_SEND_MESSAGE`).
+- NEVER use helper/lookup actions (like `SLACK_FIND_CHANNELS`, `SLACK_GET_CHANNEL_ID`, `GMAIL_SEARCH_THREADS`, etc.) to find channel names, channel IDs, user IDs, email IDs, or message IDs before executing an action. Assumes the user will configure the channel names, emails, dates, or IDs themselves! Keep the workflow extremely simple.
 - For Google Docs, use `GOOGLEDOCS_CREATE_DOCUMENT_MARKDOWN` or `GOOGLEDOCS_CREATE_DOCUMENT` (do NOT use Google Drive tools to create docs).
 - Exclude unnecessary optional/technical parameters to keep it simple. Only include core inputs (e.g. recipient_email, subject, body).
+- Fill in fields/parameters with either a sensible placeholder/reference from a previous step (using {{step_N}}), or a brief instruction text (e.g. "Enter your slack channel name") indicating what the user should fill in.
 
 ## STEP CHAINING:
 - Pass outputs between steps using `{{step_N}}` (or `{{step_N.some_field}}` if applicable), where N is the 1-based step index.
@@ -123,6 +125,8 @@ Your job is to audit and correct the draft workflow staged by the Designer Agent
 
 ## CRITICAL RULES:
 - Exclude optional, highly technical parameters to keep the user form simple. Include only important fields (e.g., recipient_email, subject, body for email).
+- NEVER use helper/lookup actions (like `SLACK_FIND_CHANNELS`, `SLACK_GET_CHANNEL_ID`, `GMAIL_SEARCH_THREADS`, etc.) to search/retrieve channel IDs, email IDs, user IDs, or message IDs. Keep the flow simple and assume the user will configure these inputs themselves. If the designer generated any lookup steps, delete/remove them entirely and bind the integration step directly.
+- Fill the fields/parameters with either a placeholder/reference from a previous step, or a short instruction text (e.g., "Enter your slack channel name") indicating what the user should fill in.
 """
 
 

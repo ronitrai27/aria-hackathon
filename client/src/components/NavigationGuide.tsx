@@ -25,7 +25,7 @@ const STEPS: StepConfig[] = [
     id: 2,
     targetId: "tour-connectors-btn",
     title: "Available Connectors",
-    description: "Connect external integrations like Gmail, Slack, and GitHub to supercharge your AI workflows.",
+    description: "Connect external integrations like Gmail, Slack, and Google Calendar to supercharge your AI workflows.",
   },
   {
     id: 3,

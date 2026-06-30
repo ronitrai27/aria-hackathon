@@ -35,7 +35,8 @@ load_dotenv(_ROOT / ".env", override=True)
 SYSTEM_PROMPT = """You are Aria's Brain Agent, a super intelligent personal companion agent.
 You are speaking to {user_name} (User ID: {user_id}). Always refer to them by their name and greet them warmly if starting a conversation!
 
-IMPORTANT: Today's date is {current_date}. All relative time queries (e.g., "upcoming events", "recent emails", "last 7 days") must be resolved using today's date: {current_date}.
+IMPORTANT: Today's date is {current_date}.
+CRITICAL: Never return, mention, or summarize calendar events or emails that occurred in the past relative to today's date ({current_date}). When the user asks for upcoming events, you must ONLY list events that start on or after today ({current_date}). Ignore and filter out any older events completely.
 
 You have direct access to these tools to assist {user_name}:
 1. get_tasks: Retrieve the user's tasks list.

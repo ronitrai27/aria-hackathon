@@ -178,8 +178,48 @@ export const createTasks = mutation({
 
     for (const task of batch) {
       const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-      const sDate = task.startDate !== undefined ? task.startDate : (task.endDate !== undefined ? task.endDate - 2 * ONE_DAY_MS : now);
-      const eDate = task.endDate !== undefined ? task.endDate : (task.startDate !== undefined ? task.startDate + 2 * ONE_DAY_MS : now + 2 * ONE_DAY_MS);
+      const sDateRaw =
+        task.startDate !== undefined
+          ? task.startDate
+          : task.endDate !== undefined
+            ? task.endDate - 2 * ONE_DAY_MS
+            : now;
+      const eDateRaw =
+        task.endDate !== undefined
+          ? task.endDate
+          : task.startDate !== undefined
+            ? task.startDate + 2 * ONE_DAY_MS
+            : now + 2 * ONE_DAY_MS;
+
+      // Sanitize start/end dates against year/month hallucinations
+      const currentYear = new Date(now).getFullYear();
+      const currentMonth = new Date(now).getMonth();
+
+      let sDateObj = new Date(sDateRaw);
+      let eDateObj = new Date(eDateRaw);
+      const originalDurationMs = eDateRaw - sDateRaw;
+
+      // Force year to current year
+      sDateObj.setFullYear(currentYear);
+      eDateObj.setFullYear(currentYear);
+
+      // Overwrite month only if it is behind our current month
+      if (sDateObj.getMonth() < currentMonth) {
+        sDateObj.setMonth(currentMonth);
+      }
+      if (eDateObj.getMonth() < currentMonth) {
+        eDateObj.setMonth(currentMonth);
+      }
+
+      // If adjustment causes end date to be before start date, shift it forward
+      if (eDateObj.getTime() < sDateObj.getTime()) {
+        const durationToUse =
+          originalDurationMs > 0 ? originalDurationMs : 2 * ONE_DAY_MS;
+        eDateObj = new Date(sDateObj.getTime() + durationToUse);
+      }
+
+      const sDate = sDateObj.getTime();
+      const eDate = eDateObj.getTime();
 
       // Check duplicate using both IDs
       const existingConvex = await ctx.db
@@ -249,6 +289,7 @@ export const getBrowserActivity = query({
     try {
       user = await ctx.db.get(args.userId as any);
     } catch (e) {}
+    // @ts-ignore
     const clerkId = user ? user.id : args.userId;
 
     // Fetch recent browser data entries for the user
@@ -258,9 +299,19 @@ export const getBrowserActivity = query({
       .order("desc")
       .take(1000);
 
-    console.log("[getBrowserActivity Query] Total rows found in DB:", rows.length);
+    console.log(
+      "[getBrowserActivity Query] Total rows found in DB:",
+      rows.length,
+    );
     if (rows.length > 0) {
-      console.log("[getBrowserActivity Query] First row openedAt:", rows[0].openedAt, "duration:", rows[0].duration, "url:", rows[0].url);
+      console.log(
+        "[getBrowserActivity Query] First row openedAt:",
+        rows[0].openedAt,
+        "duration:",
+        rows[0].duration,
+        "url:",
+        rows[0].url,
+      );
     }
 
     // Helper function to group rows by domain given a time filter
@@ -280,7 +331,9 @@ export const getBrowserActivity = query({
 
         let domain = "";
         try {
-          const urlWithProto = r.url.startsWith("http") ? r.url : `https://${r.url}`;
+          const urlWithProto = r.url.startsWith("http")
+            ? r.url
+            : `https://${r.url}`;
           const parsed = new URL(urlWithProto);
           domain = parsed.hostname.replace("www.", "");
         } catch (e) {
@@ -317,7 +370,9 @@ export const getBrowserActivity = query({
 
     // 2. Fallback: if < 10 unique domains match the 48-hour range, include older browser activity too
     if (filtered.length < 10 && rows.length > 0) {
-      console.log("[getBrowserActivity Query] Less than 10 items in last 48h. Falling back to use older database data.");
+      console.log(
+        "[getBrowserActivity Query] Less than 10 items in last 48h. Falling back to use older database data.",
+      );
       grouped = getGrouped(0);
       filtered = grouped.filter((g) => g.totalDurationMs >= twoMinutesMs);
     }
@@ -337,7 +392,10 @@ export const getBrowserActivity = query({
       .sort((a, b) => b.totalDurationMs - a.totalDurationMs)
       .slice(0, 30);
 
-    console.log("[getBrowserActivity Query] Returning aggregated items count:", result.length);
+    console.log(
+      "[getBrowserActivity Query] Returning aggregated items count:",
+      result.length,
+    );
     return result;
   },
 });

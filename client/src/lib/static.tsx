@@ -1,7 +1,6 @@
 export const connectorIcons: Record<string, string> = {
   Gmail: "/gmail.png",
   Slack: "/slack.png",
-  GitHub: "/github.png",
   Reddit: "/reddit.png",
   Calendar: "/calendar.png",
   LinkedIn: "/linkedin.png",

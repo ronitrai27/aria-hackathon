@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { Edit2 } from "lucide-react";
+import { Edit2, RefreshCw } from "lucide-react";
 import Image from "next/image";
 import {
   MutableRefObject,
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { useAgentStore } from "@/hooks/useAgentStore";
 import { useStoreUser } from "@/hooks/useStoreUser";
 import { api } from "../../../../convex/_generated/api";
+import { toast } from "sonner";
 
 // ─── Tool icons (from /public) ───────────────────────────────────────────────
 
@@ -276,6 +277,17 @@ export function ImportantActionsSection({
   const triggerFetch = useCallback(
     async (channel?: string) => {
       if (!convexUserId || fetching) return;
+
+      // Check if Gmail and Calendar are connected
+      const gmailConn = isConnected("gmail");
+      const calConn = isConnected("calendar");
+      if (!gmailConn || !calConn) {
+        toast.error("Please connect Gmail and Google Calendar first!", {
+          description: "Both connections are required to fetch actions.",
+        });
+        return;
+      }
+
       setFetching(true);
       const ch = channel ?? slackChannel;
       try {
@@ -418,11 +430,28 @@ export function ImportantActionsSection({
             {totalCount}
           </span>
         )}
+
+        <Button
+          type="button"
+          onClick={() => triggerFetch()}
+          disabled={fetching}
+          variant="outline"
+          size="sm"
+          className="flex items-center gap-1.5 ml-2 h-7 px-2.5 text-xs border border-border rounded-md hover:bg-neutral-100 hover:text-foreground cursor-pointer shrink-0"
+        >
+          <RefreshCw size={11} className={fetching ? "animate-spin" : ""} />
+          Refresh
+        </Button>
+
         {fetching && (
           <span className="text-xs text-muted-foreground animate-pulse ml-2">
             Syncing…
           </span>
         )}
+
+        <span className="ml-auto text-xs text-muted-foreground italic hidden sm:inline">
+          Auto gets refreshed every 6 hours, or refresh manually!
+        </span>
       </div>
 
       {/* Cards */}

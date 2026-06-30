@@ -24,7 +24,6 @@ import { toast } from "sonner";
 const appsToShow = [
   { name: "Gmail", src: "/gmail.png" },
   { name: "Slack", src: "/slack.png" },
-  { name: "GitHub", src: "/github.png" },
   { name: "Notion", src: "/notion.webp" },
   { name: "Discord", src: "/discord.png" },
   { name: "Linear", src: "/linear.jpeg" },
