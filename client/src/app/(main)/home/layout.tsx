@@ -1,6 +1,7 @@
 import { Cable, Mail } from "lucide-react";
 import type React from "react";
 import { ConnectionDialog } from "@/components/ConnectionDialog";
+import { OnboardingDialog } from "@/components/OnboardingDialog";
 import { UserMenu } from "@/components/UserMenu";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -45,6 +46,7 @@ export default function HomeLayout({
         <main className="flex-1 overflow-auto p-6">{children}</main>
       </div>
       <ConnectionDialog />
+      <OnboardingDialog />
     </SidebarProvider>
   );
 }

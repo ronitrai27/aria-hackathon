@@ -138,3 +138,29 @@ export const getAllUsersInternal = query({
     return await ctx.db.query("users").collect();
   },
 });
+
+export const completeOnboarding = mutation({
+  args: {
+    occupation: v.optional(v.string()),
+    age: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("id", identity.subject))
+      .unique();
+    if (!user) {
+      throw new Error("User not found");
+    }
+    await ctx.db.patch(user._id, {
+      occupation: args.occupation,
+      age: args.age,
+      onbording_dialog: true,
+    });
+    return user._id;
+  },
+});
